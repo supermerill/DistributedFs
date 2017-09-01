@@ -8,14 +8,21 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
-import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
-import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.db.StorageManager;
-import remi.distributedFS.util.ByteBuff;
+import remi.distributedFS.fs.FileSystemManager;
 
 public class FsTableLocal implements StorageManager{
 
+	public static final byte ERASED = 0;
+	public static final byte DIRECTORY = 1;
+	public static final byte FILE = 2;
+	public static final byte CHUNK = 3;
+	public static final byte EXTENSION = 4;
+	public static final byte MOVING = 5;
+
+	FileSystemManager manager;
+	
 	FsDirectory root;
 	
 	static final int FS_SECTOR_SIZE = 512; // bytes, at least 384 to have enough place to allocate other sector in a linked chain way
@@ -26,11 +33,14 @@ public class FsTableLocal implements StorageManager{
 	List<Long> unusedSectors = new ArrayList<>();
 	
 	long fileSize = 0;
+	private String rootRep;
 	
 	//TODO: create a separate thread for flushing/updating
 	
 	
-	public FsTableLocal(String filename) throws IOException{
+	public FsTableLocal(String rootRep, String filename, FileSystemManager manager) throws IOException{
+		this.manager = manager;
+		this.rootRep = rootRep;
 		 buffer = ByteBuffer.allocate(FS_SECTOR_SIZE);
 		
 		 File fic = new File(filename);
@@ -41,6 +51,14 @@ public class FsTableLocal implements StorageManager{
 		//get each unused position inside
 		fileSize = fsFile.size();
 	}
+	
+	
+
+	public FileSystemManager getManager() {
+		return manager;
+	}
+
+
 
 	protected FsDirectory readOrCreate(int sectorPos) {
 		
@@ -85,11 +103,12 @@ public class FsTableLocal implements StorageManager{
 			 * 0: erased
 			 * 1: directory
 			 * 2: file
+			 * 2: chunk
 			 * 3: extended
 			 * 4: in trasferts?
 			 */
 			byte state = buffer.get();
-			if(state == 1){
+			if(state == DIRECTORY){
 				//ok, read!
 				
 				FsDirectoryFromFile dir = new FsDirectoryFromFile(this, sectorPos, null);
@@ -101,17 +120,19 @@ public class FsTableLocal implements StorageManager{
 
 				return dir;
 			
-			}else if(state == 0){
+			}else if(state == ERASED){
 				//erased, return null;
 				System.err.println("error, shouldn't happen: you try to read a sector that is erased.");
 				return null;
-			}else if(state == 2){
+			}else if(state == FILE){
 				//TODO: get/create file
-			}else if(state == 3){
+			}else if(state == CHUNK){
+				//TODO: get/create chunk
+			}else if(state == EXTENSION){
 				//error
 				System.err.println("error, shouldn't happen: you try to read a sector that is an extension of an other? entry.");
 				return null;
-			}else if(state == 4){
+			}else if(state == MOVING){
 				//this entry is moved
 				//TODO: check te new sector
 			}
@@ -149,7 +170,6 @@ public class FsTableLocal implements StorageManager{
 			idRet = fileSize/FS_SECTOR_SIZE;
 			fileSize += FS_SECTOR_SIZE;
 		}
-		
 
 		System.out.println("new sector="+idRet);
 		return idRet;
@@ -168,26 +188,11 @@ public class FsTableLocal implements StorageManager{
 			throw new RuntimeException(e); 
 		}
 	}
+	
 
-	//return a sector, ie 64 bytes
-	void getContentAt(ByteBuff ret, long fsSector, int nbSector){
-		
-	}
-	
-	void setContentAt(ByteBuff dataToWrite, long fsSector, int nbSector){
-		
-	}
-	
-	void releaseFolder(FsDirectory folderToRemove){
-		
-	}
-	
-	void releaseFile(FsFile folderToRemove){
-		
-	}
-	
-	void releaseChunk(FsChunk toRemove){
-		
+
+	public void releaseSector(long id) {
+		unusedSectors.add(id);
 	}
 	
 	@Override
@@ -196,18 +201,19 @@ public class FsTableLocal implements StorageManager{
 	}
 
 	public long getComputerId() {
-		// TODO Auto-generated method stub
-		return 0;
+		return manager.getComputerId();
 	}
 
 	public long getUserId() {
-		// TODO Auto-generated method stub
-		return 0;
+		return manager.getUserId();
 	}
 
 	public long getGroupId() {
-		// TODO Auto-generated method stub
-		return 0;
+		return manager.getGroupId();
+	}
+	
+	public String getRootRep(){
+		return rootRep;
 	}
 	
 	

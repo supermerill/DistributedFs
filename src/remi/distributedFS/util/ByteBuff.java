@@ -36,6 +36,7 @@ public class ByteBuff
 	public ByteBuff(final int initialCapacity)
 	{
 		this.buffer = new byte[initialCapacity];
+		this.limit = initialCapacity;
 	}
 	
 	/**
@@ -540,6 +541,13 @@ public class ByteBuff
 		limit = 0;
 		position = 0;
 		return this;
+	}
+
+	public ByteBuffer toByteBuffer() {
+		ByteBuffer buff = ByteBuffer.wrap(this.buffer);
+		buff.position(position);
+		buff.limit(limit);
+		return buff;
 	}
 	
 }

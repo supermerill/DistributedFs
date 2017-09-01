@@ -2,16 +2,22 @@ package remi.distributedFS.db.impl;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.List;
 
 import remi.distributedFS.util.Ref;
 
 public class ListeningArrayList<E> extends AbstractList<E>{
 	
-	ArrayList<E> lst;
-	Ref<Boolean> isDirty;
+	final ArrayList<E> lst;
+	final Ref<Boolean> isDirty;
 	
 	public ListeningArrayList(Ref<Boolean> isDirty){
 		lst = new ArrayList<>();
+		this.isDirty = isDirty;
+	}
+	
+	public ListeningArrayList(List<?extends E> lst, Ref<Boolean> isDirty){
+		this.lst = new ArrayList<>(lst);
 		this.isDirty = isDirty;
 	}
 

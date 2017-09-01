@@ -1,10 +1,8 @@
 package remi.distributedFS.fs;
 
 import remi.distributedFS.datastruct.FsDirectory;
-import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
-import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.net.ClusterManager;
 
 public interface FileSystemManager {
@@ -22,5 +20,11 @@ public interface FileSystemManager {
 	//not used
 	public StorageManager getDb();
 	public ClusterManager getNet();
+
+	public long getComputerId();
+	public long getUserId();
+	public long getGroupId();
+	
+	public void requestDirUpdate();
 
 }

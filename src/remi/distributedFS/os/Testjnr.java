@@ -136,6 +136,12 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public void truncate(long size) {
+			// TODO Auto-generated method stub
+			
+		}
 	}
 	
 	static class FsDir extends FsObjectImpl implements FsDirectory{
@@ -249,6 +255,30 @@ public class Testjnr {
 			public ClusterManager getNet() {
 				// TODO Auto-generated method stub
 				return null;
+			}
+
+			@Override
+			public long getComputerId() {
+				// TODO Auto-generated method stub
+				return 0;
+			}
+
+			@Override
+			public long getUserId() {
+				// TODO Auto-generated method stub
+				return 0;
+			}
+
+			@Override
+			public long getGroupId() {
+				// TODO Auto-generated method stub
+				return 0;
+			}
+
+			@Override
+			public void requestDirUpdate() {
+				// TODO Auto-generated method stub
+				
 			}
 		};
 //		memfs = new MyMemoryFs2();

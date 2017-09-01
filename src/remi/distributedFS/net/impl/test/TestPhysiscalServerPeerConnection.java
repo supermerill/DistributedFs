@@ -27,10 +27,10 @@ public class TestPhysiscalServerPeerConnection {
 	}
 	public void connect() throws InterruptedException{
 
-		serv1 = new PhysicalServer(true); serv1.listen(17830);
-		serv2 = new PhysicalServer(true); serv2.listen(17831);
-		serv3 = new PhysicalServer(true); serv3.listen(17832);
-		serv4 = new PhysicalServer(true); serv4.listen(17833);
+		serv1 = new PhysicalServer(null, true); serv1.listen(17830);
+		serv2 = new PhysicalServer(null, true); serv2.listen(17831);
+		serv3 = new PhysicalServer(null, true); serv3.listen(17832);
+		serv4 = new PhysicalServer(null, true); serv4.listen(17833);
 		draw();
 		serv1.connectTo("localhost", 17831);
 //		serv1.connectTo("localhost", 17832);

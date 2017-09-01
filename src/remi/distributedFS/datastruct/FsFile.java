@@ -50,19 +50,25 @@ public interface FsFile extends FsObject {
 		 * @param offset from where we read on this file.
 		 */
 		public static void read(FsFile file, ByteBuff buff, long offset) {
+			System.out.println("READ FILE : "+file.getPath()+" read by "+offset+" -> "+(offset+buff.limit()-buff.position()));
+			System.out.println("now pos = "+buff.position());
 			//choose first chunk
 			int chunkIdx = (int) (offset/file.getChunkSize());
+			if(file.getNbChunks()==1) chunkIdx = 0;
 			int chunkOffset = (int) (offset - file.getChunkSize() * chunkIdx);
 			//first read
 			System.out.println("read first chunk");
 			FsChunk chunk = file.getChunks().get(chunkIdx);
 			if(chunk.currentSize()-chunkOffset>buff.limit()-buff.position()){
 				//read some part
+				System.out.println("read inside : "+(buff.limit()-buff.position()));
 				chunk.read(buff, chunkOffset, buff.limit()-buff.position());
 			}else{
 				//full read
+				System.out.println("read a part : "+chunk.currentSize()+" / "+(buff.limit()-buff.position()));
 				chunk.read(buff, chunkOffset, chunk.currentSize());
 			}
+			System.out.println("now pos = "+buff.position());
 			chunkIdx++;
 			//other reads
 			while(buff.position()<buff.limit()){
@@ -75,6 +81,7 @@ public interface FsFile extends FsObject {
 					//full read
 					chunk.read(buff, 0, chunk.currentSize());
 				}
+				System.out.println("now pos = "+buff.position());
 				chunkIdx++;
 			}
 		}
@@ -89,31 +96,38 @@ public interface FsFile extends FsObject {
 		}
 	
 		public static void write(FsFile file, ByteBuff buff, long offset) {
+			System.out.println("WRITE FILE : "+file.getPath()+" writen by "+offset+" -> "+(offset+buff.limit()-buff.position()));
+			System.out.println("now pos = "+buff.position());
 			//choose first chunk
 			int chunkIdx = (int) (offset/file.getChunkSize());
+			if(file.getNbChunks()==1) chunkIdx = 0;
 			int chunkOffset = (int) (offset - file.getChunkSize() * chunkIdx);
-			//first read
+			//first write
 			System.out.println("write first chunk");
 			FsChunk chunk = file.getChunks().get(chunkIdx);
-			if(chunk.currentSize()-chunkOffset>buff.limit()-buff.position()){
-				//read some part
+			if(chunk.currentSize()-chunkOffset>buff.limit()-buff.position() ||  file.getNbChunks()==chunkIdx+1){
+				System.out.println("write inside : "+(buff.limit()-buff.position()));
+				//write some part
 				chunk.write(buff, chunkOffset, buff.limit()-buff.position());
 			}else{
-				//full read
+				//full write
+				System.out.println("write a part : "+chunk.currentSize()+" / "+(buff.limit()-buff.position()));
 				chunk.write(buff, chunkOffset, chunk.currentSize());
 			}
+			System.out.println("now pos = "+buff.position());
 			chunkIdx++;
-			//other reads
+			//other writes
 			while(buff.position()<buff.limit()){
 				System.out.println("write chunk n°"+chunkIdx+", now i need "+(buff.limit()-buff.position())+"more");
 				chunk = file.getChunks().get(chunkIdx);
-				if(chunk.currentSize()>buff.limit()-buff.position()){
-					//read some part
+				if(chunk.currentSize()>buff.limit()-buff.position() || file.getNbChunks()==chunkIdx+1){
+					//write some part
 					chunk.write(buff, 0, buff.limit()-buff.position());
 				}else{
-					//full read
+					//full write
 					chunk.write(buff, 0, chunk.currentSize());
 				}
+				System.out.println("now pos = "+buff.position());
 				chunkIdx++;
 			}
 		}
@@ -122,4 +136,6 @@ public interface FsFile extends FsObject {
 			return file.getChunks().get(i);
 		}
 	}
+
+	public void truncate(long size);
 }

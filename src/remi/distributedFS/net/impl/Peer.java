@@ -348,7 +348,7 @@ public class Peer implements Runnable {
 				throw new IOException("End of stream");
 			// read message
 			try {
-				ByteBuff buffIn = new ByteBuff(4).limit(4);
+				ByteBuff buffIn = new ByteBuff(4);
 				streamIn.read(buffIn.array(), 0, 4);
 				int nbBytes = buffIn.getInt();
 				buffIn.limit(nbBytes).rewind();

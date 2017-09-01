@@ -2,6 +2,7 @@ package remi.distributedFS.os;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.file.Paths;
 import java.util.Iterator;
 
 import com.kenai.jffi.MemoryIO;
@@ -21,6 +22,7 @@ import remi.distributedFS.datastruct.FsDirectory;
 import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.*;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
+import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.datastruct.PUGA;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.util.ByteBuff;
@@ -50,9 +52,41 @@ public class JnrfuseImpl extends FuseStubFS {
 		super();
 		this.manager = manager;
 	}
+	
+	public void init(char driveletter){
+		
+		try {
+		    try {
+		        String path;
+		        switch (Platform.getNativePlatform().getOS()) {
+		            case WINDOWS:
+		                path = (""+driveletter).toUpperCase()+":\\";
+		                break;
+		            default:
+		                path = "/tmp/mntm_"+driveletter;
+		        }
+		        System.out.println("prepare to mount into "+path);
+			    try {
+			    	mount(Paths.get(path), false, false);
+			    }catch(Exception e1){
+			    	e1.printStackTrace();
+			    	System.out.println(e1.getLocalizedMessage());
+			    	throw new RuntimeException(e1);
+			    }
+		        System.out.println("mounted "+path);
+		    }catch(Throwable e2){
+		    	e2.printStackTrace();
+		    	System.out.println(e2.getLocalizedMessage());
+		    } finally {
+//		    	umount();
+		    }
+	    }catch(Throwable e3){
+	    	e3.printStackTrace();
+	    }
+	}
 
 	public static short modeToPUGA(long mode){
-		PUGA puga = new PUGA((byte)0);
+		PUGA puga = new PUGA((short)0);
 		puga.computerRead = true;
 		puga.computerWrite = true;
 		puga.userRead = (FileStat.S_IRUSR & mode) != 0;
@@ -140,7 +174,7 @@ public class JnrfuseImpl extends FuseStubFS {
         		return -ErrorCodes.ENOENT();
         	}
         	FsFile fic = dir.createSubFile(getPathObjectName(manager.getRoot(), path));
-        	fic.rearangeChunks(128, 0);
+        	fic.rearangeChunks(128, 1);
         	fic.setUserId(getContext().uid.get());
         	fic.setGroupId(getContext().gid.get());
         	
@@ -385,9 +419,29 @@ public class JnrfuseImpl extends FuseStubFS {
     }
 
     @Override
-    @NotImplemented
     public int truncate(String path, @off_t long size) {
-        return 0;
+    	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+    	System.out.println(">>>>NC truncate for (path) : "+path+", for new size : "+size);
+    	FsFile fic = getPathFile(manager.getRoot(), path);
+    	if(fic==null){
+            return -ErrorCodes.ENOENT();
+    	}
+    	if(size > Integer.MAX_VALUE){
+            return -ErrorCodes.EMSGSIZE();
+    	}
+    	try{
+    		
+	    	fic.truncate(size);
+
+	    	// save/propagate
+	    	fic.flush();
+        	manager.propagateChange(fic);
+        	
+	    	return 0;
+    	}catch(Exception e){
+    		e.printStackTrace();
+    		return -ErrorCodes.EIO();
+    	}
     }
 
     @Override
@@ -424,7 +478,6 @@ public class JnrfuseImpl extends FuseStubFS {
     	    	return 0;
     		}
 	    	ByteBuff buff = new ByteBuff(readsize);
-	    	buff.limit((int)readsize);
 	    	FsFile.FsFileMethods.read(fic, buff, offset);
 	
 	    	buf.put(0, buff.array(), 0, readsize);
@@ -447,26 +500,21 @@ public class JnrfuseImpl extends FuseStubFS {
     	if(size > Integer.MAX_VALUE){
             return -ErrorCodes.EMSGSIZE();
     	}
-    	int readsize = (int) size;
-    	if(readsize+offset>fic.getSize()){
-//            return -ErrorCodes.ENODATA();
-    		readsize = (int) (fic.getSize() - offset);
-        	System.out.println("write : reduce size read to'"+readsize+"' ("+fic.getSize()+" - "+offset+")");
-    		if(readsize<0)  return -ErrorCodes.ENODATA();
-    	}
+    	int writesize = (int) size;
     	try{
-	    	ByteBuff buff = new ByteBuff(readsize);
-	    	buff.limit((int)readsize);
+	    	ByteBuff buff = new ByteBuff(writesize);
+	    	buf.get(0, buff.array(), 0, writesize);
+	    	
 	    	FsFile.FsFileMethods.write(fic, buff, offset);
 	
-	    	buf.put(0, buff.array(), 0, readsize);
 	    	System.out.println("write : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
 
 	    	// save/propagate
 	    	fic.flush();
         	manager.propagateChange(fic);
         	
-	    	return readsize;
+        	
+	    	return writesize;
     	}catch(Exception e){
     		e.printStackTrace();
     		return -ErrorCodes.EIO();
@@ -549,15 +597,22 @@ public class JnrfuseImpl extends FuseStubFS {
     	if(dir==null){
     		return -ErrorCodes.ENOENT();
     	}
-    	filter.apply(buf, ".",  null, 0);
-    	filter.apply(buf, "..",  null, 0);
-    	for(FsDirectory childDir : dir.getDirs()){
-        	filter.apply(buf, childDir.getName(), null, 0);
+    	try{
+	    	filter.apply(buf, ".",  null, 0);
+	    	filter.apply(buf, "..",  null, 0);
+	    	for(FsDirectory childDir : dir.getDirs()){
+	        	System.out.println(dir.getName()+" have a dir");
+	        	filter.apply(buf, childDir.getName(), null, 0);
+	    	}
+	    	for(FsFile childFile : dir.getFiles()){
+	        	System.out.println(dir.getName()+" have a file");
+	        	filter.apply(buf, childFile.getName(), null, 0);
+	    	}
+    	}catch(LoadErasedException e)
+    	{
+    		autocorrectProblems(dir);
+    		return readdir(path, buf, filter, offset, fi);
     	}
-    	for(FsFile childFile : dir.getFiles()){
-        	filter.apply(buf, childFile.getName(), null, 0);
-    	}
-    	
         return 0;
     }
 

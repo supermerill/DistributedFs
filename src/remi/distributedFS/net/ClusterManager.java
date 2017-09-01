@@ -17,5 +17,11 @@ public interface ClusterManager {
 	public void writeBroadcastMessage(byte sendFileDescr, ByteBuff message);
 	public void writeMessage(long senderId, byte sendDir, ByteBuff messageRet);
 	public void registerListener(byte getDir, AbstractMessageManager propagateChange);
+	public void init(int listenPort);
+	
+	
+	public void connect(String string, int port);
+	public long getId();
+	public void launchUpdater();
 
 }

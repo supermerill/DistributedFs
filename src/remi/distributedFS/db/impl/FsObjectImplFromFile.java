@@ -135,6 +135,15 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 //		return goToNext(buff, false);
 //	}
 	
+	@Override
+	public void setDirty(boolean dirty) {
+		// modification(s) ? -> set timestamp!
+		this.setModifyDate(System.currentTimeMillis());
+		System.out.println("new modifydate for folder '"+this.getPath()+"' : "+this.getModifyDate());
+		this.setModifyUID(master.getUserId());
+		super.setDirty(dirty);
+	}
+	
 	public int goToNextOrCreate(ByteBuffer buff, Ref<Long> currentSector){
 		int pos = buff.position();
 		long nextsector = buff.getLong();
@@ -147,7 +156,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			currentSector.set(newSectorId);
 			//master.loadSector(buff, newSectorId); //useless, it's not created yet!
 			buff.rewind();
-			buff.put((byte)3);
+			buff.put(FsTableLocal.EXTENSION);
 			buff.putLong(this.getId());
 			buff.position(FsTableLocal.FS_SECTOR_SIZE-8);
 			buff.putLong(-1);
@@ -166,13 +175,13 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	public int goToNext(ByteBuffer buff){
 		long nextsector = buff.getLong();
 		if(nextsector<=0){
-				System.err.println("Error, no more sector to parse for dir "+this.getPath());
-				throw new RuntimeException("Error, no more sector to parse for dir "+this.getPath());
+				System.err.println("Error, no more sector to parse for obj "+this.getPath());
+				throw new RuntimeException("Error, no more sector to parse for obj "+this.getPath());
 			
 		}
 		buff.rewind();
 		master.loadSector(buff, nextsector);
-		if(buff.get()==3){
+		if(buff.get()==FsTableLocal.EXTENSION){
 			//ok
 			//verify it's mine
 			long storedId = buff.getLong();
@@ -197,8 +206,16 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
 		//master.loadSector(buff, getId()); //useless, we want to write, not read!
 		save(buff); //this one should auto-call master.write
+		
+		if(parentId<0){
+			//delete this one
+//			this.delete();
+			master.releaseSector(this.getId());
+		}
 	}
 	
+//	protected abstract void delete();
+
 	public void checkLoaded(){
 		if(!loaded){
 			ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);

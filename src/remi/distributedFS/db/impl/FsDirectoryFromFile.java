@@ -7,6 +7,7 @@ import java.util.List;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
+import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.util.Ref;
 
 public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDirectory{
@@ -28,9 +29,9 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	public void load(ByteBuffer buffer){
 		//check if it's a dir
 		byte type = buffer.get();
-		if(type !=1){
+		if(type !=FsTableLocal.DIRECTORY){
 			System.err.println("Error, not a directory at "+getId()+buffer.position());
-			throw new RuntimeException("Error, not a directory at "+getId());
+			throw new LoadErasedException("Error, not a directory at "+getId());
 		}
 		
 		super.load(buffer);
@@ -97,7 +98,8 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	
 
 	public synchronized void save(ByteBuffer buffer){
-		buffer.put((byte)1);
+		//set "erased" or d"directory"
+		buffer.put(parentId<0?0:FsTableLocal.DIRECTORY);
 		super.save(buffer);
 
 		//now, it should be at pos ~337

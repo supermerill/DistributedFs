@@ -1,5 +1,6 @@
 package remi.distributedFS.datastruct;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -67,7 +68,7 @@ public interface FsDirectory extends FsObject {
 		public static <N> N getPath(FsDirectory dir, String path, BiFunction<FsDirectory,String,N> func){
 			if(path.equals("/") && dir.getParent()==dir){
 	//			System.out.println("getroot");
-				return func.apply(dir, "..");
+				return func.apply(dir, ".");
 			}
 			while(path.startsWith("/")){
 				path = path.substring(1);
@@ -115,12 +116,47 @@ public interface FsDirectory extends FsObject {
 		}
 		
 		public static FsFile getFile(FsDirectory dir, String name) {
-			for(FsFile file : dir.getFiles()){
+			Iterator<FsFile> it = dir.getFiles().iterator();
+			while(it.hasNext()){
+				FsFile file = it.next();
 				if(file.getName().equals(name)){
 					return file;
 				}
 			}
 			return null;
+		}
+
+		/**
+		 * Check if some "LoadErasedException" are coming, and if so do the erase operation
+		 * @param dir directory to test (recursively)
+		 */
+		public static void autocorrectProblems(FsDirectory dir) {
+			Iterator<FsDirectory> itDir = dir.getDirs().iterator();
+			while(itDir.hasNext()){
+				FsDirectory childDir = itDir.next();
+				try{
+					//try to load
+					childDir.getDirs();
+					childDir.getFiles();
+					autocorrectProblems(childDir);
+				}catch(LoadErasedException e){
+					itDir.remove();
+					dir.flush();
+				}
+			}
+			Iterator<FsFile> it = dir.getFiles().iterator();
+			while(it.hasNext()){
+				FsFile file = it.next();
+				try{
+					//try to load
+					file.getName();
+					file.getChunks();
+					file.getSize();
+				}catch(LoadErasedException e){
+					it.remove();
+					dir.flush();
+				}
+			}
 		}
 		
 	

@@ -41,32 +41,49 @@ public class PhysicalServer implements ClusterManager {
 
 	private String jarFolder = "./jars";
 
-	public PhysicalServer() {
-		this(false);
-	}
+	private long lastDirUpdate = 0;
+	
+//	public PhysicalServer() {
+//		this(false);
+//	}
 
 	@SuppressWarnings("unchecked")
-	public PhysicalServer(boolean update) {
+	public PhysicalServer(FileSystemManager fs, boolean update) {
+		this.myFs = fs;
 		listeners = new List[256];
 		messageManager = new ConnectionMessageManager(this);
 		if(update){
+			launchUpdater();
+		}
+	}
+	
+	public void launchUpdater(){
+		if(updaterThread==null){
 			updaterThread = new Thread(()->{while(true){update();}});
 			updaterThread.start();
 		}
 	}
 	
 	public void update(){
-		System.out.println("update");
-		for(Peer peer : getPeers()){
-			System.out.println(getId()%100+" update peer "+peer.getConnectionId()%100);
-			peer.ping();
-		}
 		try {
 			Thread.sleep(2000);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		System.out.println("update");
+		for(Peer peer : getPeers()){
+			System.out.println(getId()%100+" update peer "+peer.getConnectionId()%100);
+			peer.ping();
+		}
+		//toutes les heures
+		if(lastDirUpdate+1000*60*60 < System.currentTimeMillis()){
+			System.out.println(id%100+" REQUEST DIR UPDATE");
+			myFs.requestDirUpdate();
+			lastDirUpdate = System.currentTimeMillis();
+		}
+		
 	}
 
 	public long getId() {
@@ -364,7 +381,7 @@ public class PhysicalServer implements ClusterManager {
 	
 	protected ByteBuff readMessage(InputStream in){
 		try {
-			ByteBuff buffIn = new ByteBuff(4).limit(4);
+			ByteBuff buffIn = new ByteBuff(4);
 			in.read(buffIn.array(), 0, 4);
 			int nbBytes = buffIn.getInt();
 			buffIn.limit(nbBytes).rewind();
@@ -432,7 +449,9 @@ public class PhysicalServer implements ClusterManager {
 				buffInt.putInt(0).flip();
 			}
 			out.write(buffInt.array(),0,4);
-			out.write(message.array(), message.position(), message.limit()-message.position());
+			if(message != null){
+				out.write(message.array(), message.position(), message.limit()-message.position());
+			}
 			out.flush();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -472,6 +491,16 @@ public class PhysicalServer implements ClusterManager {
 	
 	public ConnectionMessageManager message(){
 		return messageManager;
+	}
+
+	@Override
+	public void init(int listenPort) {
+		this.listen(listenPort);
+	}
+
+	@Override
+	public void connect(String path, int port) {
+		this.connectTo(path, port);
 	}
 
 }
