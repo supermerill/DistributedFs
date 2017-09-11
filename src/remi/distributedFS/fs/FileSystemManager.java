@@ -1,8 +1,12 @@
 package remi.distributedFS.fs;
 
+import java.util.List;
+
+import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
+import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.net.ClusterManager;
 
 public interface FileSystemManager {
@@ -26,5 +30,10 @@ public interface FileSystemManager {
 	public long getGroupId();
 	
 	public void requestDirUpdate();
+	public FsChunk requestChunk(FsFileFromFile parent, int idx, List<Long> serverIdPresent);
+	
+	
+	
+	char getLetter();
 
 }

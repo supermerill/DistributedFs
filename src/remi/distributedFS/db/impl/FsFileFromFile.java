@@ -58,7 +58,14 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 	
 	public synchronized void save(ByteBuffer buffer){
 		//set "erased" or d"directory"
-		buffer.put(parentId<0?0:FsTableLocal.FILE);
+		if(parentId<0){
+			buffer.put(FsTableLocal.ERASED);
+			//TODO: erase also "extended" chunks
+//		}else if(deleteDate>0){
+//			buffer.put(FsTableLocal.DELETED);
+		}else{
+			buffer.put(FsTableLocal.FILE);
+		}
 		super.save(buffer);
 
 		//now, it should be at pos ~337
@@ -106,7 +113,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 	@Override
 	public List<FsChunk> getChunks() {
 		System.out.println("chunks:"+chunks);
-		return new ListeningArrayList<FsChunk>(chunks, this.getDirty());
+		return new ListeningArrayList<FsChunk>(chunks, e->{setDirty(true);},e->{setDirty(true);});
 	}
 
 	@Override
@@ -135,6 +142,8 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		long newId = master.requestNewSector();
 		FsChunkFromFile newone = new FsChunkFromFile(master, newId, this, num);
 		newone.loaded = true;
+		newone.isValid = true;
+		newone.lastChange = System.currentTimeMillis();
 //		newone.data = new File(master.getRootRep()+getPath()+(num==0?"":num));
 //		newone.currentSize = currentSize; //FIXME: should be set by the chunk itself when we put data into it.
 //		newone.maxSize = maxSize;

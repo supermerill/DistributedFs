@@ -32,6 +32,7 @@ public abstract interface FsChunk {
 	public int currentSize();
 	public int maxSize();
 	public boolean isPresent();
+	public void setPresent(boolean isPresentLocally);
 	public List<Long> serverIdPresent();
 	public long lastModificationTimestamp();
 	public long lastModificationUID();

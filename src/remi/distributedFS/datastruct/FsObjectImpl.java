@@ -127,5 +127,8 @@ public abstract class FsObjectImpl implements FsObject {
 	}
 	
 	
+	public void delete(){
+		
+	}
 	
 }

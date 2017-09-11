@@ -15,5 +15,5 @@ public interface StorageManager {
 	
 	//used
 	FsDirectory getRoot();
-	
+
 }

@@ -22,7 +22,9 @@ public class FsChunkFromFile implements FsChunk {
 	protected int idx;
 	protected int currentSize;
 	protected int maxSize;
-	
+	protected boolean isValid; // false if data isn't available locally
+	protected long lastChange = 0;
+
 	protected boolean loaded = false;
 	protected File data;
 
@@ -31,7 +33,9 @@ public class FsChunkFromFile implements FsChunk {
 		this.parent = parent;
 		this.master = master;
 		this.idx = idx;
-		loaded = false;
+		this.lastChange = 0;
+		this.isValid = false;
+		this.loaded = false;
 	}
 
 	@Override
@@ -108,6 +112,7 @@ public class FsChunkFromFile implements FsChunk {
 				dataChannel.close();
 
 				toWrite.position(toWrite.position()+size);
+				lastChange = System.currentTimeMillis();
 				return true;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -147,10 +152,11 @@ public class FsChunkFromFile implements FsChunk {
 		currentSize = buffer.getInt(); //13
 		maxSize = buffer.getInt(); //17
 		idx = buffer.getInt(); //21
+		isValid = buffer.get()==1; //22
 		
 		
 		//get filename  (useless... for now)
-		int nbBytes = buffer.getInt(); //25
+		int nbBytes = buffer.getInt(); //26
 		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytes);
 		
 		buffer.position(buffInitPos + 32);
@@ -179,6 +185,48 @@ public class FsChunkFromFile implements FsChunk {
 		if(data==null){
 			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
 			data=new File(master.getRootRep()+"/"+id);
+			if(!isValid){
+				//request it
+				FsChunk meWithData = master.getManager().requestChunk(this.parent, idx, serverIdPresent());
+				this.currentSize = meWithData.currentSize();
+				//create file & copy data
+				if(!data.exists()){
+					try {
+						data.createNewFile();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				//copy
+				ByteBuff buff = new ByteBuff(256*256);
+				for(int i=0;i<meWithData.currentSize();i+=buff.limit()){
+					buff.rewind();
+					meWithData.read(buff, i*buff.limit(), buff.limit());
+					this.write(buff, i*buff.limit(), buff.limit());
+				}
+				//ready!
+				lastChange = meWithData.lastModificationTimestamp();
+				isValid = true;
+				parent.setDirty(true);
+				parent.flush();
+			}
+		}
+	}
+	
+
+	
+	public void flush() {
+		ensureLoaded();
+		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
+		//master.loadSector(buff, getId()); //useless, we want to write, not read!
+		save(buff); //this one should auto-call master.write
+		
+		if(parent==null){
+			//delete this one
+//			this.delete();
+			master.releaseSector(this.getId());
+		}else{
+			master.saveSector(buff, this.getId());
 		}
 	}
 
@@ -197,6 +245,7 @@ public class FsChunkFromFile implements FsChunk {
 		buffer.putInt(currentSize);
 		buffer.putInt(maxSize);
 		buffer.putInt(idx);
+		buffer.put((byte)(isValid?1:0));
 		
 		//get name buffer
 		ensureDatafield();
@@ -299,7 +348,7 @@ public class FsChunkFromFile implements FsChunk {
 	@Override
 	public boolean isPresent() {
 		ensureLoaded();
-		return true;//TODO
+		return isValid;
 	}
 
 	@Override
@@ -312,15 +361,13 @@ public class FsChunkFromFile implements FsChunk {
 	@Override
 	public long lastModificationTimestamp() {
 		ensureLoaded();
-		// TODO Auto-generated method stub
-		return 0;
+		return lastChange;
 	}
 
 	@Override
 	public long lastModificationUID() {
 		ensureLoaded();
-		// TODO Auto-generated method stub
-		return 0;
+		return master.getUserId();
 	}
 
 	public void unallocate() {
@@ -347,9 +394,23 @@ public class FsChunkFromFile implements FsChunk {
 				currentSize = (int) dataChannel.size();
 				dataChannel.close();
 				
+				lastChange = System.currentTimeMillis();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+		}
+	}
+
+	@Override
+	public void setPresent(boolean isPresentLocally) {
+		ensureLoaded();
+		isValid = isPresentLocally;
+		//if invalidate, remove local datafile
+		if(!isValid){
+			if(data!=null && data.exists()){
+				data.delete();
+			}
+			data = null;
 		}
 	}
 

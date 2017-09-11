@@ -37,6 +37,11 @@ public interface FsObject {
 	
 	
 	/**
+	 * Perform deletion operation : delete sub-thing, delete content, put it in "deleted" status
+	 */
+	public void delete(); 
+	
+	/**
 	 * Notify that modifications on this object are finished and now should be saved / transmitted.
 	 */
 	public void flush();

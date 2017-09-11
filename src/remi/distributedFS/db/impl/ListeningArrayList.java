@@ -3,22 +3,26 @@ package remi.distributedFS.db.impl;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import remi.distributedFS.util.Ref;
 
 public class ListeningArrayList<E> extends AbstractList<E>{
 	
 	final ArrayList<E> lst;
-	final Ref<Boolean> isDirty;
+	final Consumer<E> add;
+	final Consumer<E> rem;
 	
-	public ListeningArrayList(Ref<Boolean> isDirty){
+	public ListeningArrayList( Consumer<E> add, Consumer<E> remove){
 		lst = new ArrayList<>();
-		this.isDirty = isDirty;
+		this.add = add;
+		this.rem = remove;
 	}
 	
-	public ListeningArrayList(List<?extends E> lst, Ref<Boolean> isDirty){
+	public ListeningArrayList(List<?extends E> lst, Consumer<E> add, Consumer<E> remove){
 		this.lst = new ArrayList<>(lst);
-		this.isDirty = isDirty;
+		this.add = add;
+		this.rem = remove;
 	}
 
 	@Override
@@ -40,8 +44,12 @@ public class ListeningArrayList<E> extends AbstractList<E>{
      * @throws IndexOutOfBoundsException     {@inheritDoc}
      */
     public E set(int index, E element) {
-    	this.isDirty.set(true);
-    	return lst.set(index, element);
+    	E elemP = lst.set(index, element);
+    	if(elemP != element){
+    		if(elemP != null) this.rem.accept(elemP);
+    		if(element != null) this.add.accept(element);
+    	}
+    	return elemP;
     }
 
     /**
@@ -54,8 +62,8 @@ public class ListeningArrayList<E> extends AbstractList<E>{
      * @throws IndexOutOfBoundsException     {@inheritDoc}
      */
     public void add(int index, E element) {
-    	this.isDirty.set(true);
     	lst.add(index, element);
+    	this.add.accept(element);
     }
 
     /**
@@ -64,7 +72,8 @@ public class ListeningArrayList<E> extends AbstractList<E>{
      * @throws IndexOutOfBoundsException     {@inheritDoc}
      */
     public E remove(int index) {
-    	this.isDirty.set(true);
-    	return lst.remove(index);
+    	E elem = lst.remove(index);
+    	this.rem.accept(elem);
+    	return elem;
     }
 }

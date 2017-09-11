@@ -2,7 +2,10 @@ package remi.distributedFS.datastruct;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
+
+import ru.serce.jnrfuse.ErrorCodes;
 
 public interface FsDirectory extends FsObject {
 
@@ -19,6 +22,12 @@ public interface FsDirectory extends FsObject {
 	public abstract List<FsFile> getFiles();
 	public abstract FsDirectory createSubDir(String name);
 	public abstract FsFile createSubFile(String name);
+
+	/**
+	 * Get the map of delete items inside this directory
+	 * @return datetime of deletion.
+	 */
+	public Map<String,Long> getDelete();
 
 	public static class FsDirectoryMethods{
 		/**
@@ -192,6 +201,27 @@ public interface FsDirectory extends FsObject {
 				obj = getFile(dir, name);
 			}
 			return obj;
+		}
+		
+		public static void deleteAndFlush(FsObject obj){
+			FsDirectory oldDir = obj.getParent();
+	    	//remove
+	    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
+	    	while(it.hasNext()){
+	    		if(it.next() == obj){
+	    			it.remove(); // this remove the entry and trigger some other deletion job (hopefully)
+	    			break;
+	    		}
+	    	}
+
+	    	// request deletion of this entry
+	    	//don't do that, as this remove the entry completely (even from the fs array) and we want to keep it to keep track of deletions
+//	    	obj.setParent(null);
+//	    	obj.setParentId(-1);
+
+	    	// save/propagate
+	    	obj.flush();
+	    	oldDir.flush();
 		}
 	
 	}

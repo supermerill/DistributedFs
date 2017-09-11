@@ -28,7 +28,7 @@ public class ByteBuff
 	}
 	
 	/**
-	 * Init a buffer with a initial size.
+	 * Init a buffer with a initial size and limit to maximum.
 	 * 
 	 * @param initialCapacity
 	 *            size of the first backing array.

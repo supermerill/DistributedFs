@@ -66,13 +66,13 @@ public class PhysicalServer implements ClusterManager {
 	
 	public void update(){
 		try {
-			Thread.sleep(2000);
+			Thread.sleep(5000);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
-		System.out.println("update");
+		System.out.println(getId()%100+" update "+myFs.getLetter());
 		for(Peer peer : getPeers()){
 			System.out.println(getId()%100+" update peer "+peer.getConnectionId()%100);
 			peer.ping();

@@ -137,10 +137,6 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	
 	@Override
 	public void setDirty(boolean dirty) {
-		// modification(s) ? -> set timestamp!
-		this.setModifyDate(System.currentTimeMillis());
-		System.out.println("new modifydate for folder '"+this.getPath()+"' : "+this.getModifyDate());
-		this.setModifyUID(master.getUserId());
 		super.setDirty(dirty);
 	}
 	

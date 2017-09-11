@@ -217,6 +217,11 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	dirChild.setGroupId(getContext().gid.get());
 	    	dirChild.setPUGA(modeToPUGA(mode));
 	    	
+			// modification(s) ? -> set timestamp!
+	    	dir.setModifyDate(System.currentTimeMillis());
+			System.out.println("new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
+			dir.setModifyUID(manager.getUserId());
+	    	
 	    	// save/propagate
 	    	dirChild.flush();
 	    	dir.flush();
@@ -269,27 +274,33 @@ public class JnrfuseImpl extends FuseStubFS {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
     	System.out.println(">>>>NC rmdir for (path) : "+path);
     	try{
-    		FsDirectory obj = getPathDir(manager.getRoot(), path);
-	    	FsDirectory oldDir = getPathParentDir(manager.getRoot(), path);
-	    	if(obj==null || oldDir==null){
+    		FsDirectory obj = getPathDir(manager.getRoot(), path);//getPathParentDir(manager.getRoot(), path);
+	    	if(obj==null){
 	    		return -ErrorCodes.ENOENT();
 	    	}
-	    	//remove
-	    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
-	    	while(it.hasNext()){
-	    		if(it.next() == obj){
-	    			it.remove();
-	    			break;
-	    		}
+	    	FsDirectory oldDir = obj.getParent();
+	    	if(oldDir==null){
+	    		return -ErrorCodes.ENOENT();
 	    	}
-
-	    	// request deletion of this entry
-	    	obj.setParent(null);
-	    	obj.setParentId(-1);
-
-	    	// save/propagate
-	    	obj.flush();
-	    	oldDir.flush();
+//	    	//remove
+//	    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
+//	    	while(it.hasNext()){
+//	    		if(it.next() == obj){
+//	    			it.remove();
+//	    			break;
+//	    		}
+//	    	}
+//
+//	    	// request deletion of this entry
+//	    	obj.setParent(null);
+//	    	obj.setParentId(-1);
+//
+//	    	// save/propagate
+//	    	obj.flush();
+//	    	oldDir.flush();
+	    	
+	    	deleteAndFlush(obj);
+	    	
         	manager.propagateChange(obj);
 //        	manager.propagateChange(oldDir);
         	

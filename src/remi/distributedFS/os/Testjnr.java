@@ -6,6 +6,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import jnr.ffi.Platform;
 import remi.distributedFS.datastruct.FsChunk;
@@ -16,6 +17,7 @@ import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectImpl;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.db.StorageManager;
+import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.util.ByteBuff;
@@ -86,6 +88,12 @@ public class Testjnr {
 		public long lastModificationUID() {
 			// TODO Auto-generated method stub
 			return 0;
+		}
+
+		@Override
+		public void setPresent(boolean isPresentLocally) {
+			// TODO Auto-generated method stub
+			
 		}
 		
 	}
@@ -189,6 +197,12 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public Map<String, Long> getDelete() {
+			// TODO Auto-generated method stub
+			return null;
+		}
 	}
 	
 	public static void main(String[] args) {
@@ -279,6 +293,18 @@ public class Testjnr {
 			public void requestDirUpdate() {
 				// TODO Auto-generated method stub
 				
+			}
+
+			@Override
+			public FsChunk requestChunk(FsFileFromFile parent, int idx, List<Long> serverIdPresent) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public char getLetter() {
+				// TODO Auto-generated method stub
+				return 0;
 			}
 		};
 //		memfs = new MyMemoryFs2();

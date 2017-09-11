@@ -14,12 +14,13 @@ import remi.distributedFS.fs.FileSystemManager;
 
 public class FsTableLocal implements StorageManager{
 
-	public static final byte ERASED = 0;
+	public static final byte ERASED = 0; // no data
 	public static final byte DIRECTORY = 1;
 	public static final byte FILE = 2;
 	public static final byte CHUNK = 3;
 	public static final byte EXTENSION = 4;
-	public static final byte MOVING = 5;
+	public static final byte DELETED = 5; //deleted object (but it's kept here)
+	public static final byte MOVING = 6;
 
 	FileSystemManager manager;
 	
@@ -41,6 +42,13 @@ public class FsTableLocal implements StorageManager{
 	public FsTableLocal(String rootRep, String filename, FileSystemManager manager) throws IOException{
 		this.manager = manager;
 		this.rootRep = rootRep;
+		//check root rep 
+		File rootF = new File(rootRep);
+		if(!rootF.exists()){
+			rootF.mkdirs();
+		}
+		
+		
 		 buffer = ByteBuffer.allocate(FS_SECTOR_SIZE);
 		
 		 File fic = new File(filename);
@@ -50,6 +58,8 @@ public class FsTableLocal implements StorageManager{
 		root = readOrCreate(0);
 		//get each unused position inside
 		fileSize = fsFile.size();
+		
+		
 	}
 	
 	
@@ -100,12 +110,13 @@ public class FsTableLocal implements StorageManager{
 			//0: erased, 1:used , 2: moved to an other position (todo : check if it's finished or a crash has occured).
 			//3: used by the rprevious one (because it's a directory with has many many file, or a file with many many chunks)
 			/*
-			 * 0: erased
+			 * 0: erased / nothing
 			 * 1: directory
 			 * 2: file
-			 * 2: chunk
-			 * 3: extended
-			 * 4: in trasferts?
+			 * 3: chunk
+			 * 4: extended
+			 * 5: removed object
+			 * 6: in trasferts?
 			 */
 			byte state = buffer.get();
 			if(state == DIRECTORY){

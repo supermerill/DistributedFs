@@ -2,13 +2,16 @@ package remi.distributedFS.db;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.List;
 
+import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 
 import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.*;
 
+import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.db.impl.FsObjectImplFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
 import remi.distributedFS.fs.FileSystemManager;
@@ -86,6 +89,18 @@ public class TestDb {
 			public void requestDirUpdate() {
 				// TODO Auto-generated method stub
 				
+			}
+
+			@Override
+			public FsChunk requestChunk(FsFileFromFile parent, int idx,  List<Long> serverIdPresent) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public char getLetter() {
+				// TODO Auto-generated method stub
+				return 0;
 			}
 		};
 		testeur.db = new FsTableLocal(".", "fs.data", manager);
