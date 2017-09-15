@@ -4,7 +4,7 @@ import remi.distributedFS.util.Ref;
 
 public abstract class FsObjectImpl implements FsObject {
 	//static data saved inside the directory descriptor.
-	protected long id; // my unique id, can be the sector wher my data is, or anything else.
+	protected long id; // unique id for this file on the cluster, composed by computerId(2B, heavyside) and whatever is unique (6B)
 	protected long parentId; //the way to find my parent in the db.
 	protected long creationDate;
 	protected long creatorUserId;

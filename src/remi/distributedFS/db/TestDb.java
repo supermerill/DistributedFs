@@ -80,7 +80,7 @@ public class TestDb {
 			}
 			
 			@Override
-			public long getComputerId() {
+			public short getComputerId() {
 				// TODO Auto-generated method stub
 				return 0;
 			}
@@ -101,6 +101,12 @@ public class TestDb {
 			public char getLetter() {
 				// TODO Auto-generated method stub
 				return 0;
+			}
+
+			@Override
+			public String getRootFolder() {
+				// TODO Auto-generated method stub
+				return null;
 			}
 		};
 		testeur.db = new FsTableLocal(".", "fs.data", manager);

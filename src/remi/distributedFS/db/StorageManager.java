@@ -1,6 +1,7 @@
 package remi.distributedFS.db;
 
 import remi.distributedFS.datastruct.FsDirectory;
+import remi.distributedFS.datastruct.FsObject;
 
 public interface StorageManager {
 	
@@ -15,5 +16,7 @@ public interface StorageManager {
 	
 	//used
 	FsDirectory getRoot();
+	
+	FsObject getDirect(long id);
 
 }

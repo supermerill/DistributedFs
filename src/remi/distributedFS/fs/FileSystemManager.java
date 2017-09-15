@@ -25,7 +25,7 @@ public interface FileSystemManager {
 	public StorageManager getDb();
 	public ClusterManager getNet();
 
-	public long getComputerId();
+	public short getComputerId();
 	public long getUserId();
 	public long getGroupId();
 	
@@ -35,5 +35,6 @@ public interface FileSystemManager {
 	
 	
 	char getLetter();
+	String getRootFolder();
 
 }

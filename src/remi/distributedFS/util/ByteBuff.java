@@ -1,5 +1,9 @@
 package remi.distributedFS.util;
 
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
@@ -87,7 +91,12 @@ public class ByteBuff
 		}
 	}
 	
-	private void expand(final int size)
+	/**
+	 * Set limit to at least position() + size.
+	 * Shouldn't be called/used directly. But sometimes i try to re-create this so here it is, available.
+	 * @param size min size available.
+	 */
+	public void expand(final int size)
 	{
 		if (limit < position + size)
 		{
@@ -189,6 +198,13 @@ public class ByteBuff
 		return newBuff;
 	}
 	
+	/**
+	 * Put data into dest (from position).
+	 * @param dest destination array
+	 * @param destPos start idx in dest
+	 * @param length nb bytes to copy
+	 * @return this
+	 */
 	public ByteBuff get(final byte[] dest, final int destPos, final int length)
 	{
 		readcheck(length);
@@ -205,6 +221,11 @@ public class ByteBuff
 		return this;
 	}
 	
+	/**
+	 * Copy the scr.limit-src.position bytes from src.position to this.position.
+	 * @param src soruce array
+	 * @return this.
+	 */
 	public final ByteBuff put(final ByteBuff src)
 	{
 		int size = src.limit-src.position;
@@ -543,11 +564,75 @@ public class ByteBuff
 		return this;
 	}
 
+	/**
+	 * wrap this into a bytebuffer.
+	 * @return
+	 */
 	public ByteBuffer toByteBuffer() {
 		ByteBuffer buff = ByteBuffer.wrap(this.buffer);
 		buff.position(position);
 		buff.limit(limit);
 		return buff;
+	}
+
+	/**
+	 * copy content in an array of limit()-position() size.
+	 * @return byte[]
+	 */
+	public byte[] toArray() {
+		readcheck(limit()-position());
+		byte[] newBuff = new byte[limit()-position()];
+		System.arraycopy(buffer, position, newBuff, 0, limit-position);
+		return newBuff;
+	}
+
+	/**
+	 * Read nbBytes from stream an put it into this.
+	 * @param in
+	 * @param nbBytes
+	 * @return this
+	 * @throws IOException
+	 */
+	public ByteBuff read(InputStream in, int nbBytes) throws IOException{
+		expand(nbBytes); 
+		in.read(array(),position(),nbBytes);
+		position += nbBytes;
+		return this;
+	}
+	
+	/**
+	 * Read limit()-position() bytes from stream an put it into this.
+	 * @param in
+	 * @return this
+	 * @throws IOException
+	 */
+	public ByteBuff read(InputStream in) throws IOException{
+		readcheck(limit()-position());
+		in.read(array(),position(),limit()-position());
+		position = limit;
+		return this;
+	}
+	
+	/**
+	 * write nbBytes from this to outputBuffer
+	 * @param out
+	 * @param nbBytes
+	 * @return
+	 * @throws IOException
+	 */
+	public ByteBuff write(OutputStream out, int nbBytes) throws IOException{
+		readcheck(nbBytes);
+		out.write(array(),position(),nbBytes);
+		position += nbBytes;
+		return this;
+	}
+
+	public ByteBuff write(BufferedOutputStream out) throws IOException {
+		readcheck(limit()-position());
+		out.write(array(),position(),limit()-position());
+		System.out.println("write"+Arrays.toString(toArray()));
+		position = limit;
+		return this;
 	}
 	
 }

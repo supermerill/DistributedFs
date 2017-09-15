@@ -177,6 +177,14 @@ public class JnrfuseImpl extends FuseStubFS {
         	fic.rearangeChunks(128, 1);
         	fic.setUserId(getContext().uid.get());
         	fic.setGroupId(getContext().gid.get());
+
+			// modification(s) ? -> set timestamp!
+	    	dir.setModifyDate(System.currentTimeMillis());
+			System.out.println("new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
+			dir.setModifyUID(manager.getUserId());
+			
+			// set id
+        	fic.setId();
         	
         	//flush (should be done here or in db engine?)
         	fic.flush();
@@ -221,6 +229,9 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	dir.setModifyDate(System.currentTimeMillis());
 			System.out.println("new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
 			dir.setModifyUID(manager.getUserId());
+	    	
+			// set id
+	    	dirChild.setId();
 	    	
 	    	// save/propagate
 	    	dirChild.flush();

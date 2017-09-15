@@ -150,6 +150,12 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public void setId() {
+			// TODO Auto-generated method stub
+			
+		}
 	}
 	
 	static class FsDir extends FsObjectImpl implements FsDirectory{
@@ -199,9 +205,15 @@ public class Testjnr {
 		}
 
 		@Override
-		public Map<String, Long> getDelete() {
+		public List<FsObject> getDelete() {
 			// TODO Auto-generated method stub
 			return null;
+		}
+
+		@Override
+		public void setId() {
+			// TODO Auto-generated method stub
+			
 		}
 	}
 	
@@ -272,7 +284,7 @@ public class Testjnr {
 			}
 
 			@Override
-			public long getComputerId() {
+			public short getComputerId() {
 				// TODO Auto-generated method stub
 				return 0;
 			}
@@ -305,6 +317,12 @@ public class Testjnr {
 			public char getLetter() {
 				// TODO Auto-generated method stub
 				return 0;
+			}
+
+			@Override
+			public String getRootFolder() {
+				// TODO Auto-generated method stub
+				return null;
 			}
 		};
 //		memfs = new MyMemoryFs2();

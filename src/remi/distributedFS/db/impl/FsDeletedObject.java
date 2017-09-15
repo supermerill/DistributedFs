@@ -16,8 +16,8 @@ public class FsDeletedObject extends FsObjectImplFromFile{
 		//check if it's a file
 		byte type = buffer.get();
 		if(type != FsTableLocal.DELETED){
-			System.err.println("Error, not a deleted object at "+getId());
-			throw new LoadErasedException("Error, not a deleted object at "+getId());
+			System.err.println("Error, not a deleted object at "+getSector());
+			throw new LoadErasedException("Error, not a deleted object at "+getSector());
 		}
 		super.load(buffer);
 	}

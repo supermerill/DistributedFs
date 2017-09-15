@@ -46,6 +46,11 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 
 	@Override
 	public void receiveMessage(long senderId, byte messageId, ByteBuff message) {
+		if(manager.getNet().getComputerId(senderId) <0){
+			//error: not a estabished peer
+			System.err.println("Error, peer "+senderId%100+" ask us a chunk and he doens't have a computerid !");
+			return;
+		}
 		if (messageId == SEND_FILE_CHUNK) {
 			readChunk(senderId, message);
 		}

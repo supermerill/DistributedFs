@@ -42,13 +42,13 @@ public abstract class AbstractMessageManager {
 		
 		//TODO, for encrypted connection
 		/**
-		 * request a SEND_SERVER_PUBLIC_KEY
+		 * request a SEND_SERVER_PUBLIC_KEY (and a message to be encrypted)
 		 */
-//		public static final byte  GET_SERVER_PUBLIC_KEY = (byte) 7;
+		public static final byte  GET_SERVER_PUBLIC_KEY = (byte) 7;
 		/**
-		 * Send his public key
+		 * Send his public key (and a message encrypted with the private key)
 		 */
-//		public static final byte  SEND_SERVER_PUBLIC_KEY = (byte) 8;
+		public static final byte  SEND_SERVER_PUBLIC_KEY = (byte) 8;
 		/**
 		 * request a SEND_SERVER_RSA_KEY
 		 */

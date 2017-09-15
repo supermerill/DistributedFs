@@ -1,10 +1,14 @@
 package remi.distributedFS.fs;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
+import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.db.impl.FsFileFromFile;
@@ -27,24 +31,51 @@ public class StandardManager implements FileSystemManager {
 	ExchangeChunk chunkRequester = new ExchangeChunk(this);
 	
 	char driveletter;
+	String rootFolder = ".";
+	
 	
 	public static void main(String[] args) throws IOException {
 		//TODO: read config file
 		StandardManager manager = new StandardManager();
-		manager.init("./data1", "localdb.data", (char)'Q'
+		manager.init("./data1", (char)'Q'
 				, 17830);
+		manager.initializeNewCluster();
+		
 		StandardManager manager2 = new StandardManager();
-		manager2.init("./data2", "localdb2.data", (char)0//'R'
+		manager2.init("./data2", (char)0//'R'
 				, 17831);
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 		manager2.net.connect("localhost",17830);
 	}
 	
-	public void init(String dataPath, String dataFile, char letter, int port) throws IOException{
+	public void initializeNewCluster() {
+		//check if we havn't any id
+		if(getComputerId() < 0){
+			
+			//choose id
+			net.initializeNewCluster();
+			
+		}
+		
+	}
+
+	public void init(String dataPath, char letter, int port) throws IOException{
+		rootFolder = dataPath;
+		
+		//check if folder exist
+		if(!new File(rootFolder).exists()){
+			new File(rootFolder).mkdirs();
+		}
+		
 		System.out.println("begin");
-		storage = new FsTableLocal(dataPath, dataFile, this);
+		storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this);
 
 		if(port>0){
-			net = new PhysicalServer(this, false);
+			net = new PhysicalServer(this, false, dataPath);
 			net.init(port);
 			algoPropagate.register(this.net);
 		}
@@ -99,11 +130,11 @@ public class StandardManager implements FileSystemManager {
 	}
 
 	@Override
-	public long getComputerId() {
+	public short getComputerId() {
 		//TODO
-		if(net == null) return 0;
+		if(net == null) return -1;
 //		return os.getContext().pid.longValue();
-		return net.getId();
+		return net.getComputerId();
 	}
 
 	@Override
@@ -150,6 +181,11 @@ public class StandardManager implements FileSystemManager {
 			System.out.println("Can't find chunk "+file.getPath()+" idx:"+idx);
 		}
 		return chunk;
+	}
+
+	@Override
+	public String getRootFolder() {
+		return rootFolder;
 	}
 
 

@@ -27,7 +27,7 @@ public interface FsDirectory extends FsObject {
 	 * Get the map of delete items inside this directory
 	 * @return datetime of deletion.
 	 */
-	public Map<String,Long> getDelete();
+	public List<FsObject> getDelete();
 
 	public static class FsDirectoryMethods{
 		/**

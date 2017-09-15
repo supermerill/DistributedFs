@@ -13,12 +13,14 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	
 	FsTableLocal master;
 	boolean loaded;
+	long sector;
 
 	public FsObjectImplFromFile(FsTableLocal master, long sectorId, FsDirectory parent){
 		this.master = master;
 		loaded = false;
+		id = -1;
 		//read all datas //0
-		id = sectorId;	
+		this.sector = sectorId;	
 		this.parent = parent;
 		if(parent != null){
 			parentId = parent.getId();
@@ -27,11 +29,20 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		}
 	}
 	
+	
+	
 //	public FsObjectImplFromFile(FsTableLocal master, ByteBuffer buffer,long sectorId, FsDirectory parent){
 //		this(master, sectorId, parent);
 //		load(buffer);
 //	}
 	
+	@Override
+	public void setId() {
+		id = master.getComputerId()<<48 | (this.sector&0xFFFFFFFFFFFFL);
+	}
+
+
+
 	public void load(ByteBuffer buffer){
 
 
@@ -40,10 +51,11 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			System.err.println("error, wrong pos : 1<>"+pos);
 		}
 		//check if id is ok
-		if(buffer.getLong() != getId()){
-			buffer.position(pos);
-			System.err.println("error, not my id : "+buffer.getLong()+" <> "+getId());
-		}
+		id = buffer.getLong();
+//		if( != getId()){
+//			buffer.position(pos);
+//			System.err.println("error, not my id : "+buffer.getLong()+" <> "+getId());
+//		}
 		//read all datas //0+8
 		parentId = buffer.getLong(); //8
 		creationDate = buffer.getLong();//16
@@ -71,7 +83,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 
 	public void print(){
 		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
-		master.loadSector(buff, getId());
+		master.loadSector(buff, getSector());
 		buff.get();
 		this.print(buff);
 	}
@@ -153,7 +165,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			//master.loadSector(buff, newSectorId); //useless, it's not created yet!
 			buff.rewind();
 			buff.put(FsTableLocal.EXTENSION);
-			buff.putLong(this.getId());
+			buff.putLong(this.getSector());
 			buff.position(FsTableLocal.FS_SECTOR_SIZE-8);
 			buff.putLong(-1);
 			buff.position(16);
@@ -180,10 +192,10 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		if(buff.get()==FsTableLocal.EXTENSION){
 			//ok
 			//verify it's mine
-			long storedId = buff.getLong();
-			if(storedId != this.getId()){
-				System.err.println("Error, my next sector is not picked for me !!! : "+storedId+" != "+id);
-				throw new RuntimeException("Error, my next sector is not picked for me !!! : "+storedId+" != "+id);
+			long storedSec = buff.getLong();
+			if(storedSec != this.getSector()){
+				System.err.println("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
+				throw new RuntimeException("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
 			}
 			//now i should be at pos 9
 			//go to ok pos
@@ -206,7 +218,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		if(parentId<0){
 			//delete this one
 //			this.delete();
-			master.releaseSector(this.getId());
+			master.releaseSector(this.getSector());
 		}
 	}
 	
@@ -215,7 +227,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	public void checkLoaded(){
 		if(!loaded){
 			ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
-			master.loadSector(buff, getId());
+			master.loadSector(buff, getSector());
 			load(buff);
 		}
 	}
@@ -251,6 +263,9 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	}
 	public long getId() {
 		return id;
+	}
+	public long getSector() {
+		return sector;
 	}
 	public long getGroupId() {
 		checkLoaded();

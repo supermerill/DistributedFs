@@ -8,7 +8,11 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import remi.distributedFS.datastruct.FsDirectory;
+import remi.distributedFS.datastruct.FsFile;
+import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.fs.FileSystemManager;
 
@@ -37,7 +41,9 @@ public class FsTableLocal implements StorageManager{
 	private String rootRep;
 	
 	//TODO: create a separate thread for flushing/updating
-	
+
+	//this is a stub to help me tracking pos of objects.
+	Long2ObjectMap<FsObject> objectId2LocalCluster = new Long2ObjectOpenHashMap<>();
 	
 	public FsTableLocal(String rootRep, String filename, FileSystemManager manager) throws IOException{
 		this.manager = manager;
@@ -59,10 +65,26 @@ public class FsTableLocal implements StorageManager{
 		//get each unused position inside
 		fileSize = fsFile.size();
 		
-		
+
+		//load all content from fs
+		//it's a stub, this content should be stored in a 'small' separate file.
+		loadFs(getRoot());
 	}
 	
-	
+
+
+	private void loadFs(FsDirectory fsDirectory) {
+		objectId2LocalCluster.put(fsDirectory.getId(), fsDirectory);
+		for(FsDirectory dir : fsDirectory.getDirs()){
+			loadFs(dir);
+		}
+		for(FsFile fic : fsDirectory.getFiles()){
+			objectId2LocalCluster.put(fic.getId(), fic);
+		}
+		for(FsObject obj : fsDirectory.getDelete()){
+			objectId2LocalCluster.put(obj.getId(), obj);
+		}
+	}
 
 	public FileSystemManager getManager() {
 		return manager;
@@ -211,7 +233,7 @@ public class FsTableLocal implements StorageManager{
 		return root;
 	}
 
-	public long getComputerId() {
+	public short getComputerId() {
 		return manager.getComputerId();
 	}
 
@@ -225,6 +247,17 @@ public class FsTableLocal implements StorageManager{
 	
 	public String getRootRep(){
 		return rootRep;
+	}
+
+
+
+	@Override
+	public FsObject getDirect(long id) {
+		if(objectId2LocalCluster.containsKey(id)){
+			FsObject obj =  objectId2LocalCluster.get(id);
+			return obj;
+		}
+		return null;
 	}
 	
 	

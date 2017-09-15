@@ -42,6 +42,8 @@ public interface FsFile extends FsObject {
 
 	public abstract long getSize();
 
+	public void truncate(long size);
+
 	public static class FsFileMethods{
 		/**
 		 * read from buff.pos to buff.limit (so we are going to read limit-position bytes).
@@ -137,5 +139,4 @@ public interface FsFile extends FsObject {
 		}
 	}
 
-	public void truncate(long size);
 }

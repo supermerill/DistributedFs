@@ -21,7 +21,9 @@ public interface ClusterManager {
 	
 	
 	public void connect(String string, int port);
-	public long getId();
+	public short getComputerId();
 	public void launchUpdater();
+	public void initializeNewCluster();
+	public short getComputerId(long senderId); //get a computerId from a peerId (senderId)
 
 }

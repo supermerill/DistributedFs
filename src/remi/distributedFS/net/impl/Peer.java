@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.security.PublicKey;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -22,8 +23,9 @@ import remi.distributedFS.util.ByteBuff;
  */
 public class Peer implements Runnable {
 
+	private short distComputerId = -1; //unique id for the computer, private-public key protected.
 	public static class PeerKey {
-		private long otherServerId = 0;
+		private long otherServerId = 0; //use for leader election, connection establishment
 		private final InetAddress address;
 		private int port = 0;
 
@@ -162,8 +164,8 @@ public class Peer implements Runnable {
 				readMessage();
 			}
 		} catch (Exception e) {
-			// e.printStackTrace();
-			System.err.println("error in the communication stream between peers" + myServer.getId() % 100 + " and "
+			 e.printStackTrace();
+			System.err.println( myServer.getId() % 100+" error in the communication stream between peers" + myServer.getId() % 100 + " and "
 					+ getKey().otherServerId % 100 + " : " + e);
 		}
 
@@ -290,6 +292,7 @@ public class Peer implements Runnable {
 			myServer.message().sendServerId(this);
 			// MyListenPort.get().write(this);
 			myServer.message().sendListenPort(this);
+			myServer.getServerIdDb().requestPublicKey(this, false);
 			streamOut.flush();
 
 			// while (myKey.otherServerId == 0) {
@@ -330,20 +333,20 @@ public class Peer implements Runnable {
 			do {
 				do {
 					newByte = streamIn.read();
-					System.out.println(myServer.getId() % 100 + " read first 5 :" + newByte);
+//					System.out.println(myServer.getId() % 100 + " read first 5 :" + newByte);
 					if (newByte == -1)
 						throw new IOException("End of stream");
 				} while (newByte != 5);
 
 				newByte = streamIn.read();
-				System.out.println(myServer.getId() % 100 + " read second 5 :" + newByte);
+//				System.out.println(myServer.getId() % 100 + " read second 5 :" + newByte);
 				if (newByte == -1)
 					throw new IOException("End of stream");
 			} while (newByte != 5);
 
 			// read messagetype
 			newByte = streamIn.read();
-			System.out.println(myServer.getId() % 100 + " read id :" + newByte);
+			System.out.println(myServer.getId() % 100 + " read message id :" + newByte);
 			if (newByte == -1)
 				throw new IOException("End of stream");
 			// read message
@@ -352,7 +355,7 @@ public class Peer implements Runnable {
 				streamIn.read(buffIn.array(), 0, 4);
 				int nbBytes = buffIn.getInt();
 				buffIn.limit(nbBytes).rewind();
-				streamIn.read(buffIn.array(), 0, nbBytes);
+				if(nbBytes>0) streamIn.read(buffIn.array(), 0, nbBytes);
 				if (newByte == AbstractMessageManager.GET_SERVER_ID) {
 					// special case, give the peer object directly.
 					myServer.message().sendServerId(this);
@@ -360,6 +363,17 @@ public class Peer implements Runnable {
 				if (newByte == AbstractMessageManager.SEND_SERVER_ID) {
 					// special case, give the peer object directly.
 					setServerId(buffIn.getLong());
+					//check if the cluster is ok
+					long clusterId = buffIn.getLong();
+					if(clusterId >0 && myServer.getServerIdDb().clusterId < 0){
+						//set our cluster id
+						myServer.getServerIdDb().clusterId = clusterId;
+					}else if(clusterId >0 && myServer.getServerIdDb().clusterId != clusterId){
+						//error, not my cluster!
+						System.err.println("Error, trying to connect with "+getConnectionId()%100+" but his cluster is "+clusterId+" and mine is "
+						+myServer.getServerIdDb().clusterId+" => closing connection");
+						this.close();
+					}
 				}
 				if (newByte == AbstractMessageManager.GET_LISTEN_PORT) {
 					// special case, give the peer object directly.
@@ -469,6 +483,14 @@ public class Peer implements Runnable {
 			e.printStackTrace();
 		}
 
+	}
+
+	public void setComputerId(short distId) {
+		this.distComputerId = distId;
+	}
+
+	public short getComputerId() {
+		return distComputerId;
 	}
 
 }

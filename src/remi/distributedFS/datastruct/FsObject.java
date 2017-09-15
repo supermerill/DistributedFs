@@ -34,7 +34,8 @@ public interface FsObject {
 	public void setCreationDate(long creationDate) ;
 	public void setModifyDate(long modifyDate) ;
 	public void setGroupId(long groupId) ;
-	
+
+	public void setId();
 	
 	/**
 	 * Perform deletion operation : delete sub-thing, delete content, put it in "deleted" status

@@ -1,5 +1,6 @@
 package remi.distributedFS.net.impl.test;
 
+import java.io.File;
 import java.io.IOException;
 
 import remi.distributedFS.net.impl.Peer;
@@ -27,10 +28,14 @@ public class TestPhysiscalServerPeerConnection {
 	}
 	public void connect() throws InterruptedException{
 
-		serv1 = new PhysicalServer(null, true); serv1.listen(17830);
-		serv2 = new PhysicalServer(null, true); serv2.listen(17831);
-		serv3 = new PhysicalServer(null, true); serv3.listen(17832);
-		serv4 = new PhysicalServer(null, true); serv4.listen(17833);
+		new File("1").mkdir();
+		new File("2").mkdir();
+		new File("3").mkdir();
+		new File("4").mkdir();
+		serv1 = new PhysicalServer(null, true, "1"); serv1.listen(17830);
+		serv2 = new PhysicalServer(null, true, "2"); serv2.listen(17831);
+		serv3 = new PhysicalServer(null, true, "3"); serv3.listen(17832);
+		serv4 = new PhysicalServer(null, true, "4"); serv4.listen(17833);
 		draw();
 		serv1.connectTo("localhost", 17831);
 //		serv1.connectTo("localhost", 17832);

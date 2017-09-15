@@ -15,10 +15,10 @@ import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.util.Ref;
 
 public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDirectory{
-	List<FsDirectory> dirs = null;
-	List<FsFile> files = null;
+	List<FsDirectoryFromFile> dirs = null;
+	List<FsFileFromFile> files = null;
 //	Map<String,Long> delete = null;
-	List<FsObject> deleteObjs = null;
+	List<FsObjectImplFromFile> deleteObjs = null;
 	
 	protected class Deleter<E extends FsObjectImplFromFile> implements Consumer<E>{
 
@@ -51,8 +51,8 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		super(master, mysector, parent);
 		Deleter del = new Deleter();
 		Adder add = new Adder();
-		dirs = new ListeningArrayList<FsDirectory>(add, del);
-		files = new ListeningArrayList<FsFile>(add, del);
+		dirs = new ListeningArrayList<FsDirectoryFromFile>(add, del);
+		files = new ListeningArrayList<FsFileFromFile>(add, del);
 //		delete = new HashMap<>(0);
 		deleteObjs = new ArrayList<>();
 	}
@@ -75,8 +75,8 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		//check if it's a dir
 		byte type = buffer.get();
 		if(type !=FsTableLocal.DIRECTORY){
-			System.err.println("Error, "+type+" not a directory at "+getId()+" "+buffer.position());
-			throw new LoadErasedException("Error, "+type+" not a directory at "+getId());
+			System.err.println("Error, "+type+" not a directory at "+getSector()+" "+buffer.position());
+			throw new LoadErasedException("Error, "+type+" not a directory at "+getSector());
 		}
 		
 		super.load(buffer);
@@ -174,24 +174,24 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		
 		int canRead = 80;
 		ByteBuffer currentBuffer = buffer;
-		Ref<Long> currentSector = new Ref<>(this.getId());
+		Ref<Long> currentSector = new Ref<>(this.getSector());
 		//read folder
 		for(int i=0;i<dirs.size();i++){
-			currentBuffer.putLong(dirs.get(i).getId());
+			currentBuffer.putLong(dirs.get(i).getSector());
 			canRead--;
 			if(canRead == 0){
 				canRead = goToNextOrCreate(currentBuffer, currentSector);
 			}
 		}
 		for(int i=0;i<files.size();i++){
-			currentBuffer.putLong(files.get(i).getId());
+			currentBuffer.putLong(files.get(i).getSector());
 			canRead--;
 			if(canRead == 0){
 				canRead = goToNextOrCreate(currentBuffer, currentSector);
 			}
 		}
 		for(int i=0;i<deleteObjs.size();i++){
-			currentBuffer.putLong(deleteObjs.get(i).getId());
+			currentBuffer.putLong(deleteObjs.get(i).getSector());
 			canRead--;
 			if(canRead == 0){
 				canRead = goToNextOrCreate(currentBuffer, currentSector);
@@ -206,13 +206,23 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	@Override
 	public List<FsFile> getFiles() { 
 		checkLoaded();
-		return files; 
+		return (List)files; 
 	}
 	
 	@Override
 	public List<FsDirectory> getDirs() { 
 		checkLoaded();
-		return dirs; 
+		return (List)dirs; 
+	}
+
+	@Override
+	public List<FsObject> getDelete() {
+		checkLoaded();
+//		Map<String, Long> retMap = new HashMap<>();
+//		for(FsObject obj : deleteObjs){
+//			retMap.put(obj.getName(), obj.getDeleteDate());
+//		}
+		return (List)deleteObjs;
 	}
 	
 	@Override
@@ -230,6 +240,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	}
 	
 	protected void setObjectContent(FsObjectImplFromFile obj){
+		checkLoaded();
 		obj.setPUGA(getPUGA());
 		obj.setParent(this);
 		obj.setParentId(this.getId());
@@ -262,15 +273,6 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	public void accept(FsObjectVisitor visitor) {
 		checkLoaded();
 		visitor.visit(this);
-	}
-
-	@Override
-	public Map<String, Long> getDelete() {
-		Map<String, Long> retMap = new HashMap<>();
-		for(FsObject obj : deleteObjs){
-			retMap.put(obj.getName(), obj.getDeleteDate());
-		}
-		return retMap;
 	}
 
 }

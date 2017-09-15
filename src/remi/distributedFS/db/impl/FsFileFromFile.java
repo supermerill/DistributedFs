@@ -28,8 +28,8 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		//check if it's a file
 		byte type = buffer.get();
 		if(type != FsTableLocal.FILE){
-			System.err.println("Error, not a file at "+getId());
-			throw new LoadErasedException("Error, not a file at "+getId());
+			System.err.println("Error, not a file at "+getSector());
+			throw new LoadErasedException("Error, not a file at "+getSector());
 		}
 		
 		super.load(buffer);
@@ -80,10 +80,10 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		
 		int canRead = 80;
 		ByteBuffer currentBuffer = buffer;
-		Ref<Long> currentSector = new Ref<>(this.getId());
+		Ref<Long> currentSector = new Ref<>(this.getSector());
 		//read folder
 		for(int i=0;i<chunks.size();i++){
-			currentBuffer.putLong((chunks.get(i)).getId());
+			currentBuffer.putLong((chunks.get(i)).getSector());
 			canRead--;
 			if(canRead == 0){
 				canRead = goToNextOrCreate(currentBuffer, currentSector);

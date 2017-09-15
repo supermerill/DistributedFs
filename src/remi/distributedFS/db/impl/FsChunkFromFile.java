@@ -19,6 +19,7 @@ public class FsChunkFromFile implements FsChunk {
 	protected FsTableLocal master;
 	protected FsFileFromFile parent;
 	protected long id;
+	protected long sector;
 	protected int idx;
 	protected int currentSize;
 	protected int maxSize;
@@ -29,13 +30,14 @@ public class FsChunkFromFile implements FsChunk {
 	protected File data;
 
 	public FsChunkFromFile(FsTableLocal master, long sectorId, FsFileFromFile parent, int idx) {
-		this.id = sectorId;
+		this.sector = sectorId;
 		this.parent = parent;
 		this.master = master;
 		this.idx = idx;
 		this.lastChange = 0;
 		this.isValid = false;
 		this.loaded = false;
+		this.id = master.getComputerId()<<48 | ( sectorId&0xFFFFFFFFFFFFL);
 	}
 
 	@Override
@@ -126,7 +128,7 @@ public class FsChunkFromFile implements FsChunk {
 	public void ensureLoaded(){
 		if(!loaded){
 			ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
-			master.loadSector(buff, getId());
+			master.loadSector(buff, getSector());
 			load(buff);
 		}
 	}
@@ -142,11 +144,11 @@ public class FsChunkFromFile implements FsChunk {
 		}
 		
 		//check  id
-		long myId = buffer.getLong(); //9
-		if(myId != id){
-			System.err.println("Error, wrong chunk id : "+id + " <> "+myId);
-			throw new RuntimeException("Error, wrong chunk id : "+id + " <> "+myId);
-		}
+		this.id = buffer.getLong(); //9
+//		if(myId != id){
+//			System.err.println("Error, wrong chunk id : "+id + " <> "+myId);
+//			throw new RuntimeException("Error, wrong chunk id : "+id + " <> "+myId);
+//		}
 		
 		//datas
 		currentSize = buffer.getInt(); //13
@@ -184,7 +186,7 @@ public class FsChunkFromFile implements FsChunk {
 	protected void ensureDatafield(){
 		if(data==null){
 			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
-			data=new File(master.getRootRep()+"/"+id);
+			data=new File(master.getRootRep()+"/"+getId());
 			if(!isValid){
 				//request it
 				FsChunk meWithData = master.getManager().requestChunk(this.parent, idx, serverIdPresent());
@@ -224,9 +226,9 @@ public class FsChunkFromFile implements FsChunk {
 		if(parent==null){
 			//delete this one
 //			this.delete();
-			master.releaseSector(this.getId());
+			master.releaseSector(this.getSector());
 		}else{
-			master.saveSector(buff, this.getId());
+			master.saveSector(buff, this.getSector());
 		}
 	}
 
@@ -239,7 +241,7 @@ public class FsChunkFromFile implements FsChunk {
 		//set "erased" or d"directory"
 		buffer.put(parent==null?0:FsTableLocal.CHUNK);
 
-		buffer.putLong(id);
+		buffer.putLong(getId());
 		
 		//save data
 		buffer.putInt(currentSize);
@@ -257,7 +259,7 @@ public class FsChunkFromFile implements FsChunk {
 		int canRead = FsTableLocal.FS_SECTOR_SIZE-32-8;
 		
 		ByteBuffer currentBuffer = buffer;
-		Ref<Long> currentSector = new Ref<>(this.getId());
+		Ref<Long> currentSector = new Ref<>(this.getSector());
 		//save folder
 		for(int i=0;i<buffName.limit();i++){
 			currentBuffer.put(buffName.get(i));
@@ -286,7 +288,7 @@ public class FsChunkFromFile implements FsChunk {
 			//master.loadSector(buff, newSectorId); //useless, it's not created yet!
 			buff.rewind();
 			buff.put(FsTableLocal.EXTENSION);
-			buff.putLong(this.getId());
+			buff.putLong(this.getSector());
 			buff.position(FsTableLocal.FS_SECTOR_SIZE-8);
 			buff.putLong(-1);
 			buff.position(16);
@@ -305,8 +307,8 @@ public class FsChunkFromFile implements FsChunk {
 	public int goToNext(ByteBuffer buff){
 		long nextsector = buff.getLong();
 		if(nextsector<=0){
-				System.err.println("Error, no more sector to parse for chunk "+this.getId());
-				throw new RuntimeException("Error, no more sector to parse for chunk "+this.getId());
+				System.err.println("Error, no more sector to parse for chunk "+this.getSector());
+				throw new RuntimeException("Error, no more sector to parse for chunk "+this.getSector());
 			
 		}
 		buff.rewind();
@@ -314,10 +316,10 @@ public class FsChunkFromFile implements FsChunk {
 		if(buff.get()==FsTableLocal.EXTENSION){
 			//ok
 			//verify it's mine
-			long storedId = buff.getLong();
-			if(storedId != this.getId()){
-				System.err.println("Error, my next sector is not picked for me !!! : "+storedId+" != "+id);
-				throw new RuntimeException("Error, my next sector is not picked for me !!! : "+storedId+" != "+id);
+			long storedSec = buff.getLong();
+			if(storedSec != this.getSector()){
+				System.err.println("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
+				throw new RuntimeException("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
 			}
 			//now i should be at pos 9
 			//go to ok pos
@@ -331,6 +333,10 @@ public class FsChunkFromFile implements FsChunk {
 
 	public long getId() {
 		return id;
+	}
+
+	public long getSector() {
+		return sector;
 	}
 
 	@Override
@@ -377,8 +383,8 @@ public class FsChunkFromFile implements FsChunk {
 		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
 		buff.put((byte)0);
 		buff.rewind();
-		master.saveSector(buff, id);
-		master.releaseSector(id);
+		master.saveSector(buff, sector);
+		master.releaseSector(sector);
 	}
 
 	public void truncate(long newSize) {

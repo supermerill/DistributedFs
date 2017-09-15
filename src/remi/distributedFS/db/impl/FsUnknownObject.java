@@ -20,14 +20,14 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 		byte type = buffer.get();
 		//if it contain a "file" or a directory, then create them instead of me
 		if(type == FsTableLocal.DIRECTORY){
-			me = new FsDirectoryFromFile(master, getId(), parent);
+			me = new FsDirectoryFromFile(master, getSector(), parent);
 		}else if(type == FsTableLocal.FILE){
-			me = new FsFileFromFile(master, getId(), parent);
+			me = new FsFileFromFile(master, getSector(), parent);
 		}else if(type == FsTableLocal.DELETED){
-			me = new FsDeletedObject(master, getId(), parent);
+			me = new FsDeletedObject(master, getSector(), parent);
 		}else{
-			System.err.println("Error, not an object at "+getId());
-			throw new LoadErasedException("Error, not an object at "+getId());
+			System.err.println("Error, not an object at "+getSector());
+			throw new LoadErasedException("Error, not an object at "+getSector());
 		}
 	}
 
@@ -264,6 +264,11 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 	public void delete() {
 		checkLoaded();
 		me.delete();
+	}
+
+	@Override
+	public long getSector() {
+		return me.getSector();
 	}
 	
 	
