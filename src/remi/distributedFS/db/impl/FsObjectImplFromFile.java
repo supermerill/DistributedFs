@@ -22,11 +22,22 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		//read all datas //0
 		this.sector = sectorId;	
 		this.parent = parent;
-		if(parent != null){
+//		if(parent != null){
 			parentId = parent.getId();
-		}else{
-			parentId = 0;
-		}
+			System.out.println("created object with parent "+this.parent.getId());
+//		}else{
+//			parentId = 0;
+//		}
+	}
+
+	//only for root folder
+	protected FsObjectImplFromFile(FsTableLocal master, long sectorId){
+		System.out.println("ROOT created");
+		this.master = master;
+		loaded = false;
+		id = -1;
+		//read all datas //0
+		this.sector = sectorId;	
 	}
 	
 	
@@ -35,10 +46,20 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 //		this(master, sectorId, parent);
 //		load(buffer);
 //	}
-	
+
 	@Override
 	public void setId() {
-		id = master.getComputerId()<<48 | (this.sector&0xFFFFFFFFFFFFL);
+		id = ((long)master.getComputerId())<<48 | (this.sector&0xFFFFFFFFFFFFL);
+		System.out.println(master.getComputerId()+"$ "+getPath()+" NEW ID : "+id+" from this.sector : "+this.sector+" => "+Long.toHexString(id));
+		master.registerNewFile(id, this);
+	}
+
+	@Override
+	public void setId(long newId) {
+		System.out.println(master.getComputerId()+"$ "+getPath()+" SET ID : "+id);
+		master.unregisterFile(id, this);
+		id = newId;
+		master.registerNewFile(id, this);
 	}
 
 
@@ -77,7 +98,8 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			System.err.println("error, buffer at wrong pos! : "+buffer.position()+" != "+(340+pos)+" (posinit = "+pos+")");
 		}
 		
-		parent = null;
+//		parent = null;
+//		System.out.println("LOAD: parent null!");
 		loaded = true;
 	}
 
@@ -273,23 +295,25 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	}
 	public long getParentId() {
 		checkLoaded();
-		return parentId;
+		if(parent==null){
+			return parentId; //TODO : it's not refreshed when necessary.
+		}
+		return parent.getId();
 	}
 	public FsDirectory getParent() {
 		return parent;
 	}
 	public void setParent(FsDirectory newDir) {
 		checkLoaded();
-		parent = newDir;
-		if(newDir==null)parentId = -1;
-		else parentId = newDir.getId();
+		super.setParent(newDir);
 	}
 	public String getPath() {
 		checkLoaded();
-		if(parent == this || parent == null){
-			return getName();
-		}
-		return parent.getPath()+"/"+getName();
+		return super.getPath();
+//		if(parent == this || parent == null){
+//			return getName();
+//		}
+//		return "'"+parent.getPath()+"'"+"/#"+getName()+"#";
 	}
 	public void setName(String newName) {
 		checkLoaded();

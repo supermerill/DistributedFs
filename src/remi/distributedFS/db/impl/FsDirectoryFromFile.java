@@ -15,48 +15,31 @@ import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.util.Ref;
 
 public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDirectory{
-	List<FsDirectoryFromFile> dirs = null;
-	List<FsFileFromFile> files = null;
+	ArrayList<FsDirectoryFromFile> dirs = null;
+	ArrayList<FsFileFromFile> files = null;
 //	Map<String,Long> delete = null;
 	List<FsObjectImplFromFile> deleteObjs = null;
-	
-	protected class Deleter<E extends FsObjectImplFromFile> implements Consumer<E>{
-
-		@Override
-		public void accept(E e) {
-			e.setDeleteDate(System.currentTimeMillis()); 
-			e.setDeleteUID(master.getUserId());
-			e.delete();
-			e.flush();
-//			FsErasedObject eobj = new FsErasedObject(master, e.getId(), FsDirectoryFromFile.this);
-			deleteObjs.add(e);
-			setModifyDate();
-			setDirty(true);
-		}
-		
-	}
-	
-	protected class Adder<E extends FsObjectImplFromFile> implements Consumer<E>{
-
-		@Override
-		public void accept(E e) {
-			setModifyDate();
-			e.setDirty(true);
-			setDirty(true);
-		}
-		
-	}
 
 	FsDirectoryFromFile(FsTableLocal master, long mysector, FsDirectory parent){
 		super(master, mysector, parent);
-		Deleter del = new Deleter();
-		Adder add = new Adder();
-		dirs = new ListeningArrayList<FsDirectoryFromFile>(add, del);
-		files = new ListeningArrayList<FsFileFromFile>(add, del);
+		dirs = new ArrayList<FsDirectoryFromFile>();
+		files = new ArrayList<FsFileFromFile>();
 //		delete = new HashMap<>(0);
 		deleteObjs = new ArrayList<>();
 	}
 	
+	//only for the root
+	FsDirectoryFromFile(FsTableLocal fsTableLocal, int sectorPos) {
+		super(fsTableLocal, sectorPos);
+		this.parent = this;
+		id = 0;
+		parentId = 0;
+		dirs = new ArrayList<FsDirectoryFromFile>();
+		files = new ArrayList<FsFileFromFile>();
+//		delete = new HashMap<>(0);
+		deleteObjs = new ArrayList<>();
+	}
+
 	public void setModifyDate(){
 
 		// modification(s) ? -> set timestamp!
@@ -151,8 +134,13 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	
 
 	public synchronized void save(ByteBuffer buffer){
+		if(id<0){
+			System.err.println("WARN, can't save a directory without id : "+getPath()+" : "+getId()+" "+getParentId());
+		}
+		System.out.println("save folder"+getPath()+" with id "+id+" and parentid "+parentId);
 		//set "erased" or d"directory"
-		if(parentId<0){
+		if(getParentId()<0){
+			System.err.println("WARN, can't save a directory without parent : "+getPath()+" : "+getId()+" "+getParentId());
 			buffer.put(FsTableLocal.ERASED);
 			//TODO: erase also "extended" chunks
 //		}else if(deleteDate>0){
@@ -275,4 +263,93 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		visitor.visit(this);
 	}
 
+	@Override
+	public void removeFile(FsFile fic) {
+		fic.setDeleteDate(System.currentTimeMillis()); 
+		fic.setDeleteUID(master.getUserId());
+		fic.delete();
+//		FsErasedObject eobj = new FsErasedObject(master, e.getId(), FsDirectoryFromFile.this);
+		files.remove(fic);
+		deleteObjs.add((FsObjectImplFromFile) fic);
+		setModifyDate();
+		setDirty(true);
+		((FsObjectImplFromFile)fic).setDirty(true);
+		fic.flush();
+		flush();
+	}
+
+	@Override
+	public void removeDir(FsDirectory dir) {
+		dir.setDeleteDate(System.currentTimeMillis()); 
+		dir.setDeleteUID(master.getUserId());
+		dir.delete();
+//		FsErasedObject eobj = new FsErasedObject(master, e.getId(), FsDirectoryFromFile.this);
+		dirs.remove(dir);
+		deleteObjs.add((FsObjectImplFromFile) dir);
+		setModifyDate();
+		setDirty(true);
+		((FsObjectImplFromFile)dir).setDirty(true);
+		dir.flush();
+		flush();
+	}
+
+	@Override
+	public void moveFile(FsFile obj, FsDirectory newDir) {
+		files.remove(obj);
+		obj.setModifyDate(System.currentTimeMillis()); 
+		obj.setModifyUID(master.getUserId());
+		obj.setParent(newDir);
+		obj.setParentId(newDir.getId());
+		setModifyDate();
+		setModifyUID(master.getUserId());
+		newDir.getFiles().add(obj);
+		newDir.setModifyDate(System.currentTimeMillis()); 
+		newDir.setModifyUID(master.getUserId());
+		((FsObjectImplFromFile)obj).setDirty(true);
+		setDirty(true);
+		((FsObjectImplFromFile)newDir).setDirty(true);
+		obj.flush();
+		flush();
+		newDir.flush();
+	}
+
+	@Override
+	public void moveDir(FsDirectory obj, FsDirectory newDir) {
+		dirs.remove(obj);
+		obj.setModifyDate(System.currentTimeMillis()); 
+		obj.setModifyUID(master.getUserId());
+		obj.setParent(newDir);
+		obj.setParentId(newDir.getId());
+		setModifyDate();
+		setModifyUID(master.getUserId());
+		newDir.getDirs().add(obj);
+		newDir.setModifyDate(System.currentTimeMillis()); 
+		newDir.setModifyUID(master.getUserId());
+		((FsObjectImplFromFile)obj).setDirty(true);
+		setDirty(true);
+		((FsObjectImplFromFile)newDir).setDirty(true);
+		obj.flush();
+		flush();
+		newDir.flush();
+	}
+	
+	protected class Deleter<E extends FsObjectImplFromFile> implements Consumer<E>{
+
+		@Override
+		public void accept(E e) {
+		}
+		
+	}
+	
+	protected class Adder<E extends FsObjectImplFromFile> implements Consumer<E>{
+
+		@Override
+		public void accept(E e) {
+			setModifyDate();
+			e.setDirty(true);
+			setDirty(true);
+		}
+		
+	}
+	
 }

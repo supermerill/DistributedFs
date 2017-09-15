@@ -23,13 +23,35 @@ public interface FsDirectory extends FsObject {
 	public abstract FsDirectory createSubDir(String name);
 	public abstract FsFile createSubFile(String name);
 
+	public void removeFile(FsFile obj);
+	public void removeDir(FsDirectory obj);
+
+	public void moveFile(FsFile obj, FsDirectory newDir);
+	public void moveDir(FsDirectory obj, FsDirectory newDir);
+
 	/**
 	 * Get the map of delete items inside this directory
 	 * @return datetime of deletion.
 	 */
 	public List<FsObject> getDelete();
+	public static class FsDirectoryRemover implements FsObjectVisitor{
+
+		@Override
+		public void visit(FsDirectory obj) {
+			obj.getParent().removeDir(obj);
+		}
+
+		@Override
+		public void visit(FsFile obj) {
+			obj.getParent().removeFile(obj);
+		}
+		
+	}
 
 	public static class FsDirectoryMethods{
+		
+		public static final FsDirectoryRemover REMOVER = new FsDirectoryRemover();
+		
 		/**
 		 * please, only use '/'
 		 * @param path a correct path
@@ -203,26 +225,26 @@ public interface FsDirectory extends FsObject {
 			return obj;
 		}
 		
-		public static void deleteAndFlush(FsObject obj){
-			FsDirectory oldDir = obj.getParent();
-	    	//remove
-	    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
-	    	while(it.hasNext()){
-	    		if(it.next() == obj){
-	    			it.remove(); // this remove the entry and trigger some other deletion job (hopefully)
-	    			break;
-	    		}
-	    	}
-
-	    	// request deletion of this entry
-	    	//don't do that, as this remove the entry completely (even from the fs array) and we want to keep it to keep track of deletions
-//	    	obj.setParent(null);
-//	    	obj.setParentId(-1);
-
-	    	// save/propagate
-	    	obj.flush();
-	    	oldDir.flush();
-		}
+//		public static void deleteAndFlush(FsObject obj){
+//			FsDirectory oldDir = obj.getParent();
+//	    	//remove
+//	    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
+//	    	while(it.hasNext()){
+//	    		if(it.next() == obj){
+//	    			it.remove(); // this remove the entry and trigger some other deletion job (hopefully)
+//	    			break;
+//	    		}
+//	    	}
+//
+//	    	// request deletion of this entry
+//	    	//don't do that, as this remove the entry completely (even from the fs array) and we want to keep it to keep track of deletions
+////	    	obj.setParent(null);
+////	    	obj.setParentId(-1);
+//
+//	    	// save/propagate
+//	    	obj.flush();
+//	    	oldDir.flush();
+//		}
 	
 	}
 	

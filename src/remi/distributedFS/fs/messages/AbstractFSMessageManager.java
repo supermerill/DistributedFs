@@ -30,6 +30,8 @@ public abstract class AbstractFSMessageManager extends AbstractMessageManager {
 		public static final byte  SEND_FILE_DESCR = (byte) 23;
 		public static final byte  GET_FILE_CHUNK = (byte) 24;
 		public static final byte  SEND_FILE_CHUNK = (byte) 25;
+		public static final byte  GET_OBJECT = (byte) 26;
+		public static final byte  SEND_OBJECT = (byte) 27;
 		
 	
 }

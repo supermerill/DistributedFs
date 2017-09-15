@@ -156,6 +156,12 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public void setId(long newId) {
+			// TODO Auto-generated method stub
+			
+		}
 	}
 	
 	static class FsDir extends FsObjectImpl implements FsDirectory{
@@ -212,6 +218,36 @@ public class Testjnr {
 
 		@Override
 		public void setId() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void setId(long newId) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void removeFile(FsFile obj) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void removeDir(FsDirectory obj) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void moveFile(FsFile obj, FsDirectory newDir) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void moveDir(FsDirectory obj, FsDirectory newDir) {
 			// TODO Auto-generated method stub
 			
 		}

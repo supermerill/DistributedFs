@@ -38,6 +38,7 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 
 	@Override
 	public void accept(FsObjectVisitor visitor) {
+		checkLoaded();
 		me.accept(visitor);
 	}
 
@@ -137,13 +138,13 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 	@Override
 	public long getParentId() {
 		checkLoaded();
-		return me.getParentId();
+		return me==null?super.parent.getId():me.getParentId();
 	}
 
 	@Override
 	public FsDirectory getParent() {
 		checkLoaded();
-		return me.getParent();
+		return me==null?super.parent:me.getParent();
 	}
 
 	@Override
@@ -268,7 +269,7 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 
 	@Override
 	public long getSector() {
-		return me.getSector();
+		return super.sector;
 	}
 	
 	

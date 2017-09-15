@@ -36,20 +36,35 @@ public class StandardManager implements FileSystemManager {
 	
 	public static void main(String[] args) throws IOException {
 		//TODO: read config file
-		StandardManager manager = new StandardManager();
-		manager.init("./data1", (char)'Q'
-				, 17830);
-		manager.initializeNewCluster();
+		new Thread(()->{
+			StandardManager manager = new StandardManager();
+			manager.initBdNet("./data1", 17830);
+			manager.initializeNewCluster();
+			manager.initOs("./data1", (char)'Q'
+					);
+		}).start();
 		
-		StandardManager manager2 = new StandardManager();
-		manager2.init("./data2", (char)0//'R'
-				, 17831);
 		try {
-			Thread.sleep(1000);
+			Thread.sleep(100);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		manager2.net.connect("localhost",17830);
+		
+		System.out.println("====================start second client ====================");
+		new Thread(()->{
+			StandardManager manager2 = new StandardManager();
+			
+			manager2.initBdNet("./data2", 17831);
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			manager2.net.connect("localhost",17830);
+
+			manager2.initOs("./data2", (char)0//'R'
+					);
+		}).start();
 	}
 	
 	public void initializeNewCluster() {
@@ -63,38 +78,68 @@ public class StandardManager implements FileSystemManager {
 		
 	}
 
-	public void init(String dataPath, char letter, int port) throws IOException{
-		rootFolder = dataPath;
-		
-		//check if folder exist
-		if(!new File(rootFolder).exists()){
-			new File(rootFolder).mkdirs();
-		}
-		
-		System.out.println("begin");
-		storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this);
-
-		if(port>0){
-			net = new PhysicalServer(this, false, dataPath);
-			net.init(port);
-			algoPropagate.register(this.net);
-		}
-		
-		if(letter >0){
-			os = new JnrfuseImpl(this);
-			os.init(letter);
-			driveletter = letter;
-		}else driveletter = ' ';
-		
-		System.out.println("end of init");
-		
-		try {
-			Thread.sleep(4000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
+	public void initBdNet(String dataPath, int port) {
+		try{
+			rootFolder = dataPath;
+			
+			//check if folder exist
+			if(!new File(rootFolder).exists()){
+				new File(rootFolder).mkdirs();
+			}
+			
+			System.out.println("begin");
+			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this);
+	
+			if(port>0){
+				net = new PhysicalServer(this, false, dataPath);
+				net.init(port);
+				algoPropagate.register(this.net);
+			}
+		}catch (Exception e) {
 			e.printStackTrace();
+			close();
 		}
-		net.launchUpdater();
+	}
+
+
+	public void initOs(String dataPath, char letter) {
+		try{
+	
+			//wait initialization before giving hand to men
+			try {
+				while(getComputerId()<0){
+					System.err.println("Warn : waiting for connection");
+					Thread.sleep(1000);
+				}
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			if(letter >0){
+				os = new JnrfuseImpl(this);
+				os.init(letter);
+				driveletter = letter;
+			}else driveletter = ' ';
+			
+			System.out.println("end of init");
+			
+			try {
+				Thread.sleep(4000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			net.launchUpdater();
+		}catch (Exception e) {
+			e.printStackTrace();
+			close();
+		}
+	}
+
+	private void close() {
+		// TODO Auto-generated method stub
+		
 	}
 
 	@Override

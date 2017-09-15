@@ -24,6 +24,7 @@ import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.datastruct.PUGA;
+import remi.distributedFS.db.impl.FsDirectoryFromFile;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.util.ByteBuff;
 import ru.serce.jnrfuse.ErrorCodes;
@@ -121,7 +122,7 @@ public class JnrfuseImpl extends FuseStubFS {
     public int getattr(String path, FileStat stat) {
     	try{
         	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-        	System.out.println(/*">>>>NC */"get attr for (path) : "+path);
+//        	System.out.println(/*">>>>NC */"get attr for (path) : "+path);
     	FsObject obj = getPathObj(manager.getRoot(), path);
 //    	System.out.println("get attr for (obj) : "+obj);
     	if(obj ==null){
@@ -256,17 +257,21 @@ public class JnrfuseImpl extends FuseStubFS {
 	    		return -ErrorCodes.ENOENT();
 	    	}
 	    	//remove
-	    	Iterator<FsFile> it = oldDir.getFiles().iterator();
-	    	while(it.hasNext()){
-	    		if(it.next() == obj){
-	    			it.remove();
-	    			break;
-	    		}
-	    	}
+//	    	Iterator<FsFile> it = oldDir.getFiles().iterator();
+//	    	while(it.hasNext()){
+//	    		if(it.next() == obj){
+//	    			it.remove(); //here we request the deletion
+//	    			break;
+//	    		}
+//	    	}
 	    	
-	    	// request deletion of this entry
-	    	obj.setParent(null);
-	    	obj.setParentId(-1);
+	    	oldDir.removeFile(obj);
+	    	
+	    	// 'request deletion' of this entry
+	    	//already done by the fs
+//	    	obj.setDeleteDate(System.currentTimeMillis());
+//	    	obj.setDeleteUID(manager.getComputerId());
+//	    	oldDir.getDelete().add(obj);
 	    	
 	    	// save/propagate
 	    	obj.flush();
@@ -309,8 +314,8 @@ public class JnrfuseImpl extends FuseStubFS {
 //	    	// save/propagate
 //	    	obj.flush();
 //	    	oldDir.flush();
-	    	
-	    	deleteAndFlush(obj);
+
+	    	oldDir.removeDir(obj);
 	    	
         	manager.propagateChange(obj);
 //        	manager.propagateChange(oldDir);
@@ -327,6 +332,7 @@ public class JnrfuseImpl extends FuseStubFS {
     public int symlink(String oldpath, String newpath) {
         return 0;
     }
+    
 
     @Override
     public int rename(String oldpath, String newpath) {
@@ -344,44 +350,53 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	}
         	System.out.println("rename : path : "+obj.getPath()+", "+oldDir.getPath()+", "+newDir.getPath());
         	System.out.println("rename : obj : "+obj+", "+oldDir+", "+newDir);
-	    	if(obj instanceof FsDirectory){
-	        	//remove
-		    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
-		    	while(it.hasNext()){
-		    		if(it.next() == obj){
-		    	    	System.out.println("rename :removedir");
-		    			it.remove();
-		    			break;
-		    		}
-		    	}
-	        	System.out.println("rename : test old location : "+getPathObj(manager.getRoot(), oldpath));
-		    	//add
-    	    	System.out.println("rename : adddir");
-		    	newDir.getDirs().add((FsDirectory) obj);
-		    	obj.setName(newName);
-	        	System.out.println("rename : test new location : "+getPathObj(manager.getRoot(), newpath));
+//	    	if(obj instanceof FsDirectory){
+//	        	//remove
+//		    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
+//		    	while(it.hasNext()){
+//		    		if(it.next() == obj){
+//		    	    	System.out.println("rename :removedir");
+//		    			it.remove();
+//		    			break;
+//		    		}
+//		    	}
+//	        	System.out.println("rename : test old location : "+getPathObj(manager.getRoot(), oldpath));
+//		    	//add
+//    	    	System.out.println("rename : adddir");
+//		    	newDir.getDirs().add((FsDirectory) obj);
+//		    	obj.setName(newName);
+//	        	System.out.println("rename : test new location : "+getPathObj(manager.getRoot(), newpath));
+//
+//	    	}else{
+//	        	//remove
+//		    	Iterator<FsFile> it = oldDir.getFiles().iterator();
+//		    	while(it.hasNext()){
+//		    		if(it.next() == obj){
+//		    			it.remove();
+//		    			break;
+//		    		}
+//		    	}
+//		    	//add
+//		    	newDir.getFiles().add((FsFile) obj);
+//		    	obj.setName(newName);
+//		    	
+//	    	}
+//	    	obj.setParent(newDir);
+//	    	// save/propagate
+//        	oldDir.flush();
+//        	newDir.flush();
+//        	obj.flush();
 
-		    	// save/propagate
-	        	oldDir.flush();
-	        	newDir.flush();
-	        	obj.flush();
-	        	manager.propagateChange(oldDir);
-	        	manager.propagateChange(newDir);
-	    	}else{
-	        	//remove
-		    	Iterator<FsFile> it = oldDir.getFiles().iterator();
-		    	while(it.hasNext()){
-		    		if(it.next() == obj){
-		    			it.remove();
-		    			break;
-		    		}
-		    	}
-		    	//add
-		    	newDir.getFiles().add((FsFile) obj);
-		    	obj.setName(newName);
-		    	
-	    	}
-	    	obj.setParent(newDir);
+        	obj.setName(newName);
+        	if(oldDir != newDir){
+	        	if(obj instanceof FsFile){
+	    	    	oldDir.moveFile((FsFile)obj, newDir);
+	        	}else if(obj instanceof FsDirectory){
+	    	    	oldDir.moveDir((FsDirectory)obj, newDir);
+	        	}
+        	}
+        	obj.flush();
+        	manager.propagateChange(obj);
 	    	
 	    	
 	        return 0;

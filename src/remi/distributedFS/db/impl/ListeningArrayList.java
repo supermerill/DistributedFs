@@ -65,6 +65,10 @@ public class ListeningArrayList<E> extends AbstractList<E>{
     	lst.add(index, element);
     	this.add.accept(element);
     }
+    
+    public void addSilently(E element) {
+    	lst.add(size(), element);
+    }
 
     /**
      * {@inheritDoc}
@@ -74,6 +78,11 @@ public class ListeningArrayList<E> extends AbstractList<E>{
     public E remove(int index) {
     	E elem = lst.remove(index);
     	this.rem.accept(elem);
+    	return elem;
+    }
+    
+    public E removeSilently(int index) {
+    	E elem = lst.remove(index);
     	return elem;
     }
 }

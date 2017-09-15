@@ -35,7 +35,8 @@ public interface FsObject {
 	public void setModifyDate(long modifyDate) ;
 	public void setGroupId(long groupId) ;
 
-	public void setId();
+	public void setId(); //create id for us
+	void setId(long newId); //set id to create a new one from distant peer
 	
 	/**
 	 * Perform deletion operation : delete sub-thing, delete content, put it in "deleted" status

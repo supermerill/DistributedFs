@@ -8,11 +8,14 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.omg.CORBA.VisibilityHelper;
+
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
+import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.fs.FileSystemManager;
 
@@ -61,30 +64,59 @@ public class FsTableLocal implements StorageManager{
 		 if(!fic.exists()) fic.createNewFile();
 		fsFile = FileChannel.open(fic.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
 		//read root
-		root = readOrCreate(0);
+		root = readOrCreateRoot(0);
 		//get each unused position inside
 		fileSize = fsFile.size();
 		
 
 		//load all content from fs
 		//it's a stub, this content should be stored in a 'small' separate file.
-		loadFs(getRoot());
+		getRoot().accept(new Loader());
 	}
 	
 
+	class Loader implements FsObjectVisitor{
 
-	private void loadFs(FsDirectory fsDirectory) {
-		objectId2LocalCluster.put(fsDirectory.getId(), fsDirectory);
-		for(FsDirectory dir : fsDirectory.getDirs()){
-			loadFs(dir);
+		@Override
+		public void visit(FsDirectory dirParent) {
+			objectId2LocalCluster.put(dirParent.getId(), dirParent);
+			for(FsDirectory dir : dirParent.getDirs()){
+				visit(dir);
+				System.out.println(dir.getPath() + dir.getId());
+			}
+			for(FsFile fic : dirParent.getFiles()){
+				visit(fic);
+				System.out.println(fic.getPath()+" (F) " + fic.getId());
+			}
+			for(FsObject obj : dirParent.getDelete()){
+				System.out.println(obj.getPath()+" (D) " + obj.getId());
+				obj.accept(this);
+				objectId2LocalCluster.put(obj.getId(), obj);
+			}
 		}
-		for(FsFile fic : fsDirectory.getFiles()){
+
+		@Override
+		public void visit(FsFile fic) {
 			objectId2LocalCluster.put(fic.getId(), fic);
 		}
-		for(FsObject obj : fsDirectory.getDelete()){
-			objectId2LocalCluster.put(obj.getId(), obj);
-		}
+		
 	}
+	
+//	private void loadFs(FsDirectory fsDirectory) {
+//		objectId2LocalCluster.put(fsDirectory.getId(), fsDirectory);
+//		System.out.println(fsDirectory.getPath());
+//		for(FsDirectory dir : fsDirectory.getDirs()){
+//			loadFs(dir);
+//		}
+//		for(FsFile fic : fsDirectory.getFiles()){
+//			objectId2LocalCluster.put(fic.getId(), fic);
+//			System.out.println(fsDirectory.getPath()+" (F)");
+//		}
+//		for(FsObject obj : fsDirectory.getDelete()){
+//			objectId2LocalCluster.put(obj.getId(), obj);
+//			System.out.println(fsDirectory.getPath()+" (D)");
+//		}
+//	}
 
 	public FileSystemManager getManager() {
 		return manager;
@@ -92,7 +124,7 @@ public class FsTableLocal implements StorageManager{
 
 
 
-	protected FsDirectory readOrCreate(int sectorPos) {
+	protected FsDirectory readOrCreateRoot(int sectorPos) {
 		
 		try {
 			fsFile.position(FS_SECTOR_SIZE*sectorPos);
@@ -101,7 +133,7 @@ public class FsTableLocal implements StorageManager{
 			
 			if(fsFile.size()<FS_SECTOR_SIZE){
 				//create!
-				FsDirectoryFromFile obj = new FsDirectoryFromFile(this, 0, null);
+				FsDirectoryFromFile obj = new FsDirectoryFromFile(this, 0);
 				obj.loaded = true;
 				obj.setName("");
 				obj.setPUGA((short)0x1FF);
@@ -144,7 +176,7 @@ public class FsTableLocal implements StorageManager{
 			if(state == DIRECTORY){
 				//ok, read!
 				
-				FsDirectoryFromFile dir = new FsDirectoryFromFile(this, sectorPos, null);
+				FsDirectoryFromFile dir = new FsDirectoryFromFile(this, sectorPos);
 				buffer.rewind();
 				dir.load(buffer);
 				if(dir.getParentId()==0){
@@ -155,10 +187,11 @@ public class FsTableLocal implements StorageManager{
 			
 			}else if(state == ERASED){
 				//erased, return null;
-				System.err.println("error, shouldn't happen: you try to read a sector that is erased.");
+				System.err.println("error, shouldn't happen: you try to read a sector ("+sectorPos+") that is erased.");
 				return null;
 			}else if(state == FILE){
 				//TODO: get/create file
+				System.err.println("error, shouldn't happen: root file.");
 			}else if(state == CHUNK){
 				//TODO: get/create chunk
 			}else if(state == EXTENSION){
@@ -168,6 +201,7 @@ public class FsTableLocal implements StorageManager{
 			}else if(state == MOVING){
 				//this entry is moved
 				//TODO: check te new sector
+				System.err.println("error, shouldn't happen: root moved.");
 			}
 		
 		
@@ -258,6 +292,15 @@ public class FsTableLocal implements StorageManager{
 			return obj;
 		}
 		return null;
+	}
+
+
+
+	public void unregisterFile(long id, FsObject fsObjectImplFromFile) {
+		objectId2LocalCluster.remove(id);
+	}
+	public void registerNewFile(long id, FsObject fsObjectImplFromFile) {
+		objectId2LocalCluster.put(id, fsObjectImplFromFile);
 	}
 	
 	
