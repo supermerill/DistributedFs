@@ -44,6 +44,10 @@ public abstract class FsObjectImpl implements FsObject {
 	public String getName() {
 		return name;
 	}
+	public void setName(String newName) {
+		this.name = newName;
+		setDirty(true);
+	}
 	public long getId() {
 		return id;
 	}
@@ -69,9 +73,6 @@ public abstract class FsObjectImpl implements FsObject {
 			return getName();
 		}
 		return parent.getPath()+"/"+getName();
-	}
-	public void setName(String newName) {
-		this.name = newName;
 	}
 
 	public abstract void accept(FsObjectVisitor visitor);
@@ -131,4 +132,14 @@ public abstract class FsObjectImpl implements FsObject {
 		
 	}
 	
+	
+	@Override
+	public FsDirectory asDirectory() {
+		return this instanceof FsDirectory ? (FsDirectory) this : null;
+	}
+	
+	@Override
+	public FsFile asFile() {
+		return this instanceof FsFile ? (FsFile) this : null;
+	}
 }

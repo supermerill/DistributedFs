@@ -175,7 +175,8 @@ public class JnrfuseImpl extends FuseStubFS {
         		return -ErrorCodes.ENOENT();
         	}
         	FsFile fic = dir.createSubFile(getPathObjectName(manager.getRoot(), path));
-        	fic.rearangeChunks(128, 1);
+//        	fic.rearangeChunks(128, 1);
+        	fic.createNewChunk(-1);
         	fic.setUserId(getContext().uid.get());
         	fic.setGroupId(getContext().gid.get());
 
@@ -190,7 +191,7 @@ public class JnrfuseImpl extends FuseStubFS {
         	//flush (should be done here or in db engine?)
         	fic.flush();
         	dir.flush();
-        	manager.propagateChange(dir);
+        	manager.propagateChange(fic);
         	
         	//temp fix because sometimes, it doesn't work
         	//fic.setPUGA(modeToPUGA(mode));
@@ -389,12 +390,14 @@ public class JnrfuseImpl extends FuseStubFS {
 
         	obj.setName(newName);
         	if(oldDir != newDir){
+        		System.out.println("FS : move "+obj.getPath()+" from "+oldDir.getPath()+" to "+newDir.getPath());
 	        	if(obj instanceof FsFile){
 	    	    	oldDir.moveFile((FsFile)obj, newDir);
 	        	}else if(obj instanceof FsDirectory){
 	    	    	oldDir.moveDir((FsDirectory)obj, newDir);
 	        	}
         	}
+        	obj.changes();
         	obj.flush();
         	manager.propagateChange(obj);
 	    	
@@ -468,7 +471,8 @@ public class JnrfuseImpl extends FuseStubFS {
     	}
     	try{
     		
-	    	fic.truncate(size);
+//	    	fic.truncate(size);
+    		FsFile.truncate(fic, size);
 
 	    	// save/propagate
 	    	fic.flush();
@@ -515,7 +519,7 @@ public class JnrfuseImpl extends FuseStubFS {
     	    	return 0;
     		}
 	    	ByteBuff buff = new ByteBuff(readsize);
-	    	FsFile.FsFileMethods.read(fic, buff, offset);
+	    	FsFile.read(fic, buff, offset);
 	
 	    	buf.put(0, buff.array(), 0, readsize);
 	    	System.out.println("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
@@ -542,7 +546,7 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	ByteBuff buff = new ByteBuff(writesize);
 	    	buf.get(0, buff.array(), 0, writesize);
 	    	
-	    	FsFile.FsFileMethods.write(fic, buff, offset);
+	    	FsFile.write(fic, buff, offset);
 	
 	    	System.out.println("write : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
 
@@ -550,7 +554,7 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	fic.flush();
         	manager.propagateChange(fic);
         	
-        	
+        	System.out.println("write "+writesize+" bytes / "+size);
 	    	return writesize;
     	}catch(Exception e){
     		e.printStackTrace();

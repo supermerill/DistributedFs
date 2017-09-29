@@ -40,7 +40,7 @@ public class Testjnr {
 		}
 
 		@Override
-		public int maxSize() {
+		public int getMaxSize() {
 			return data.array().length;
 		}
 
@@ -58,7 +58,7 @@ public class Testjnr {
 
 		@Override
 		public boolean write(ByteBuff toWrite, int offset, int size) {
-			if(offset<0 || size<1 || offset+size >maxSize()){
+			if(offset<0 || size<1 || offset+size >getMaxSize()){
 				return false;
 			}
 			data.position(offset);
@@ -95,11 +95,41 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public long getId() {
+			// TODO Auto-generated method stub
+			return 0;
+		}
+
+		@Override
+		public void setCurrentSize(int newSize) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void setMaxSize(int newMaxSize) {
+			int limit = data.limit();
+			data.limit(newMaxSize);
+			data.limit(limit);
+		}
+
+		@Override
+		public void flush() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void changes() {
+			// TODO Auto-generated method stub
+			
+		}
 		
 	}
 	static class FsFic extends FsObjectImpl implements FsFile{
 
-		int currentChunkSize = 0;
 		List<FsBout> chunks = new ArrayList<>();
 		
 		FsFic(String name){
@@ -115,38 +145,17 @@ public class Testjnr {
 		public List<FsChunk> getChunks() { return new ArrayList<>(chunks); }
 
 		@Override
-		public int getChunkSize() { return currentChunkSize; }
-
-		@Override
-		public void rearangeChunks(int newSizeChunk, int newNbChunks) {
-			currentChunkSize = newSizeChunk;
-			//create chunks
-			List<FsBout> newchunks = new ArrayList<>();
-			for(int i=0;i<newNbChunks-1;i++){
-				newchunks.add(new FsBout(newSizeChunk,newSizeChunk));
-			}
-			newchunks.add(new FsBout(0,newSizeChunk));
-			
-			this.chunks = newchunks;
-		}
-		@Override
 		public void accept(FsObjectVisitor visitor) {
 			visitor.visit(this);
 		}
 
 		@Override
 		public long getSize() {
-			return FsFile.FsFileMethods.getSize(this);
+			return FsFile.getSize(this);
 		}
 
 		@Override
 		public void flush() {
-			// TODO Auto-generated method stub
-			
-		}
-
-		@Override
-		public void truncate(long size) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -159,6 +168,30 @@ public class Testjnr {
 
 		@Override
 		public void setId(long newId) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void changes() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public List<FsChunk> getAllChunks() {
+			return new ArrayList<>(chunks);
+		}
+
+		@Override
+		public FsChunk createNewChunk(long id) {
+			FsBout bch = new FsBout(128, 128);
+			chunks.add(bch);
+			return bch;
+		}
+
+		@Override
+		public void setChunks(List<FsChunk> newList) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -251,6 +284,36 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public long getLastChangeDate() {
+			// TODO Auto-generated method stub
+			return 0;
+		}
+
+		@Override
+		public void setLastChangeDate(long timestamp) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public long getLastChangeUID() {
+			// TODO Auto-generated method stub
+			return 0;
+		}
+
+		@Override
+		public void setLastChangeUID(long uid) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void changes() {
+			// TODO Auto-generated method stub
+			
+		}
 	}
 	
 	public static void main(String[] args) {
@@ -269,7 +332,8 @@ public class Testjnr {
 		FsFic f = (FsFic) getDir(root, "dir1").createSubFile("fic1");
 		f.setUserId(myFuseManager.getContext().uid.get());
 		f.setGroupId(myFuseManager.getContext().gid.get());
-		f.rearangeChunks(10, 1);
+//		f.rearangeChunks(10, 1);
+		f.createNewChunk(-1);
 		String str = "Hello world!";
 		f.chunks.get(0).data.put( Arrays.copyOf(Charset.forName("UTF-8").encode(str).array(),str.length()));
 //		System.out.println("Create a file with "+Charset.forName("UTF-8").encode("Hello world!").array().length+"bytes : "+(int)(Charset.forName("UTF-8").encode("Hello world!").array()[12]));
@@ -344,12 +408,6 @@ public class Testjnr {
 			}
 
 			@Override
-			public FsChunk requestChunk(FsFileFromFile parent, int idx, List<Long> serverIdPresent) {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
 			public char getLetter() {
 				// TODO Auto-generated method stub
 				return 0;
@@ -357,6 +415,12 @@ public class Testjnr {
 
 			@Override
 			public String getRootFolder() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
 				// TODO Auto-generated method stub
 				return null;
 			}

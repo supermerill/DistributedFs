@@ -19,6 +19,8 @@ public interface FsObject {
 	public void setName(String newName) ;
 
 	public abstract void accept(FsObjectVisitor visitor);
+	public FsDirectory asDirectory();
+	public FsFile asFile();
 	
 	public long getModifyUID() ;
 	
@@ -42,6 +44,8 @@ public interface FsObject {
 	 * Perform deletion operation : delete sub-thing, delete content, put it in "deleted" status
 	 */
 	public void delete(); 
+	
+	public void changes();
 	
 	/**
 	 * Notify that modifications on this object are finished and now should be saved / transmitted.

@@ -450,9 +450,10 @@ public class PhysicalServer implements ClusterManager {
 
 	@Override
 	public void writeBroadcastMessage(byte messageId, ByteBuff message) {
-		synchronized (peers) {
-			for (Peer peer : peers) {
-				writeMessage(peer, messageId, message);
+		synchronized (this.clusterIdMananger.getRegisteredPeers()) {
+			for (Peer peer : this.clusterIdMananger.getRegisteredPeers()) {
+				if(peer != null && peer.isAlive())
+					writeMessage(peer, messageId, message);
 			}
 		}
 	}

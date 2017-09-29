@@ -3,6 +3,7 @@ package remi.distributedFS.db.impl;
 import java.nio.ByteBuffer;
 
 import remi.distributedFS.datastruct.FsDirectory;
+import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.util.Ref;
@@ -29,6 +30,18 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 			System.err.println("Error, not an object at "+getSector());
 			throw new LoadErasedException("Error, not an object at "+getSector());
 		}
+	}
+	
+	@Override
+	public FsDirectory asDirectory() {
+		checkLoaded();
+		return me instanceof FsDirectory ? (FsDirectory) me : null;
+	}
+	
+	@Override
+	public FsFile asFile() {
+		checkLoaded();
+		return me instanceof FsFile ? (FsFile) me : null;
 	}
 
 	public synchronized void save(ByteBuffer buffer){

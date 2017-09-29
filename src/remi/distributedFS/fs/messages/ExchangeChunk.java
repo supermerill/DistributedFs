@@ -2,6 +2,7 @@ package remi.distributedFS.fs.messages;
 
 import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getPathFile;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -11,6 +12,7 @@ import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.fs.StandardManager;
+import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.util.ByteBuff;
 
 /**
@@ -25,17 +27,26 @@ import remi.distributedFS.util.ByteBuff;
 public class ExchangeChunk extends AbstractFSMessageManager {
 	
 	class Request{
+		//message
 		long arrivalDate;
+		ByteBuff msg;
+		
+		//file
+		public long fileId;
 		String path;
 		long modifyDate;
 		long modifyUID;
-		int idx;
-		ByteBuff msg;
+		//chunk
+		public long chunkId;
+		public long chunkDate;
+		public long chunkDateUID;
+		public int nbBytes; // = chunkSize
+		public int chunkMaxSize;
 	}
 	
 	List<Semaphore> waiters = new java.util.concurrent.CopyOnWriteArrayList<>();
 	
-	List<Request> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
+	List<Request> requests = new ArrayList<>();
 	
 
 	private StandardManager manager;
@@ -52,36 +63,60 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 			return;
 		}
 		if (messageId == SEND_FILE_CHUNK) {
+			System.out.println(this.manager.getComputerId()+"$ RECEIVE SEND_FILE_CHUNK from "+senderId);
 			readChunk(senderId, message);
 		}
 		if (messageId == GET_FILE_CHUNK) {
+			System.out.println(this.manager.getComputerId()+"$ RECEIVE GET_FILE_CHUNK from "+senderId);
 			//check if we have it
+			long fileId = message.getLong();
 			String filePath = message.getUTF8();
 			long modifyDateMin = message.getLong();
-			int idx = message.getInt();
+			long chunkId = message.getLong();
+			long chunkModDate = message.getLong();
 			FsChunk chunkOk = null;
 
 			FsDirectory root = manager.getRoot();
 			FsFile fic = getPathFile(root, filePath);
-			if(fic != null && fic.getNbChunks()>idx && fic.getChunks().size()>idx){
-				FsChunk chunk = fic.getChunks().get(idx);
-				if(chunk.isPresent() && chunk.lastModificationTimestamp()>=modifyDateMin){
+			if(fic != null){
+				FsChunk chunk = FsFile.getChunk(fic, chunkId);
+				if(chunk == null){
+					//nothing to do : we don't have it.
+					System.out.println("GET CHUNK : can't find it!");
+					ByteBuff buff = new ByteBuff();
+					buff.put((byte)0);
+					buff.putLong(fileId);
+					buff.putUTF8(filePath);
+					buff.putLong(modifyDateMin);
+					buff.putLong(chunkId);
+					buff.flip();
+					System.out.println(this.manager.getComputerId()+"$ Can't send unknown chunk, send file instead "+senderId);
+					manager.getNet().writeMessage(senderId, SEND_FILE_CHUNK, buff);
+					return;
+				}
+				if(chunk.isPresent() && chunk.lastModificationTimestamp()>=chunkModDate){
+					System.out.println(this.manager.getComputerId()+"$ Good chunk "+senderId);
 					//find
 					chunkOk = chunk;
+				}else{
+					System.out.println(this.manager.getComputerId()+"$ Old/nothere chunk: our:"+chunk.lastModificationTimestamp()+">=their:"+chunkModDate+", present:"+chunk.isPresent());
 				}
 			}
 			
 			if(chunkOk != null){
-				sendChunk(senderId, fic, idx, chunkOk);
+				sendChunk(senderId, fic, chunkOk);
 			}else{
-				System.out.println("GET CHUNK : can't find it!");
+				System.out.println(this.manager.getComputerId()+"$ GET CHUNK : not good enough (or can't find it)!");
 				ByteBuff buff = new ByteBuff();
 				buff.put((byte)0);
+				buff.putLong(fileId);
 				buff.putUTF8(filePath);
 				buff.putLong(modifyDateMin);
-				buff.putInt(idx);
+				buff.putLong(chunkId);
+				buff.putLong(chunkModDate);
 				buff.flip();
 				manager.getNet().writeMessage(senderId, SEND_FILE_CHUNK, buff);
+				return;
 			}
 		}
 
@@ -92,11 +127,15 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		if(message.get()==1){
 			Request req = new Request();
 			req.arrivalDate = System.currentTimeMillis();
+			req.fileId = message.getLong();
 			req.path = message.getUTF8();
 			req.modifyDate = message.getLong();
 			req.modifyUID = message.getLong();
-			req.idx = message.getInt();
-			int nbBytes = message.getTrailInt();
+			req.chunkId = message.getLong();
+			req.chunkDate = message.getLong();
+			req.chunkDateUID = message.getLong();
+			req.chunkMaxSize = message.getInt();
+			req.nbBytes = message.getTrailInt();
 			req.msg = message;
 			synchronized (requests) {
 				requests.add(req);
@@ -109,15 +148,19 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		}
 	}
 
-	private void sendChunk(long senderId, FsFile fic, int idx, FsChunk chunkOk) {
+	private void sendChunk(long senderId, FsFile fic, FsChunk chunkOk) {
 
-		System.out.println("SEND CHUNK : send it!");
+		System.out.println(this.manager.getComputerId()+"$ SEND CHUNK : send it!");
 		ByteBuff buff = new ByteBuff();
 		buff.put((byte)1);
+		buff.putLong(fic.getId());
 		buff.putUTF8(fic.getPath());
+		buff.putLong(fic.getModifyDate());
+		buff.putLong(fic.getModifyUID());
+		buff.putLong(chunkOk.getId());
 		buff.putLong(chunkOk.lastModificationTimestamp());
 		buff.putLong(chunkOk.lastModificationUID());
-		buff.putInt(idx);
+		buff.putInt(chunkOk.getMaxSize());
 		//send chunk data
 		buff.putTrailInt(chunkOk.currentSize());
 		buff.limit(buff.position()+chunkOk.currentSize());
@@ -126,17 +169,19 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		manager.getNet().writeMessage(senderId, SEND_FILE_CHUNK, buff);
 	}
 
-	public void requestchunk(String path, long modifyDate, int idx) {
-		System.out.println(this.manager.getComputerId()%100+" WRITE GET CHUNK "+path);
+	public void requestchunk(FsFile fic, FsChunk chunk) {
+		System.out.println(this.manager.getComputerId()%100+" WRITE GET CHUNK "+fic.getPath()+" : "+chunk.getId());
 		ByteBuff buff = new ByteBuff();
-		buff.putUTF8(path);
-		buff.putLong(modifyDate);
-		buff.putInt(idx);
+		buff.putLong(fic.getId());
+		buff.putUTF8(fic.getPath());
+		buff.putLong(fic.getModifyDate());
+		buff.putLong(chunk.getId());
+		buff.putLong(chunk.lastModificationTimestamp());
 		buff.flip();
 		manager.getNet().writeBroadcastMessage(GET_FILE_CHUNK, buff);
 	}
 	
-	public FsChunk waitReceiveChunk(String path, long modifyDate, int idx) {
+	public FsChunk waitReceiveChunk(long idChunk, long idFile, long modifyDateFile) {
 		Semaphore mySema= new Semaphore(1);
 		waiters.add(mySema);
 		try {
@@ -149,21 +194,33 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 					Iterator<Request> it = requests.iterator();
 					while(it.hasNext()){
 						Request req = it.next();
-						if(req.path.equals(path) && modifyDate <= req.modifyDate && idx == req.idx){
+						if(idFile == req.fileId && idChunk == req.chunkId){
 							//my message!
+							//TODO: do not use modifyDateFile?
 							System.out.println("check msgs for chunks : FIND MY ONE!");
-							retVal = new FsChunkBuffer(req.msg, req.modifyDate, req.modifyUID);
+							retVal = new FsChunkBuffer(req.msg, req.modifyDate, req.modifyUID, idChunk);
+							retVal.setCurrentSize(req.nbBytes);
+							retVal.setMaxSize(req.chunkMaxSize);
 							it.remove();
+							System.out.println("check msgs for chunks : FIND MY ONE: "+retVal);
 							break;
 						}
 					}
 				}
 			}
+			System.out.println("check msgs for chunks : return: "+retVal);
 			return retVal;
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 			return null;
+		}finally {
+			waiters.remove(mySema);
 		}
+	}
+
+	public void register(ClusterManager net) {
+		net.registerListener(GET_FILE_CHUNK, this);
+		net.registerListener(SEND_FILE_CHUNK, this);
 	}
 
 }

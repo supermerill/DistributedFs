@@ -36,35 +36,46 @@ public class StandardManager implements FileSystemManager {
 	
 	public static void main(String[] args) throws IOException {
 		//TODO: read config file
-		new Thread(()->{
-			StandardManager manager = new StandardManager();
-			manager.initBdNet("./data1", 17830);
-			manager.initializeNewCluster();
-			manager.initOs("./data1", (char)'Q'
-					);
-		}).start();
-		
-		try {
-			Thread.sleep(100);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+		System.out.println("args.length="+args.length);
+		if(args.length>1){
+			System.out.println("====================start client ====================");
+
+			new Thread(()->{
+				StandardManager manager = new StandardManager();
+				manager.initBdNet("./data"+args[0], Integer.parseInt(args[1]));
+				if(args.length<3){
+					manager.initializeNewCluster();
+				}
+
+				if(args.length>2){
+						try {
+							Thread.sleep(100);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						manager.net.connect("localhost",Integer.parseInt(args[2]));
+				}
+				
+				manager.initOs("./data"+args[0], args[0].charAt(0));
+			}).start();
 		}
 		
-		System.out.println("====================start second client ====================");
-		new Thread(()->{
-			StandardManager manager2 = new StandardManager();
-			
-			manager2.initBdNet("./data2", 17831);
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			manager2.net.connect("localhost",17830);
-
-			manager2.initOs("./data2", (char)0//'R'
-					);
-		}).start();
+		
+//		System.out.println("====================start second client ====================");
+//		new Thread(()->{
+//			StandardManager manager2 = new StandardManager();
+//			
+//			manager2.initBdNet("./data2", 17831);
+//			try {
+//				Thread.sleep(1000);
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
+//			manager2.net.connect("localhost",17830);
+//
+//			manager2.initOs("./data2", (char)0//'R'
+//					);
+//		}).start();
 	}
 	
 	public void initializeNewCluster() {
@@ -94,6 +105,7 @@ public class StandardManager implements FileSystemManager {
 				net = new PhysicalServer(this, false, dataPath);
 				net.init(port);
 				algoPropagate.register(this.net);
+				chunkRequester.register(this.net);
 			}
 		}catch (Exception e) {
 			e.printStackTrace();
@@ -200,32 +212,33 @@ public class StandardManager implements FileSystemManager {
 
 	@Override
 	public void requestDirUpdate() {
-		algoPropagate.requestDirPath("/");
+		algoPropagate.requestDirPath("/",-1);
 	}
 
 	@Override
-	public FsChunk requestChunk(FsFileFromFile file, int idx, List<Long> serverIdPresent) {
+	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
 		System.out.println("REQUEST CHUNK");
 		//request chunk to all servers
-		chunkRequester.requestchunk(file.getPath(), file.getModifyDate(), idx);
+		chunkRequester.requestchunk(file, chunk);
 		//register to the chunk requester
 		boolean ok = false;
-		FsChunk chunk = null;
+		FsChunk chunkReceived = null;
 		try{
 //			while(!ok){
-				chunk = chunkRequester.waitReceiveChunk(file.getPath(), file.getModifyDate(), idx);
+			chunkReceived = chunkRequester.waitReceiveChunk(chunk.getId(), file.getId(), file.getModifyDate());
 //				if(chunk.)
 				//TODO : check if it's our chunk
-				if(chunk != null){
+				if(chunkReceived != null){
 					ok = true;
 				}else{
-					System.out.println("Can't find chunk "+file.getPath()+" idx:"+idx);
+					System.out.println("Can't find chunk(1) "+file.getPath()+" id:"+chunk.getId());
 				}
 //			}
 		}catch(RuntimeException ex){
-			System.out.println("Can't find chunk "+file.getPath()+" idx:"+idx);
+			ex.printStackTrace();
+			System.out.println("Can't find chunk(2) "+file.getPath()+" id:"+chunk.getId());
 		}
-		return chunk;
+		return chunkReceived;
 	}
 
 	@Override

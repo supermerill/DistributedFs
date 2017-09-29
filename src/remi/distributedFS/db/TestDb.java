@@ -92,12 +92,6 @@ public class TestDb {
 			}
 
 			@Override
-			public FsChunk requestChunk(FsFileFromFile parent, int idx,  List<Long> serverIdPresent) {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
 			public char getLetter() {
 				// TODO Auto-generated method stub
 				return 0;
@@ -105,6 +99,12 @@ public class TestDb {
 
 			@Override
 			public String getRootFolder() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
 				// TODO Auto-generated method stub
 				return null;
 			}
@@ -135,7 +135,7 @@ public class TestDb {
 
     	ByteBuff buff = new ByteBuff(1024);
     	buff.limit((int)f21.getSize());
-    	FsFile.FsFileMethods.read(f21, buff, 0);
+    	FsFile.read(f21, buff, 0);
     	buff.flip();
     	System.out.println(Charset.forName("UTF-8").decode(buff.toByteBuffer()));
 //		System.out.println("=========dir=====>\n ");((FsObjectImplFromFile)dir).print();
@@ -163,7 +163,8 @@ public class TestDb {
 		if(d1==null){
 			System.out.println("create "+name);
 			d1 = parent.createSubFile(name);
-			d1.rearangeChunks(128, 1);
+//			d1.rearangeChunks(128, 1);
+			d1.createNewChunk(-1);
 		}
 		System.out.println(name+" = "+d1);
 		System.out.println(name+" = "+d1.getPath());

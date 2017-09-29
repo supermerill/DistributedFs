@@ -35,6 +35,8 @@ public class FsChunkFromFile implements FsChunk {
 		this.master = master;
 		this.idx = idx;
 		this.lastChange = 0;
+		this.maxSize = 0; //maybe we should use factories (with interface for them)
+		this.currentSize = 0;
 		this.isValid = false;
 		this.loaded = false;
 		this.id = master.getComputerId()<<48 | ( sectorId&0xFFFFFFFFFFFFL);
@@ -80,22 +82,6 @@ public class FsChunkFromFile implements FsChunk {
 	public boolean write(ByteBuff toWrite, int offset, int size) {
 		ensureLoaded();
 		ensureDatafield();
-		//create folder path
-		if(!data.exists()){
-			try {
-				//ensure dirs exists
-//				File myDir = new File(master.getRootRep()+parent.getParent().getPath());
-//				if(!myDir.exists()) myDir.mkdirs();
-				//useless, we now store all on our root folder
-				
-				
-				//create file
-				data.createNewFile();
-				System.err.println("data '"+data.getPath()+"'is now created");
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
 		synchronized (this) {
 
 			try {
@@ -175,42 +161,66 @@ public class FsChunkFromFile implements FsChunk {
 			}
 		}
 		nameBuffer.flip();
+		//lol it's not used as we use the id!!!
 //		data = new File(FsObjectImplFromFile.CHARSET.decode(nameBuffer).toString());
-		ensureDatafield();
-		System.out.println("chunk has data in "+data.getPath());
+//		ensureDatafield();
+//		System.out.println("chunk has data in "+data.getPath());
 		
 		this.loaded = true;
 		
 	}
 	
 	protected void ensureDatafield(){
+		System.out.println("ensureDatafield "+getId()+" isLocal="+isValid);
+		new Exception().printStackTrace();
 		if(data==null){
 			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
 			data=new File(master.getRootRep()+"/"+getId());
+			//create folder path
+			if(!data.exists()){
+				try {
+					//ensure dirs exists
+//					File myDir = new File(master.getRootRep()+parent.getParent().getPath());
+//					if(!myDir.exists()) myDir.mkdirs();
+					//useless, we now store all on our root folder
+					
+					
+					//create file
+					data.createNewFile();
+					System.err.println("data '"+data.getPath()+"'is now created");
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 			if(!isValid){
 				//request it
-				FsChunk meWithData = master.getManager().requestChunk(this.parent, idx, serverIdPresent());
+				System.out.println("REQUEST DATA FOR CHUNK "+getId());
+				FsChunk meWithData = master.getManager().requestChunk(this.parent, this, serverIdPresent());
+				System.out.println("ensureDatafield(2) "+getId());
 				this.currentSize = meWithData.currentSize();
 				//create file & copy data
-				if(!data.exists()){
-					try {
-						data.createNewFile();
-					} catch (IOException e) {
-						e.printStackTrace();
+//				if(!data.exists()){
+//					try {
+//						data.createNewFile();
+//					} catch (IOException e) {
+//						e.printStackTrace();
+//					}
+//				}
+				System.out.println("ensureDatafield(3) "+getId());
+				//copy
+				synchronized(this){
+					isValid = true; //to not proc this method again
+					ByteBuff buff = new ByteBuff(Math.min(currentSize,1024*16));
+					for(int i=0;i<meWithData.currentSize();i+=buff.limit()){
+						buff.rewind();
+						meWithData.read(buff, i*buff.limit(), buff.limit());
+						this.write(buff, i*buff.limit(), buff.limit());
 					}
 				}
-				//copy
-				ByteBuff buff = new ByteBuff(256*256);
-				for(int i=0;i<meWithData.currentSize();i+=buff.limit()){
-					buff.rewind();
-					meWithData.read(buff, i*buff.limit(), buff.limit());
-					this.write(buff, i*buff.limit(), buff.limit());
-				}
 				//ready!
-				lastChange = meWithData.lastModificationTimestamp();
-				isValid = true;
-				parent.setDirty(true);
-				parent.flush();
+//				lastChange = meWithData.lastModificationTimestamp();
+//				parent.setDirty(true);
+//				parent.flush();
 			}
 		}
 	}
@@ -222,13 +232,14 @@ public class FsChunkFromFile implements FsChunk {
 		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
 		//master.loadSector(buff, getId()); //useless, we want to write, not read!
 		save(buff); //this one should auto-call master.write
-		
+
 		if(parent==null){
 			//delete this one
 //			this.delete();
 			master.releaseSector(this.getSector());
 		}else{
-			master.saveSector(buff, this.getSector());
+			//alread saved in save()
+//			master.saveSector(buff, this.getSector());
 		}
 	}
 
@@ -248,10 +259,14 @@ public class FsChunkFromFile implements FsChunk {
 		buffer.putInt(maxSize);
 		buffer.putInt(idx);
 		buffer.put((byte)(isValid?1:0));
-		
+
 		//get name buffer
-		ensureDatafield();
-		ByteBuffer buffName = FsObjectImplFromFile.CHARSET.encode(data.getPath());
+//		ensureDatafield(); //don't do that, it create a dead loop
+		ByteBuffer buffName = FsObjectImplFromFile.CHARSET.encode("");
+		if(data!=null){
+			buffName = FsObjectImplFromFile.CHARSET.encode(data.getPath());
+		}
+		
 		//buffName.flip(); already done in encode()
 		buffer.putInt(buffName.limit());
 
@@ -331,7 +346,9 @@ public class FsChunkFromFile implements FsChunk {
 		}
 	}
 
+	@Override
 	public long getId() {
+		ensureLoaded();
 		return id;
 	}
 
@@ -346,9 +363,15 @@ public class FsChunkFromFile implements FsChunk {
 	}
 
 	@Override
-	public int maxSize() {
+	public int getMaxSize() {
 		ensureLoaded();
 		return maxSize;
+	}
+
+	@Override
+	public void setMaxSize(int newMaxSize) {
+		ensureLoaded();
+		maxSize = newMaxSize;
 	}
 
 	@Override
@@ -387,23 +410,29 @@ public class FsChunkFromFile implements FsChunk {
 		master.releaseSector(sector);
 	}
 
-	public void truncate(long newSize) {
+	public void setCurrentSize(int newSize) {
 		ensureLoaded();
-		ensureDatafield();
-
-		synchronized (this) {
-
-			try {
-				FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
-				
-				dataChannel.truncate(newSize);
-				currentSize = (int) dataChannel.size();
-				dataChannel.close();
-				
-				lastChange = System.currentTimeMillis();
-			} catch (IOException e) {
-				e.printStackTrace();
+		if(isValid){
+			ensureDatafield();
+	
+			synchronized (this) {
+	
+				try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)){
+					
+					if( dataChannel.size() < newSize){
+						//grow
+						dataChannel.write(ByteBuffer.allocate((int) (newSize - dataChannel.size())), dataChannel.size());
+					}else{
+						//reduce (or let the same)
+						dataChannel.truncate(newSize);
+					}
+					currentSize = (int) dataChannel.size();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
+		}else{
+			currentSize = newSize;
 		}
 	}
 
@@ -418,6 +447,12 @@ public class FsChunkFromFile implements FsChunk {
 			}
 			data = null;
 		}
+	}
+
+	@Override
+	public void changes() {
+		ensureLoaded();
+		lastChange = System.currentTimeMillis();
 	}
 
 }

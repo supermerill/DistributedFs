@@ -30,11 +30,11 @@ public interface FileSystemManager {
 	public long getGroupId();
 	
 	public void requestDirUpdate();
-	public FsChunk requestChunk(FsFileFromFile parent, int idx, List<Long> serverIdPresent);
+	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent);
 	
 	
 	
-	char getLetter();
-	String getRootFolder();
+	public char getLetter();
+	public String getRootFolder();
 
 }

@@ -6,21 +6,18 @@ import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getPa
 import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getPathFile;
 import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getPathObjectName;
 import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getPathParentDir;
-import static remi.distributedFS.datastruct.FsFile.FsFileMethods.getChunk;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Set;
 
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectVisitor;
-import remi.distributedFS.db.impl.FsDirectoryFromFile;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.util.ByteBuff;
@@ -28,6 +25,90 @@ import remi.distributedFS.util.ByteBuff;
 public class PropagateChange extends AbstractFSMessageManager implements FsObjectVisitor {
 	
 	FileSystemManager manager;
+	
+	static interface FsObjectFunc<T extends FsObject>{
+		public void move(T obj, FsDirectory newDir);
+		public T getFromPath(FsDirectory root, String path);
+		public T asObject(FsObject obj);
+		public void remove(FsDirectory parent, T obj);
+		public void send(long senderId, T obj);
+		public T createNew(FsDirectory dirParent, String name);
+		public void readd(FsDirectory parent, T obj);
+	}
+	class FsDirectoryFunc implements FsObjectFunc<FsDirectory>{
+		@Override
+		public void move(FsDirectory obj, FsDirectory newDir) {
+			obj.getParent().moveDir(obj, newDir);
+		}
+
+		@Override
+		public FsDirectory getFromPath(FsDirectory root, String path) {
+			return getPathDir(root, path);
+		}
+
+		@Override
+		public FsDirectory asObject(FsObject obj) {
+			return (obj instanceof FsDirectory)? (FsDirectory)obj : null;
+		}
+
+		@Override
+		public void remove(FsDirectory parent, FsDirectory dir) {
+			parent.removeDir(dir);
+		}
+
+		@Override
+		public void send(long senderId, FsDirectory dir) {
+			PropagateChange.this.sendDir(senderId, dir);
+		}
+
+		@Override
+		public FsDirectory createNew(FsDirectory dirParent, String name) {
+			return dirParent.createSubDir(name);
+		}
+
+		@Override
+		public void readd(FsDirectory parent, FsDirectory dir) {
+			dir.getParent().getDirs().add(dir);
+		}
+	}
+	class FsFileFunc implements FsObjectFunc<FsFile>{
+		@Override
+		public void move(FsFile obj, FsDirectory newDir) {
+			obj.getParent().moveFile(obj, newDir);
+		}
+
+		@Override
+		public FsFile getFromPath(FsDirectory root, String path) {
+			return getPathFile(root, path);
+		}
+
+		@Override
+		public FsFile asObject(FsObject obj) {
+			return (obj instanceof FsFile)? (FsFile)obj : null;
+		}
+
+		@Override
+		public void remove(FsDirectory parent, FsFile obj) {
+			parent.removeFile(obj);
+		}
+
+		@Override
+		public void send(long senderId, FsFile obj) {
+			PropagateChange.this.sendfile(senderId, obj);
+		}
+
+		@Override
+		public FsFile createNew(FsDirectory dirParent, String name) {
+			return dirParent.createSubFile(name);
+		}
+
+		@Override
+		public void readd(FsDirectory parent, FsFile obj) {
+			obj.getParent().getFiles().add(obj);
+		}
+	}
+	protected final FsDirectoryFunc dirFunc = new FsDirectoryFunc();
+	protected final FsFileFunc fileFunc = new FsFileFunc();
 
 	public PropagateChange(FileSystemManager manager) {
 		super();
@@ -61,32 +142,27 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		message.putLong(obj.getDeleteUID());
 	}
 	
-	public boolean isDeleted(ByteBuff message){
-		//check if parentId is -1
-		int pos = message.position();
-		long myId = message.getLong();
-		long modifyDate = message.getLong();
-		long parentId = message.getLong();
-		
-		message.position(pos);
-		
-		return parentId < 0;
-	}
+//	public boolean isDeleted(ByteBuff message){
+//		//check if parentId is -1
+//		int pos = message.position();
+//		long myId = message.getLong();
+//		long modifyDate = message.getLong();
+//		long parentId = message.getLong();
+//		
+//		message.position(pos);
+//		
+//		return parentId < 0;
+//	}
 	
-	public boolean getHeader(ByteBuff message, FsObject obj){
-		System.out.println(this.manager.getComputerId()%100+" getHeader ");
-//		if(obj.getId() != id) System.err.println("Error, file id is <"+id+"> for "+obj.getPath());
-		long modifyDate = message.getLong();
-		if(modifyDate > obj.getModifyDate()){
-			System.out.println(this.manager.getComputerId()%100+" sended dir is new! nice! : "+modifyDate+ " > "+obj.getModifyDate());
-			//more recent, update!
+	public void readHeader(ByteBuff message, FsObject obj){
+			obj.setModifyDate(message.getLong());
+			
 			obj.setParentId(message.getLong());
 			obj.setUserId(message.getLong());
 			obj.setGroupId(message.getLong());
 			obj.setPUGA(message.getShort());
 			
 			obj.setCreationDate(message.getLong());
-			obj.setModifyDate(modifyDate);
 			obj.setDeleteDate(message.getLong());
 
 			obj.setName(message.getUTF8());
@@ -94,30 +170,83 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			obj.setCreatorUID(message.getLong());
 			obj.setModifyUID(message.getLong());
 			obj.setDeleteUID(message.getLong());
+	}
+	
+	public boolean copyHeader(FsObject from, FsObject to){
+		System.out.println(this.manager.getComputerId()%100+" getHeader ");
+		if(from.getModifyDate() > to.getModifyDate()){
+			System.out.println(this.manager.getComputerId()%100+" sended dir is changed! nice! : "+from.getModifyDate()+ " > "+to.getModifyDate());
+			to.setModifyDate(from.getModifyDate());
+//			//more recent, update!
+				
+			to.setParentId(from.getParentId());
+			to.setUserId(from.getUserId());
+			to.setGroupId(from.getGroupId());
+			to.setPUGA(from.getPUGA());
+				
+			to.setCreationDate(from.getCreationDate());
+			to.setDeleteDate(from.getDeleteDate());
+	
+			to.setName(from.getName());
+	
+			to.setCreatorUID(from.getCreatorUID());
+			to.setModifyUID(from.getModifyUID());
+			to.setDeleteUID(from.getDeleteUID());
+
 			return true;
 		}else{
-			System.out.println(this.manager.getComputerId()%100+" sended dir is OOOOld: "+modifyDate+ " < "+obj.getModifyDate());
-			//just parse, ignore it.
-			message.getLong(); // pid
-			message.getLong(); // uid
-			message.getLong(); // gid
-			message.getShort(); // puga
-
-			message.getLong(); // dateC
-			message.getLong(); // dateD
-			
-			message.getUTF8();
-			
-			message.getLong(); // cuid
-			message.getLong(); // muid
-			message.getLong(); // duid
-			
+			System.out.println(this.manager.getComputerId()%100+" sended dir is OOOOld: "+from.getModifyDate()+ " < "+to.getModifyDate());
 			return false;
 			
 		}
 	}
+	
+//	public boolean getHeader(ByteBuff message, FsObject obj){
+//		System.out.println(this.manager.getComputerId()%100+" getHeader ");
+////		if(obj.getId() != id) System.err.println("Error, file id is <"+id+"> for "+obj.getPath());
+//		long modifyDate = message.getLong();
+//		if(modifyDate > obj.getModifyDate()){
+//			System.out.println(this.manager.getComputerId()%100+" sended dir is new! nice! : "+modifyDate+ " > "+obj.getModifyDate());
+//			//more recent, update!
+//			obj.setParentId(message.getLong());
+//			obj.setUserId(message.getLong());
+//			obj.setGroupId(message.getLong());
+//			obj.setPUGA(message.getShort());
+//			
+//			obj.setCreationDate(message.getLong());
+//			obj.setModifyDate(modifyDate);
+//			obj.setDeleteDate(message.getLong());
+//
+//			obj.setName(message.getUTF8());
+//
+//			obj.setCreatorUID(message.getLong());
+//			obj.setModifyUID(message.getLong());
+//			obj.setDeleteUID(message.getLong());
+//			return true;
+//		}else{
+//			System.out.println(this.manager.getComputerId()%100+" sended dir is OOOOld: "+modifyDate+ " < "+obj.getModifyDate());
+//			//just parse, ignore it.
+//			message.getLong(); // pid
+//			message.getLong(); // uid
+//			message.getLong(); // gid
+//			message.getShort(); // puga
+//
+//			message.getLong(); // dateC
+//			message.getLong(); // dateD
+//			
+//			message.getUTF8();
+//			
+//			message.getLong(); // cuid
+//			message.getLong(); // muid
+//			message.getLong(); // duid
+//			
+//			return false;
+//			
+//		}
+//	}
 
 	private ByteBuff createNotFindPathMessage(String path) {
+		System.out.println(this.manager.getComputerId()%100+" WRITE SEND NO PATH OBJ "+path);
 		ByteBuff message = new ByteBuff();
 		message.put((byte)0);
 		//send path
@@ -125,40 +254,45 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		return message.flip();
 	}
 
-	public void requestDirPath(String path){
+	public void requestDirPath(String path, long dirId){
 		System.out.println(this.manager.getComputerId()%100+" WRITE GET DIR "+path+" for all");
 		ByteBuff buff = new ByteBuff();
 		buff.putUTF8(path);
+		buff.putLong(dirId);
 		buff.flip();
 		manager.getNet().writeBroadcastMessage(GET_DIR, buff);
 	}
 	
-	public void requestFilePath(String path){
-//		System.out.println(this.manager.getComputerId()%100+" WRITE GET DIR "+path+" for "+senderId);
+	public void requestFilePath(String path, long fileId){
+		System.out.println(this.manager.getComputerId()%100+" WRITE GET FILE MESSAGE : "+path+" : "+fileId);
 		ByteBuff buff = new ByteBuff();
 		buff.putUTF8(path);
+		buff.putLong(fileId);
 		buff.flip();
 		manager.getNet().writeBroadcastMessage(GET_FILE_DESCR, buff);
 	}
 
-	public void requestDirPath(long serverId, String path){
-//		System.out.println(this.manager.getComputerId()%100+" WRITE GET DIR "+path+" for "+senderId);
+	public void requestDirPath(long serverId, String path, long dirId){
+		System.out.println(this.manager.getComputerId()%100+" WRITE GET DIR MESSAGE : "+path+" : "+dirId+" for "+serverId);
 		ByteBuff buff = new ByteBuff();
 		buff.putUTF8(path);
+		buff.putLong(dirId);
 		buff.flip();
 		manager.getNet().writeMessage(serverId, GET_DIR, buff);
 	}
 	
-	public void requestFilePath(long serverId, String path){
-//		System.out.println(this.manager.getComputerId()%100+" WRITE GET DIR "+path+" for "+senderId);
+	public void requestFilePath(long serverId, String path, long fileId){
+		System.out.println(this.manager.getComputerId()%100+" WRITE GET FILE MESSAGE : "+path+" : "+fileId+" for "+serverId);
 		ByteBuff buff = new ByteBuff();
 		buff.putUTF8(path);
+		buff.putLong(fileId);
 		buff.flip();
 		manager.getNet().writeMessage(serverId, GET_FILE_DESCR, buff);
 	}
 
 	//TODO: sendobject, and receive for the 2 of them.
-	public void requestPath(long serverId, long objId) {
+	@Deprecated
+	public void requestObject(long serverId, long objId) {
 //		System.out.println(this.manager.getComputerId()%100+" WRITE GET DIR "+path+" for "+senderId);
 		ByteBuff buff = new ByteBuff();
 		buff.putLong(objId);
@@ -179,118 +313,139 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		//send metadata
 		putHeader(message, fic);
 		//send nbChunks
-		message.putTrailInt(fic.getNbChunks());
-		message.putTrailInt(fic.getChunkSize());
+		message.putTrailInt(fic.getChunks().size());
 		//send my chunks timestamps (0 if i didn't have this one
-		for(int i=0; i<fic.getNbChunks();i++){
-			FsChunk chunk = getChunk(fic, i);
-			if(chunk!=null && chunk.isPresent()){
-				message.putLong(chunk.lastModificationTimestamp());
+		final int sizeChunk = fic.getChunks().size();
+		for(int i=0; i<sizeChunk;i++){
+			FsChunk chunk = fic.getChunks().get(i);
+			if(chunk!=null){
+				message.putLong(chunk.getId());
+				if(chunk.isPresent()){
+					message.putLong(chunk.lastModificationTimestamp());
+				}else{
+					message.putLong(-1);
+				}
+				message.putInt(chunk.currentSize());
 			}else{
+				System.err.println(this.manager.getComputerId()%100+" SEND FILE ERROR: null chunk!! (pos "+i+")");
 				message.putLong(-1);
+				message.putLong(-1);
+				message.putInt(-1);
 			}
 		}
 		message.flip();
 		return message;
 	}
 
+	
 	private void getAFileFrom(long senderId, ByteBuff message) {
-		System.out.println(this.manager.getComputerId()%100+" READ SEND FileChunk from "+senderId%100);
+
 		if (message.get()==1){
 			String path = message.getUTF8();
-			long  fileId = message.getLong();
-			if(fileId<0){
-				System.out.println(this.manager.getComputerId()%100+" READ SEND File  id = "+fileId+" << USELESSS!!!!!!");
+			long receivedId = message.getLong();
+			System.out.println(this.manager.getComputerId()%100+" FILECG RECEIVE FILE "+path+" "+receivedId+" from "+senderId);
+			FsObjectDummy dummy = new FsObjectDummy(receivedId, path);
+			readHeader(message, dummy);
+			if(receivedId<0){
+				System.out.println(this.manager.getComputerId()%100+" FILECG  Id = "+receivedId+" << USELESSS!!!!!!");
 				return;
 			}
-			FsDirectory root = manager.getRoot();
-			FsFile fic = getPathFile(root, path);
-			boolean changes = false;
-			if(fic == null){
-				//try to see if it has moved
-				FsObject obj = manager.getDb().getDirect(fileId);
-				if(obj != null){
-					if(obj instanceof FsFile){
-						System.out.println(this.manager.getComputerId()%100+" Finded a displaced file : "+obj.getPath()+" -> "+path);
-						fic = (FsFile) obj;
-						System.err.println("TODO: move the file");
-					}else{
-						System.err.println(this.manager.getComputerId()%100+" Finded a displaced thing! : "+obj+" which isn't a file : "+obj.getPath()+" -> "+path);
-						System.err.println("TODO: correct the error");
-					}
-				}
-			}
-			if(fic == null){
-				//check if it's not a delete notification
-				if(isDeleted(message)){
-					System.out.println(this.manager.getComputerId()%100+" notif of detion on an not-existant file -> no-event!");
-					return;
-				}else{
-					System.out.println(this.manager.getComputerId()%100+" can't find fic "+path);
-					//Create new dir!
-					
-					FsDirectory ficParent = getPathParentDir(root, path);
-					if(ficParent==null){
-						ficParent = getPathDir(root, path.substring(0, path.lastIndexOf('/')));
-					}
-					if(ficParent==null){
-						//request parent before child.
-						requestDirPath(senderId, path.substring(0, path.lastIndexOf('/')));
-						System.out.println(this.manager.getComputerId()%100+" FICCG can't find parent : request parent and terminate this message parsing. "+path+"=="+getPathParentDir(root, path)+" -> "+path.substring(0, path.lastIndexOf('/')));
-						return;
-					}
-					fic = ficParent.createSubFile(getPathObjectName(root,path));
-					fic.setId(fileId);
-					ficParent.flush();
-					changes = true;
-				}
-			}
-			else{
-				System.out.println(this.manager.getComputerId()%100+" dir "+path+ " already there : "+fic.getPath());
-				System.out.println(fic.getPath());
-			}
-			changes = changes || getHeader(message, fic);
 			
-			//don't verify changes if we are more recent than them
-			//TODO change this by a better way
-			if(changes){
-				int nbChunks = message.getTrailInt();
-				int chunkSize = message.getTrailInt();
-				if(fic.getNbChunks() != nbChunks && chunkSize != fic.getChunkSize()){
-					fic.rearangeChunks(chunkSize, nbChunks);
-					//invalidate all
-					System.out.println(this.manager.getComputerId()%100+" READ SEND FileChunk : INVALIDATE ALL");
-					for(FsChunk fsChunk : fic.getChunks()){
-						fsChunk.setPresent(false);
-					}
-				}else{
-					//check last modification timestamp
-					for(int i=0;i<nbChunks;i++){
-						if(fic.getChunks().get(i).lastModificationTimestamp() < message.getLong()){
-							System.out.println(this.manager.getComputerId()%100+" READ SEND FileChunk : INVALIDATE "+i);
-							fic.getChunks().get(i).setPresent(false);
-						}
-					}
-				}
-				
-				
+			
+			//get the dir object or create it if not present
+			FsFile fic = getOrCreateOrRequestObject(senderId, path, receivedId, dummy, fileFunc);
+			if(fic==null){
+				return;
 			}
-			//flush changes
-			if(changes){
+			
+
+			//check if moved
+			if(!checkObjectMoved(senderId, fic, path, dummy, fileFunc)){
+				return;
+			}
+			
+
+			//copy header  / properties
+			long tempOldLong = fic.getModifyDate();
+			copyHeader(dummy, fic);
+			System.out.println(this.manager.getComputerId()%100+" FILECG old mod date (fic) : "+tempOldLong+", new one : "+fic.getModifyDate());
+			
+			//check chunks
+			System.out.println(this.manager.getComputerId()%100+" FILECG check fic inside "+fic.getPath());
+			int nbChunks = message.getTrailInt();
+			System.out.println(this.manager.getComputerId()%100+" FILECG "+fic.getPath()+" has "+nbChunks+" chunks");
+			List<FsChunk> chunksToSet = new ArrayList<>();
+			for(int i=0;i<nbChunks;i++){
+				long chunkId = message.getLong();
+				long chunkDate = message.getLong();
+				int chunkSize = message.getInt();
+				if(chunkId != -1){
+					FsChunk chunk = FsFile.getChunk(fic, chunkId);
+					boolean used = true;
+					if(chunk == null){
+						//search in allChunks
+						chunk = FsFile.getFromAllChunk(fic, chunkId);
+						used = false;
+					}
+					if(chunk == null){
+						//if can't retrieve by id, maybe new?
+						System.out.println(this.manager.getComputerId()%100+" FILECG oh, a new chunk");
+//						requestDirPath(senderId, dir.getPath()+"/"+dirName, chunkId);
+						chunk = fic.createNewChunk(chunkId);
+//						chunk.setLastModificationTimestamp()
+						if(!chunk.serverIdPresent().contains(senderId))
+							chunk.serverIdPresent().add(senderId);
+						chunk.setCurrentSize(chunkSize);
+					}else if(chunk.getId() != chunkId){
+						System.err.println(this.manager.getComputerId()%100+" FILECG oh, a chunk BAD ID : impossibkle!!!!");
+						// bad id: request the two of them.
+//						requestDirPath(senderId, dir.getPath()+"/"+dirName, childDir.getId()); //this one should get us the two files, one from path, one from id
+					}else{
+						//check lastChangeDate & modifyDate
+						if(chunk.lastModificationTimestamp()<chunkDate && !used){
+							System.out.println(this.manager.getComputerId()%100+" FILECG oh, a chunk was re-used : "+chunk.getId());
+							//this dir has something modified (inside or deep inside)
+							//request a recursive check. NOT FOR CHUNK
+//							requestDirPath(senderId, childDir.getPath(), childDir.getId());
+						}
+						if(chunk.lastModificationTimestamp()<chunkDate){
+							chunk.setPresent(false);
+							chunk.setCurrentSize(chunkSize);
+							if(!chunk.serverIdPresent().contains(senderId))
+								chunk.serverIdPresent().add(senderId);
+							chunk.flush();
+						}
+//						direxist.add(childDir);
+					}
+					chunksToSet.add(chunk);
+				}
+			}
+			if(!chunksToSet.equals(fic.getChunks())){
+				System.out.println(this.manager.getComputerId()%100+" FILECG : chunks are not the sames : "); 
+				System.out.print(" their=");
+				for(FsChunk ch : chunksToSet){ System.out.print(", "+ch.getId());}
+				System.out.println( " ; ");
+				System.out.print(" our=");
+				for(FsChunk ch : fic.getChunks()){ System.out.print(", "+ch.getId());}
+				System.out.println();
+				fic.setChunks(chunksToSet);
 				fic.flush();
 			}
+
 		}else{
 			String mypath = message.getUTF8();
 			System.out.println(this.manager.getComputerId()%100+" READ SEND FILE : NO file "+mypath+" from "+senderId);
-			System.err.println("Requested an not existant file : "+mypath);
+			System.err.println("Requested an not existant file/folder : "+mypath);
 			// request his par<ent dir, to see if it's not deleted.
 			FsDirectory dirParent = getPathParentDir( manager.getRoot(), mypath);
-			if(dirParent != null) requestDirPath(senderId, dirParent.getPath());
+			if(dirParent != null) requestDirPath(senderId, dirParent.getPath(), dirParent.getId());
 		}
+
 	}
 
 	
 	public ByteBuff createDirectoryMessage(FsDirectory dir){
+		System.out.println("WRITE SEND DIR MESSAGE : "+dir.getPath()+" : "+dir.getModifyDate());
 
 		String path = dir.getPath();
 		if(path.equals("") && dir.getParent()==dir){
@@ -302,6 +457,8 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		message.put((byte)1);
 		message.putUTF8(path);
 		message.putLong(dir.getId());
+		message.putLong(dir.getLastChangeDate());
+		message.putLong(dir.getLastChangeUID());
 		putHeader(message, dir);
 		List<FsDirectory> arrayDir = new ArrayList<>(dir.getDirs());
 		message.putTrailInt(arrayDir.size());
@@ -310,6 +467,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			message.putUTF8(dchild.getName());
 			message.putLong(dchild.getId());
 			message.putLong(dchild.getModifyDate());
+			message.putLong(dchild.getLastChangeDate());
 		}
 		List<FsFile> arrayFile = new ArrayList<>(dir.getFiles());
 		message.putTrailInt(arrayFile.size());
@@ -341,197 +499,245 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		return null;
 	}
 	
-	@SuppressWarnings("unused")
+
+	public <T extends FsObject> boolean checkObjectMoved(final long senderId, final T obj, final String path, final FsObject dummy, final FsObjectFunc<T> func){
+		//check if moved
+		if(obj.getPath().equals(path) || path.equals("/")){
+			//not moved : ok
+		}else if(obj.getModifyDate()<dummy.getModifyDate()){
+			//move it
+			FsDirectory root = manager.getRoot();
+			//TODO: refactor "get parent dir from path" , it's used multiple time : create external function.
+			FsDirectory dirParent = getPathParentDir(root, path);
+			if(dirParent==null){
+				dirParent = getPathDir(root, path.substring(0, path.lastIndexOf('/')));
+			}
+			if(dirParent==null){
+				//request parent before child.
+				requestDirPath(senderId, path.substring(0, path.lastIndexOf('/')),-1);
+				System.out.println(this.manager.getComputerId()%100+" OBJCG can't find parent(2) : request parent and terminate this emssage parsing. "+path+"=="+getPathParentDir(root, path)+" -> "+path.substring(0, path.lastIndexOf('/')));
+				return false;
+			}
+			//move
+			System.out.println(this.manager.getComputerId()%100+" OBJCG move dir "+obj.getPath()+ " from "+obj.getParent().getPath()+ " to "+dirParent.getPath());
+			if(obj.getParent() != dirParent){
+//				dir.getParent().moveDir(dir, dirParent);
+				func.move(obj, dirParent);
+				obj.flush();
+			}
+			//rename
+			String newName = path.substring(path.lastIndexOf('/')+1);
+			if(!obj.getName().equals(newName)){
+				System.out.println(this.manager.getComputerId()%100+" OBJCG rename dir "+obj.getName()+" to "+newName);
+				obj.setName(newName);
+				obj.changes();
+				obj.flush();
+			}
+		}else{
+			//conflict : don't move it! / create a copy? -> TODO
+			System.err.println(this.manager.getComputerId()%100+" OBJCG conflict : a dir has been moved by "+senderId+" but i have already modified it! my date : "+obj.getModifyDate()+", their date : "+dummy.getModifyDate());
+			//don't merge the rest
+			return false;
+		}
+		return true;
+	}
+	
+	public <T extends FsObject> T getOrCreateOrRequestObject(final long senderId, final String path, final long objId, final FsObject dummy, final FsObjectFunc<T> func){
+		FsDirectory root = manager.getRoot();
+		T searchedObj = func.getFromPath(root, path);
+		if(searchedObj == null){
+			//try to see if it has moved
+			FsObject obj = manager.getDb().getDirect(objId);
+			if(obj != null){
+				searchedObj = func.asObject(obj);
+				if(searchedObj == null){
+					System.err.println(this.manager.getComputerId()%100+" OBJCG Finded a displaced thing! : "+obj+" which isn't a dir : "+obj.getPath()+" -> "+path);
+					System.err.println("TODO: correct the error");
+					return null;
+				}else{
+					System.out.println(this.manager.getComputerId()%100+" OBJCG Finded a displaced/deleted dir : "+obj.getPath()+" -> "+path);
+				}
+			}
+		}
+		if(searchedObj == null){
+			//check if it's not a delete notification
+			if(dummy.getDeleteDate()>0){
+				System.out.println(this.manager.getComputerId()%100+" OBJCG notif of detion on an not-existant folder -> no-event!");
+				return null;
+			}else{
+				System.out.println(this.manager.getComputerId()%100+" OBJCG can't find dir "+path);
+				//Create new dir!
+				FsDirectory dirParent = getPathParentDir(root, path);
+				if(dirParent==null){
+					dirParent = getPathDir(root, path.substring(0, path.lastIndexOf('/')));
+				}
+				if(dirParent==null){
+					//request parent before child.
+					requestDirPath(senderId, path.substring(0, path.lastIndexOf('/')),-1);
+					System.out.println(this.manager.getComputerId()%100+" OBJCG can't find parent : request parent and terminate this emssage parsing. "+path+"=="+getPathParentDir(root, path)+" -> "+path.substring(0, path.lastIndexOf('/')));
+					return null;
+				}
+				searchedObj = func.createNew(dirParent, getPathObjectName(root,path));
+				searchedObj.setId(objId);
+				searchedObj.flush();
+			}
+		}
+		else{
+			//check if deleted
+			if(dummy.getDeleteDate()>0){
+				//deletion message, check if deleted
+				if(searchedObj.getDeleteDate()>0){
+					//ok
+				}else{
+					//delete it, if it's newer than our modif date
+					if(searchedObj.getModifyDate()<dummy.getDeleteDate()){
+						//delete
+						func.remove(searchedObj.getParent(), searchedObj);
+					}else{
+						//emit a "warn"
+						System.out.println("Warn : dir "+searchedObj.getPath()+" is deleted in a peer, but we already change his content.");
+						//emit our version of the file
+						func.send(senderId, searchedObj);
+						//exit here
+						return null;
+					}
+				}
+			}else{
+				//check if we have not deleted it
+				if(searchedObj.getDeleteDate()>0){
+
+					//un-delete it, if it's changes are newer than our modif date
+					if(searchedObj.getDeleteDate()<dummy.getModifyDate()){
+						if(searchedObj.getParent() == searchedObj){
+							System.err.println("ERROR : root folder is deleted ???? : "+searchedObj.getPath()+" : "+searchedObj.getDeleteDate()+" : "+searchedObj.getModifyDate());
+						}
+						func.readd(searchedObj.getParent(), searchedObj);
+						searchedObj.setDeleteDate(dummy.getDeleteDate()); //already done by the copyheader, i think, anyway.
+					}else{
+						//emit a "warn"
+						System.out.println("Warn : dir "+searchedObj.getPath()+" is not deleted in a peer, but we already deleted it.");
+						//emit our version of the file
+						func.send(senderId, searchedObj);
+						//exit here
+						return null;
+					}
+				}else{
+					//ok
+				}
+			}
+		}
+		return searchedObj;
+	}
+	
+	
 	public void getADirFrom(long senderId, ByteBuff message){
-		System.out.println(this.manager.getComputerId()%100+" READ SEND DIR from "+senderId);
 		if (message.get()==1){
 			String path = message.getUTF8();
-			long rootId = message.getLong();
-			if(rootId<0){
-				System.out.println(this.manager.getComputerId()%100+" READ SEND DIR  Id = "+rootId+" << USELESSS!!!!!!");
+			long receivedId = message.getLong();
+			long lastChangeDate = message.getLong();
+			long lastChangeUID = message.getLong();
+			System.out.println(this.manager.getComputerId()%100+" DIRCG RECEIVE DIR "+path+" "+receivedId+" from "+senderId);
+			FsObjectDummy dummy = new FsObjectDummy(receivedId, path);
+			readHeader(message, dummy);
+			if(receivedId<0){
+				System.out.println(this.manager.getComputerId()%100+" DIRCG  Id = "+receivedId+" << USELESSS!!!!!!");
 				return;
 			}
-			System.out.println(this.manager.getComputerId()%100+" READ SEND DIR  "+path+" from "+senderId);
-			FsDirectory root = manager.getRoot();
-			FsDirectory dir = getPathDir(root, path);
-			if(dir == null){
-				//try to see if it has moved
-				FsObject obj = manager.getDb().getDirect(rootId);
-				if(obj != null){
-					if(obj instanceof FsDirectory){
-						System.out.println(this.manager.getComputerId()%100+" DIRCG Finded a displaced dir : "+obj.getPath()+" -> "+path);
-						dir = (FsDirectory) obj;
-						System.err.println("TODO: move the directory");
-					}else{
-						System.err.println(this.manager.getComputerId()%100+" DIRCG Finded a displaced thing! : "+obj+" which isn't a dir : "+obj.getPath()+" -> "+path);
-						System.err.println("TODO: correct the error");
-					}
-				}
-			}
-			boolean changes = false;
-			if(dir == null){
-				//check if it's not a delete notification
-				if(isDeleted(message)){
-					System.out.println(this.manager.getComputerId()%100+" DIRCG notif of detion on an not-existant folder -> no-event!");
-					return;
-				}else{
-					System.out.println(this.manager.getComputerId()%100+" DIRCG can't find dir "+path);
-					//Create new dir!
-					FsDirectory dirParent = getPathParentDir(root, path);
-					if(dirParent==null){
-						dirParent = getPathDir(root, path.substring(0, path.lastIndexOf('/')));
-					}
-					if(dirParent==null){
-						//request parent before child.
-						requestDirPath(senderId, path.substring(0, path.lastIndexOf('/')));
-						System.out.println(this.manager.getComputerId()%100+" DIRCG can't find parent : request parent and terminate this emssage parsing. "+path+"=="+getPathParentDir(root, path)+" -> "+path.substring(0, path.lastIndexOf('/')));
-						return;
-					}
-					dir = dirParent.createSubDir(getPathObjectName(root,path));
-					dir.setId(rootId);
-					dirParent.flush();
-					changes = true;
-				}
-			}
-			else{
-				//TODO: check if it's not deleted?
-				System.out.println(this.manager.getComputerId()%100+" DIRCG dir "+path+ " already there : "+dir.getPath());
-				System.out.println(dir.getPath());
+			
+			
+			//get the dir object or create it if not present
+			FsDirectory dir = getOrCreateOrRequestObject(senderId, path, receivedId,dummy,dirFunc);
+			if(dir==null){
+				return;
 			}
 			
-			changes = getHeader(message, dir) || changes;
+			//check if moved
+			if(!checkObjectMoved(senderId, dir, path, dummy, dirFunc)){
+				return;
+			}
+			
+			long tempOldLong = dir.getModifyDate();
+			copyHeader(dummy, dir);
+			dir.setLastChangeDate(lastChangeDate);
+			dir.setLastChangeUID(lastChangeUID);
+			System.out.println(this.manager.getComputerId()%100+" DIRCG old mod date : "+tempOldLong+", new one : "+dir.getModifyDate());
 
 
-			//don't verify changes if we are more recent than them
-			//TODO change this by a better way
-//			if(changes){
+			//now, explore childs to see if we need to request them.
+			
+			//check dirs
 			System.out.println(this.manager.getComputerId()%100+" DIRCG check dir inside "+dir.getPath());
-				int nbDir = message.getTrailInt();
-				System.out.println(this.manager.getComputerId()%100+" DIRCG "+dir.getPath()+" has "+nbDir+" dirs");
-				List<FsDirectory> direxist = new ArrayList<FsDirectory>(dir.getDirs());
-				for(int i=0;i<nbDir;i++){
-					String dirName = message.getUTF8();
-					long dirId = message.getLong();
-					long dirDate = message.getLong();
-					FsDirectory childDir = getDir(dir,dirName);
-					if(childDir == null){
-						//if can't retrieve by name, try with id.
-						childDir = containsId(dir.getDirs(), dirId);
-						if(childDir != null){
-							System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir "+childDir==null?"null":childDir.getName()+" was name differently in the peer"+senderId%100+" : "+dirName);
-						}
-					}
-					if(childDir == null){
-						// it was moved?
-						FsObject obj = manager.getDb().getDirect(dirId);
-						if(obj != null){
-							if(obj instanceof FsDirectory){
-								System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir "+obj.getPath()+" was moved "+senderId%100+" : "+path+"/"+dirName);
-								childDir = (FsDirectory) obj;
-							}else{
-								System.err.println(this.manager.getComputerId()%100+" DIRCG oh, a obj (which is not a dir) "+obj.getPath()+" was moved"+senderId%100+" : "+path+"/"+dirName);
-								System.err.println("TODO: correct the error");
-							}
-							//request more info to make the move
-							requestDirPath(senderId, path+"/"+dirName);
-						}
-					}
-					System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir '"+dirName+"' path.endsWith(/)?="+path.endsWith("/")+" finded? "+childDir!=null);
-					if(childDir == null){
-						//check if it's not already in our delete file name
-						FsObject deletedDir = containsId(dir.getDelete(), dirId);
-						if(deletedDir != null){
-							//TODO: check if the creation is not more recent than the deletion
-							System.out.println(this.manager.getComputerId()%100+" DIRCG directory "+deletedDir.getName()+" was deleted, i won't add it at "+dirName);
-							System.err.println("TODO: move the dir(2)");
-						}else{
-							changes = true;
-							requestDirPath(senderId, path+(path.endsWith("/")?"":"/")+dirName);
-							System.out.println(this.manager.getComputerId()%100+" DIRCG new dir: "+path+(path.endsWith("/")?"":"/")+dirName);
-						}
+			int nbDir = message.getTrailInt();
+			System.out.println(this.manager.getComputerId()%100+" DIRCG "+dir.getPath()+" has "+nbDir+" dirs");
+			Collection<FsDirectory> direxist = new ArrayList<FsDirectory>();
+			for(int i=0;i<nbDir;i++){
+				String dirName = message.getUTF8();
+				long dirId = message.getLong();
+				long dirDate = message.getLong();
+				long dirLastChangeDate = message.getLong();
+				FsDirectory childDir = getDir(dir,dirName);
+				if(childDir == null){
+					//if can't retrieve by name, something may have changed, request it.
+					System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir "+((childDir==null)?"null":childDir.getName())+" was name differently in the peer"+senderId%100+" : "+dirName);
+					requestDirPath(senderId, dir.getPath()+"/"+dirName, dirId);
+				}else if(childDir.getId() != dirId){
+					System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir BAD ID, same path : "+childDir.getPath());
+					// bad id: request the two of them.
+					requestDirPath(senderId, dir.getPath()+"/"+dirName, childDir.getId()); //this one should get us the two files, one from path, one from id
+				}else{
+					//check lastChangeDate & modifyDate
+					if(childDir.getModifyDate()<dirDate || childDir.getLastChangeDate() < dirLastChangeDate){
+						System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir has changed / a child has changed : "+childDir.getPath());
+						//this dir has something modified (inside or deep inside)
+						//request a recursive check.
+						requestDirPath(senderId, childDir.getPath(), childDir.getId());
 					}else{
-						System.out.println(this.manager.getComputerId()%100+" DIRCG directory was already here "+dirName+", time: local:"+childDir.getModifyDate()+" =?= dist:"+dirDate);
-						if(childDir.getModifyDate() < dirDate){
-							//ask for updates
-							requestDirPath(senderId, childDir.getPath());
-							System.out.println(this.manager.getComputerId()%100+" DIRCG dir req update");
-						}
-						Iterator<FsDirectory> it = direxist.iterator();
-						while(it.hasNext()){
-							if(it.next().getName().equals(dirName)){
-								it.remove();
-							}
-						}
+						System.out.println(this.manager.getComputerId()%100+" DIRCG dir "+childDir.getPath()+" has not changed, no need to update ("+dirLastChangeDate+"<="+childDir.getModifyDate()+")");
 					}
+					direxist.add(childDir);
 				}
+			}
+			
 				
-				
-				int nbFile = message.getTrailInt();
-				System.out.println(this.manager.getComputerId()%100+" DIRCG "+dir.getPath()+" has "+nbFile+" files");
-				List<FsFile> fileExist = new ArrayList<>(dir.getFiles());
-				for(int i=0;i<nbFile;i++){
-					String fileName = message.getUTF8();
-					long fileId = message.getLong();
-					long fileDate = message.getLong();
-					FsFile childFile = getFile(dir,fileName);
-					if(childFile == null){
-						//if can't retreive by name, try with id.
-						childFile = containsId(dir.getFiles(), fileId);
-						if(childFile != null)
-							System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a file '"+childFile==null?"null":childFile.getName()+" was name differently in the peer"+senderId%100+" : "+fileName);
-					}
-					if(childFile == null){
-						// it was moved?
-						FsObject obj = manager.getDb().getDirect(fileId);
-						if(obj != null){
-							if(obj instanceof FsFile){
-								System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir "+childFile.getPath()+" was moved"+senderId%100+" : "+path+"/"+fileName);
-								childFile = (FsFile) obj;
-								System.err.println("TODO: move the file(2)");
-							}else{
-								System.err.println(this.manager.getComputerId()%100+" DIRCG oh, a obj (which is not a file) "+obj.getPath()+" was moved"+senderId%100+" : "+path+"/"+fileName);
-								System.err.println("TODO: correct the error");
-							}
-							//request more info to make the move
-							requestFilePath(senderId, path+"/"+fileName);
-						}
-					}
-					if(childFile == null){
-						//check if it's not already in our delete file name
-						FsObject deletedFile = containsId(dir.getDelete(), fileId);
-						if(deletedFile != null){
-							System.out.println(this.manager.getComputerId()%100+" DIRCG file "+deletedFile.getName()+" was deleted, i won't add it at "+fileName);
-						}else{
-							changes = true;
-							//TODO: check if it's not already in our delete file name
-							requestFilePath(senderId, path+(path.endsWith("/")?"":"/")+fileName);
-							System.out.println(this.manager.getComputerId()%100+" DIRCG new file: "+path+(path.endsWith("/")?"":"/")+fileName);
-						}
+			int nbFile = message.getTrailInt();
+			System.out.println(this.manager.getComputerId()%100+" DIRCG "+dir.getPath()+" has "+nbFile+" files");
+			Collection<FsFile> fileExist = new ArrayList<>();
+			for(int i=0;i<nbFile;i++){
+				String fileName = message.getUTF8();
+				long fileId = message.getLong();
+				long fileDate = message.getLong();
+				FsFile childFile = getFile(dir,fileName);
+				if(childFile == null){
+					//can't retreive by name : request update for this file
+					System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a file "+(childFile==null?"null":childFile.getName())+" was name differently in the peer"+senderId%100+" : "+fileName);
+					requestFilePath(senderId, dir.getPath()+"/"+fileName, fileId);
+				}else if(childFile.getId() != fileId){
+					System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a file BAD ID, same path : "+childFile.getPath());
+					// bad id: request the two of them.
+					requestFilePath(senderId, dir.getPath()+"/"+fileName, childFile.getId()); //this one should get us the two files, one from path, one from id
+				}else{
+					//check lastChangeDate & modifyDate
+					if(childFile.getModifyDate()<fileDate){
+						System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a file has changed : "+childFile.getPath());
+						//this dir has something modified (inside or deep inside), request a check
+						requestFilePath(senderId, childFile.getPath(), childFile.getId());
 					}else{
-						System.out.println(this.manager.getComputerId()%100+" DIRCG file was already here "+fileName+", time: local:"+childFile.getModifyDate()+" =?= dist:"+fileDate);
-						if(childFile.getModifyDate() < fileDate){
-							//ask for updates
-							requestPath(senderId, childFile.getId());
-							System.out.println(this.manager.getComputerId()%100+" DIRCG file req update");
-						}
-						Iterator<FsFile> it = fileExist.iterator();
-						while(it.hasNext()){
-							if(it.next().getName().equals(fileName)){
-								it.remove();
-							}
-						}
+						System.out.println(this.manager.getComputerId()%100+" DIRCG file "+childFile.getPath()+" has not changed, no need to update ("+fileDate+"<="+childFile.getModifyDate()+")");
 					}
+					fileExist.add(childFile);
 				}
+			}
 
-				int nbDel = message.getTrailInt();
-				System.out.println(this.manager.getComputerId()%100+" DIRCG "+dir.getPath()+" has "+nbDel+" del objects");
-				for(int i=0;i<nbDel;i++){
-					String objectName = message.getUTF8();
-					long objectId = message.getLong();
-					long deleteDate = message.getLong();
-					//try to find them in dir/file exist 
-					FsObject obj = null;
-					boolean finded = false;
+			//TODO: check if it work very well
+			int nbDel = message.getTrailInt();
+			System.out.println(this.manager.getComputerId()%100+" DIRCG "+dir.getPath()+" has "+nbDel+" del objects");
+			for(int i=0;i<nbDel;i++){
+				String objectName = message.getUTF8();
+				long objectId = message.getLong();
+				long deleteDate = message.getLong();
+				//try to find them in dir/file exist 
+				FsObject obj = null;
+				boolean finded = false;
 //					Iterator<FsDirectory> itD = direxist.iterator();
 //					while(itD.hasNext() && !finded){
 //						obj = itD.next();
@@ -546,77 +752,83 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 //							finded = true;
 //						}
 //					}
-					obj = containsId(dir.getDirs(), objectId);
+				obj = containsId(dir.getDirs(), objectId);
+				if(obj==null){
+					obj = containsId(dir.getFiles(), objectId);
 					if(obj==null){
-						obj = containsId(dir.getFiles(), objectId);
-						if(obj==null){
-							finded = false;
-						}else{
-							finded = true;
-							System.out.println(this.manager.getComputerId()%100+" need to delete file "+obj.getName()+" == "+objectName);
-						}
+						finded = false;
 					}else{
 						finded = true;
-						System.out.println(this.manager.getComputerId()%100+" need to delete dir "+obj.getName()+" == "+objectName);
+						System.out.println(this.manager.getComputerId()%100+" need to delete file "+obj.getName()+" == "+objectName);
 					}
-					
-					if(finded){
-						//check date to see if we have to delete our
-						if(obj.getModifyDate()<=deleteDate){
-							System.out.println(this.manager.getComputerId()%100+" erase: "+path+(path.endsWith("/")?"":"/")+objectName);
-//							FsDirectory.FsDirectoryMethods.deleteAndFlush(obj);
-							obj.accept(FsDirectory.FsDirectoryMethods.REMOVER);
-							changes = true;
-						}
-					}else{
-						obj = containsId(dir.getDelete(), objectId);
-						if(obj==null){
-
-							// it was moved?
-							obj = manager.getDb().getDirect(objectId);
-							if(obj != null){
-								System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir "+obj.getPath()+" was moved AND deleted "+senderId%100+" : "+path+"/"+objectName);
-								System.err.println("TODO: delete this entry");
-							}else{
-								System.out.println(this.manager.getComputerId()%100+" need ??  to add delete obj  ?? "+objectName);
-							}
-						}else{
-							System.out.println(this.manager.getComputerId()%100+" already del obj "+obj.getName()+" == "+objectName);
-						}
-					}
+				}else{
+					finded = true;
+					System.out.println(this.manager.getComputerId()%100+" need to delete dir "+obj.getName()+" == "+objectName);
 				}
 				
-				
-//				//remove directories that are superflus
-//				for(FsDirectory toRemoveDir : direxist){
-//					changes = true;
-//					dir.getDirs().remove(toRemoveDir);
-//					toRemoveDir.setParent(null);
-//					toRemoveDir.setParentId(-1);
-//					toRemoveDir.flush();
-//				}
-//				//remove files that are superflus
-//				for(FsFile toRemovFile : fileExist){
-//					changes = true;
-//					dir.getFiles().remove(toRemovFile);
-//					toRemovFile.setParent(null);
-//					toRemovFile.setParentId(-1);
-//					toRemovFile.flush();
-//				}
-//			}
-			//flush changes
-			if(changes){
-				dir.flush();
-				System.out.println(this.manager.getComputerId()%100+" changes for "+dir);
+				if(finded){
+					//check date to see if we have to delete our
+					if(obj.getModifyDate()<=deleteDate){
+						System.out.println(this.manager.getComputerId()%100+" erase: "+path+(path.endsWith("/")?"":"/")+objectName);
+//							FsDirectory.FsDirectoryMethods.deleteAndFlush(obj);
+						obj.accept(FsDirectory.FsDirectoryMethods.REMOVER);
+//						changes = true;
+					}
+				}else{
+					obj = containsId(dir.getDelete(), objectId);
+					if(obj==null){
+
+						// it was moved?
+						obj = manager.getDb().getDirect(objectId);
+						if(obj != null){
+							System.out.println(this.manager.getComputerId()%100+" DIRCG oh, a dir "+obj.getPath()+" was moved AND deleted "+senderId%100+" : "+path+"/"+objectName);
+							System.err.println("TODO: delete this entry");
+						}else{
+							System.out.println(this.manager.getComputerId()%100+" DIRCG need ??  to add delete obj  ?? "+objectName);
+						}
+					}else{
+						System.out.println(this.manager.getComputerId()%100+" DIRCG already del obj "+obj.getName()+" == "+objectName);
+					}
+				}
 			}
+
+			//request updates for missing files & dirs (maybe moved?)
+			Set<FsDirectory> missingDirs = new HashSet<>();
+			missingDirs.addAll(dir.getDirs());
+			missingDirs.removeAll(direxist);
+			for(FsDirectory missingDir : missingDirs ){
+				System.out.println(this.manager.getComputerId()%100+" DIRCG request missing dir "+missingDir.getPath());
+				requestDirPath(senderId, missingDir.getPath(), missingDir.getId());
+			}
+
+			Set<FsFile> missingFiles = new HashSet<>();
+			missingFiles.addAll(dir.getFiles());
+			missingFiles.removeAll(fileExist);
+			for(FsFile missingFile : missingFiles ){
+				System.out.println(this.manager.getComputerId()%100+" DIRCG request missing file "+missingFile.getPath());
+				requestFilePath(senderId, missingFile.getPath(), missingFile.getId());
+			}
+				
 		}else{
 			String mypath = message.getUTF8();
 			System.out.println(this.manager.getComputerId()%100+" READ SEND DIR : NO dir "+mypath+" from "+senderId);
 			System.err.println("Requested an not existant file/folder : "+mypath);
 			// request his par<ent dir, to see if it's not deleted.
 			FsDirectory dirParent = getPathParentDir( manager.getRoot(), mypath);
-			if(dirParent != null) requestDirPath(senderId, dirParent.getPath());
+			if(dirParent != null) requestDirPath(senderId, dirParent.getPath(), dirParent.getId());
 		}
+	}
+	
+	public void sendDir(long peerId, FsDirectory dir){
+
+		ByteBuff messageRet = createDirectoryMessage(dir);
+		System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR for "+peerId);
+		manager.getNet().writeMessage(peerId, SEND_DIR, messageRet);
+	}
+	
+	public void sendfile(long peerId, FsFile file){
+		ByteBuff messageRet = createFileDescrMessage(file);
+		manager.getNet().writeMessage(peerId, SEND_FILE_DESCR, messageRet);
 	}
 
 	@Override
@@ -627,30 +839,68 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			return;
 		}
 		if(messageId == SEND_FILE_DESCR){
+			System.out.println(this.manager.getComputerId()+"$ RECEIVE SEND FILE from "+senderId);
 			//TODO ajout/fusion
-			//notTODO request chunks? -> i think it's more a db thing, to know if we want one.
+			//notTODO request chunks? -> i think it's more a db thing, to know if we want one. OR NOT
 			getAFileFrom(senderId, message);
 		}
 		if(messageId == SEND_DIR){
-			System.out.println(this.manager.getComputerId()+"$ RESEIVE SEND DIR from "+senderId);
+			System.out.println(this.manager.getComputerId()+"$ RECEIVE SEND DIR from "+senderId);
 			getADirFrom(senderId, message);
 		}
 		if(messageId == GET_DIR){
-			System.out.println(this.manager.getComputerId()+"$ RESEIVE GET DIR from "+senderId);
 			String path = message.getUTF8();
-			FsDirectory dir = getPathDir(manager.getRoot(), path);
-			ByteBuff messageRet = null;
-			if(dir==null){
-				messageRet = createNotFindPathMessage(path);
-				System.out.println(this.manager.getComputerId()+"$ NOT SEND DIR for "+senderId);
-			}else{
-				messageRet = createDirectoryMessage(dir);
-				System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR for "+senderId);
+			long idDir = message.getLong();
+			System.out.println(this.manager.getComputerId()+"$ RECEIVE GET DIR "+path+"  from "+senderId);
+			FsDirectory dirByPath = getPathDir(manager.getRoot(), path);
+			FsObject dirById = dirByPath;
+			if(dirByPath==null || dirByPath.getId() != idDir){
+				dirById = manager.getDb().getDirect(idDir);
 			}
-			manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
+			ByteBuff messageRet = null;
+			if(dirByPath==null && (dirById == null || dirById.asDirectory() == null)){
+				messageRet = createNotFindPathMessage(path);
+				manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
+				System.out.println(this.manager.getComputerId()+"$ NOT SEND DIR "+path+"  for "+senderId);
+			}else if(dirByPath==null && dirById != null && dirById.asDirectory() != null){
+				//can find the id, send that
+				messageRet = createDirectoryMessage(dirById.asDirectory());
+				manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
+				System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR "+path+"  (ID) for "+senderId);
+			}else if(dirByPath!=null && dirById == null){
+				//can find the path, send that
+				messageRet = createDirectoryMessage(dirByPath);
+				manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
+				System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR "+path+"  (PATH) for "+senderId);
+			}else{
+				//check if it's the same id
+				if(dirByPath.getId() == idDir){
+					///ok
+					messageRet = createDirectoryMessage(dirByPath);
+					manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
+					System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR "+path+"  (impossible no conflict) for "+senderId);
+				}else{
+					//send what we have
+					if(dirById.asDirectory() != null){
+						messageRet = createDirectoryMessage(dirById.asDirectory());
+						manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
+						System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR "+path+"  (conflict, id) for "+senderId);
+					}else if(dirById.asFile() != null){
+						messageRet = createFileDescrMessage(dirById.asFile());
+						manager.getNet().writeMessage(senderId, SEND_FILE_DESCR, messageRet);
+						System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR->FILE "+path+"  (conflict, id) for "+senderId);
+					}
+					if(dirByPath != null){
+						messageRet = createDirectoryMessage(dirByPath);
+						manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
+						System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR "+path+"  (conflict, path) for "+senderId);
+					}
+				}
+			}
 		}
 		if(messageId == GET_FILE_DESCR){
 			String path = message.getUTF8();
+			System.out.println(this.manager.getComputerId()+"$ RECEIVE GET FILE "+path+" from "+senderId);
 			FsFile file = getPathFile(manager.getRoot(), path);
 			ByteBuff messageRet = null;
 			if(file==null){

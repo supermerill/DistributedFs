@@ -24,7 +24,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		this.parent = parent;
 //		if(parent != null){
 			parentId = parent.getId();
-			System.out.println("created object with parent "+this.parent.getId());
+//			System.out.println("created object with parent "+this.parent.getId());
 //		}else{
 //			parentId = 0;
 //		}
@@ -232,15 +232,20 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	
 	@Override
 	public void flush() {
-		checkLoaded();
-		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
-		//master.loadSector(buff, getId()); //useless, we want to write, not read!
-		save(buff); //this one should auto-call master.write
-		
-		if(parentId<0){
-			//delete this one
-//			this.delete();
-			master.releaseSector(this.getSector());
+		if(isDirty()){
+			checkLoaded();
+			ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
+			//master.loadSector(buff, getId()); //useless, we want to write, not read!
+			save(buff); //this one should auto-call master.write
+			
+			if(parentId<0){
+				//delete this one
+	//			this.delete();
+				master.releaseSector(this.getSector());
+			}
+			
+			//flush parent if useful (if i have changed)
+			getParent().flush();
 		}
 	}
 	
@@ -284,6 +289,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		return name;
 	}
 	public long getId() {
+		checkLoaded();
 		return id;
 	}
 	public long getSector() {
@@ -301,6 +307,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		return parent.getId();
 	}
 	public FsDirectory getParent() {
+		checkLoaded();
 		return parent;
 	}
 	public void setParent(FsDirectory newDir) {
@@ -317,7 +324,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	}
 	public void setName(String newName) {
 		checkLoaded();
-		this.name = newName;
+		super.setName(newName);
 	}
 
 	public long getModifyUID() {
@@ -368,5 +375,18 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	public void setGroupId(long groupId) {
 		checkLoaded();
 		this.groupId = groupId;
+	}
+	
+	@Override
+	public void changes() {
+		checkLoaded();
+		long modDate = System.currentTimeMillis();
+		System.out.println("RENAME OBJ "+getModifyDate()+" -> "+modDate);
+		setModifyDate(modDate); 
+		setModifyUID(master.getUserId());
+		getParent().setLastChangeDate(modDate); 
+		getParent().setLastChangeUID(master.getUserId());
+		setDirty(true);
+		flush();
 	}
 }

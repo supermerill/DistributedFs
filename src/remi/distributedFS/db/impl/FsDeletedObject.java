@@ -3,6 +3,7 @@ package remi.distributedFS.db.impl;
 import java.nio.ByteBuffer;
 
 import remi.distributedFS.datastruct.FsDirectory;
+import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.datastruct.LoadErasedException;
 

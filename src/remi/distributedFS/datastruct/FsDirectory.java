@@ -29,6 +29,15 @@ public interface FsDirectory extends FsObject {
 	public void moveFile(FsFile obj, FsDirectory newDir);
 	public void moveDir(FsDirectory obj, FsDirectory newDir);
 
+
+	//last cahnge date : when a sub-folder or this folder has a contnet which has changed
+	// if lastchange date if newer, it say "something in this tree has changed, you should check it!"
+	public long getLastChangeDate();
+	public void setLastChangeDate(long timestamp);
+	public long getLastChangeUID() ;
+	public void setLastChangeUID(long uid) ;
+	
+	
 	/**
 	 * Get the map of delete items inside this directory
 	 * @return datetime of deletion.

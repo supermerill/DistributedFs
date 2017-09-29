@@ -30,11 +30,19 @@ public abstract interface FsChunk {
 	
 	//metadata
 	public int currentSize();
-	public int maxSize();
+	public void setCurrentSize(int newSize);
+	public int getMaxSize();
+	public void setMaxSize(int newMaxSize);
 	public boolean isPresent();
 	public void setPresent(boolean isPresentLocally);
 	public List<Long> serverIdPresent();
 	public long lastModificationTimestamp();
 	public long lastModificationUID();
-	
+
+	public long getId();
+
+	public void flush();
+
+	public void changes();
+
 }

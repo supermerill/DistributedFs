@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.omg.CORBA.VisibilityHelper;
@@ -16,6 +17,7 @@ import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectVisitor;
+import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.fs.FileSystemManager;
 
@@ -71,24 +73,68 @@ public class FsTableLocal implements StorageManager{
 
 		//load all content from fs
 		//it's a stub, this content should be stored in a 'small' separate file.
+//		getRoot().accept(new Visu());
 		getRoot().accept(new Loader());
 	}
-	
+	class Visu implements FsObjectVisitor{
+		
+		int nbEspace = 0;
+
+		@Override
+		public void visit(FsDirectory dirParent) {
+			//largeur d'abord
+			StringBuilder spacer = new StringBuilder();
+			for(int i=0;i<nbEspace;i++){
+				spacer.append(" - ");
+			}
+			System.out.println(spacer+" "+((FsDirectoryFromFile)dirParent).getSector()+" DIR "+dirParent.getPath()+" "+dirParent.getId());
+			for(FsDirectory dir : dirParent.getDirs()){
+				System.out.println(spacer+" |->dir "+((FsDirectoryFromFile)dir).getSector());
+			}
+			for(FsFile fic : dirParent.getFiles()){
+				System.out.println(spacer+" |->fic "+((FsFileFromFile)fic).getSector());
+			}
+			for(FsDirectory dir : dirParent.getDirs()){
+//				System.out.println(dirParent.getPath()+" "+dirParent.getId()+" visit "+dir.getPath()+" "+dir.getId());
+//				System.out.println(spacer+" |->dir "+((FsDirectoryFromFile)dir).getSector()+ " : ");
+				nbEspace++;
+				visit(dir);
+			}
+			nbEspace--;
+		}
+
+		@Override
+		public void visit(FsFile fic) {
+			objectId2LocalCluster.put(fic.getId(), fic);
+		}
+		
+	}
 
 	class Loader implements FsObjectVisitor{
 
 		@Override
 		public void visit(FsDirectory dirParent) {
 			objectId2LocalCluster.put(dirParent.getId(), dirParent);
-			for(FsDirectory dir : dirParent.getDirs()){
-				visit(dir);
-				System.out.println(dir.getPath() + dir.getId());
+			System.out.println(" dir "+dirParent.getPath());
+			for(FsDirectory dir : new ArrayList<>(dirParent.getDirs())){
+				try{
+					System.out.println("contains "+dir.getName());
+					visit(dir);
+				}catch(LoadErasedException ex){
+					ex.printStackTrace();
+					//recover : del this
+					dirParent.getDirs().remove(dir);
+					((FsDirectoryFromFile)dirParent).setDirty(true);
+					dirParent.flush();
+				}
+				System.out.println(dir.getPath() + " "+dir.getId());
 			}
 			for(FsFile fic : dirParent.getFiles()){
 				visit(fic);
 				System.out.println(fic.getPath()+" (F) " + fic.getId());
 			}
 			for(FsObject obj : dirParent.getDelete()){
+				if(obj == dirParent) System.err.println("error, dir is inside deletes");
 				System.out.println(obj.getPath()+" (D) " + obj.getId());
 				obj.accept(this);
 				objectId2LocalCluster.put(obj.getId(), obj);
