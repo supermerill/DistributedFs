@@ -1,6 +1,7 @@
 package remi.distributedFS.datastruct;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -83,7 +84,7 @@ public interface FsFile extends FsObject {
 			long currentPos = 0;
 			int chunkIdx = 0;
 			FsChunk chunk = file.getChunks().get(chunkIdx);
-			while(currentPos+chunk.currentSize()<offset && chunkIdx+1<file.getChunks().size()){
+			while(currentPos+chunk.currentSize() <= offset && chunkIdx+1<file.getChunks().size()){
 				currentPos+=chunk.currentSize();
 				chunkIdx++;
 				chunk = file.getChunks().get(chunkIdx);
@@ -91,30 +92,31 @@ public interface FsFile extends FsObject {
 			//choose first chunk
 			int chunkOffset = (int) (offset - currentPos);
 			//first read
-			System.out.println("read first chunk");
-			if(chunk.currentSize()-chunkOffset>buff.limit()-buff.position()){
+			System.out.println("read first chunk ("+chunkIdx+"°) chunk.currentSize()="+chunk.currentSize()+", chunkOffset="+chunkOffset+", buff.limit()="+buff.limit()+", buff.position()="+buff.position());
+			if(chunk.currentSize()-chunkOffset >= buff.limit()-buff.position()){
 				//read some part
 				System.out.println("read inside : "+(buff.limit()-buff.position()));
 				chunk.read(buff, chunkOffset, buff.limit()-buff.position());
 			}else{
 				//full read
 				System.out.println("read a part : "+chunk.currentSize()+" / "+(buff.limit()-buff.position()));
-				chunk.read(buff, chunkOffset, chunk.currentSize());
+				chunk.read(buff, chunkOffset, chunk.currentSize()-chunkOffset);
 			}
-			System.out.println("now pos = "+buff.position());
+			System.out.println("now pos = "+buff.position()+", limit="+buff.limit()+", chunk.currentSize()="+chunk.currentSize()+", chunkOffset="+chunkOffset);
 			chunkIdx++;
 			//other reads
 			while(buff.position()<buff.limit()){
 				System.out.println("read chunk n°"+chunkIdx+", now i need "+(buff.limit()-buff.position())+"more");
 				chunk = file.getChunks().get(chunkIdx);
-				if(chunk.currentSize()>buff.limit()-buff.position()){
+				if(chunk.currentSize()>=buff.limit()-buff.position()){
 					//read some part
 					chunk.read(buff, 0, buff.limit()-buff.position());
 				}else{
 					//full read
 					chunk.read(buff, 0, chunk.currentSize());
 				}
-				System.out.println("now pos = "+buff.position());
+				System.out.println("now pos = "+buff.position()+" /"+buff.array().length);
+				System.out.println("sample = "+Arrays.toString(Arrays.copyOfRange(buff.array(), buff.position()-10,  buff.position())));
 				chunkIdx++;
 			}
 		}
@@ -143,34 +145,37 @@ public interface FsFile extends FsObject {
 			long currentPos = 0;
 			int chunkIdx = 0;
 			FsChunk chunk = file.getChunks().get(chunkIdx);
-			while(currentPos+chunk.currentSize()<offset && chunkIdx+1<file.getChunks().size()){
+			while(currentPos+chunk.currentSize() <= offset && chunkIdx+1<file.getChunks().size()){
 				currentPos+=chunk.currentSize();
 				chunkIdx++;
 				chunk = file.getChunks().get(chunkIdx);
 			}
 			int chunkOffset = (int) (offset - currentPos);
 			//first write
-			System.out.println("write first chunk");
-			if(chunk.currentSize()-chunkOffset>buff.limit()-buff.position() ||  file.getNbChunks()==chunkIdx+1){
+			System.out.println("write first chunk chunk.currentSize()="+chunk.currentSize()+", chunkOffset="+chunkOffset+",  buff.limit()="+ buff.limit()+", buff.position()="+buff.position()+
+					", cs-co = "+(chunk.currentSize()-chunkOffset)+" ? <= ? bl-bp="+(buff.limit()-buff.position()));
+			if(chunk.currentSize()-chunkOffset >= buff.limit()-buff.position()){
 				System.out.println("write inside : "+(buff.limit()-buff.position()));
 				//write some part
 				chunk.write(buff, chunkOffset, buff.limit()-buff.position());
 			}else{
 				//full write
-				System.out.println("write a part : "+chunk.currentSize()+" / "+(buff.limit()-buff.position()));
-				chunk.write(buff, chunkOffset, chunk.currentSize());
+				System.out.println("write a part : "+buff.position()+" -> "+(buff.limit()-buff.position())+" / "+chunk.currentSize());
+				chunk.write(buff, chunkOffset, chunk.currentSize()-chunkOffset);
 			}
 			System.out.println("now pos = "+buff.position());
 			chunkIdx++;
 			//other writes
-			while(buff.position()<buff.limit()){
+			while(buff.position() < buff.limit()){
 				System.out.println("write chunk n°"+chunkIdx+", now i need "+(buff.limit()-buff.position())+"more");
 				chunk = file.getChunks().get(chunkIdx);
-				if(chunk.currentSize()>buff.limit()-buff.position() || file.getNbChunks()==chunkIdx+1){
+				if(chunk.currentSize()>buff.limit()-buff.position()){
 					//write some part
+					System.out.println("partial write = "+(buff.limit()-buff.position()));
 					chunk.write(buff, 0, buff.limit()-buff.position());
 				}else{
 					//full write
+					System.out.println("full write = "+chunk.currentSize());
 					chunk.write(buff, 0, chunk.currentSize());
 				}
 				System.out.println("now pos = "+buff.position());
@@ -208,18 +213,22 @@ public interface FsFile extends FsObject {
 			//go to first chunk
 			long currentPos = 0;
 			int chunkIdx = 0;
-			FsChunk chunk = file.getChunks().get(chunkIdx);
-			newLst.add(chunk);
-			while(currentPos+chunk.currentSize()<size && chunkIdx+1<file.getChunks().size()){
-				currentPos+=chunk.currentSize();
-				chunkIdx++;
-				chunk = file.getChunks().get(chunkIdx);
+			if(file.getSize()<=size){
+				growFile(file, size);
+			}else{
+				FsChunk chunk = file.getChunks().get(chunkIdx);
 				newLst.add(chunk);
+				while(currentPos+chunk.currentSize()<size && chunkIdx+1<file.getChunks().size()){
+					currentPos+=chunk.currentSize();
+					chunkIdx++;
+					chunk = file.getChunks().get(chunkIdx);
+					newLst.add(chunk);
+				}
+				//truncate the last chunk
+				chunk.setCurrentSize((int) (size - currentPos));
+				//remove all others chunks
+				file.setChunks(newLst);
 			}
-			//truncate the last chunk
-			chunk.setCurrentSize((int) (size - currentPos));
-			//remove all others chunks
-			file.setChunks(newLst);
 		}
 	
 
@@ -245,12 +254,14 @@ public interface FsFile extends FsObject {
 			System.out.println("WRITE FILE : file size :  "+file.getSize()+" < "+newSize);
 			//grow last chunk
 			FsChunk lastChunk = file.getChunks().get(file.getChunks().size()-1);
+			System.out.println("WRITE FILE : needNewSize :  "+needNewSize+" , last max sie :  "+lastChunk.getMaxSize()+" (current) "+lastChunk.currentSize());
 			if(lastChunk.getMaxSize() - lastChunk.currentSize() >= needNewSize){
 				lastChunk.setCurrentSize((int) (lastChunk.currentSize() + needNewSize));
 				lastChunk.changes();
 				System.out.println("WRITE FILE : setFistChunk "+lastChunk.currentSize());
 				return;
 			}
+			List<FsChunk> lst = new ArrayList<>(file.getChunks());
 			//else
 			needNewSize -= (lastChunk.getMaxSize() - lastChunk.currentSize());
 			lastChunk.setCurrentSize(lastChunk.getMaxSize());
@@ -258,24 +269,19 @@ public interface FsFile extends FsObject {
 				//create new chunk (bigger than last one, as it seems too small)
 				int newMaxSizeChunk = Math.min(Math.max(1024*4, lastChunk.getMaxSize()*2), 1073741824); //max 1gio per chunk
 				FsChunk newChunk = file.createNewChunk(-1);
-				newChunk.setCurrentSize(0);
+				newChunk.setCurrentSize((int) Math.min(needNewSize, newMaxSizeChunk));
 				newChunk.setMaxSize(newMaxSizeChunk);
 				System.out.println("WRITE FILE : lastChunk.getMaxSize() "+newChunk.getMaxSize());
-				List<FsChunk> lst = new ArrayList<>(file.getChunks());
 				lst.add(newChunk);
-				file.setChunks(lst);
 				//grow it
+				needNewSize -= newChunk.currentSize();
 				lastChunk = newChunk;
-				if(lastChunk.getMaxSize() - lastChunk.currentSize() >= needNewSize){
-					lastChunk.setCurrentSize((int) (lastChunk.currentSize() + needNewSize));
-					return;
-				}
-				needNewSize -= (lastChunk.getMaxSize() - lastChunk.currentSize());
-				System.out.println("WRITE FILE : lastChunk.getMaxSize() "+lastChunk.getMaxSize()+" : lastChunk.currentSize() "+lastChunk.currentSize());
-				lastChunk.setCurrentSize(lastChunk.getMaxSize());
+				System.out.println("WRITE FILE : lastChunk.getMaxSize() "+newChunk.getMaxSize()+" : lastChunk.currentSize() "+newChunk.currentSize());
 				System.out.println("WRITE FILE : now grow to "+file.getSize()+" : reste "+needNewSize);
 			}
+			file.setChunks(lst);
 
+			System.out.println("End of grow, now i have "+file.getChunks());
 		}
 	}
 

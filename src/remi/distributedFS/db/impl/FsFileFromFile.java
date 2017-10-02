@@ -10,7 +10,6 @@ import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
-import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.util.Ref;
 
 public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
@@ -32,7 +31,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		byte type = buffer.get();
 		if(type != FsTableLocal.FILE){
 			System.err.println("Error, not a file at "+getSector());
-			throw new LoadErasedException("Error, not a file at "+getSector());
+			throw new WrongSectorTypeException("Error, not a file at "+getSector());
 		}
 		
 		super.load(buffer);
@@ -46,18 +45,20 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		buffer.getInt(); //not used
 		int nbAllChunks = buffer.getInt();
 		int nbChunks = buffer.getInt();
-		
-		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-3;
+
+		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-3; //4int (=2long) +nextSector
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
 		//read AllChunks
 		for(int i=0;i<nbAllChunks;i++){
 			allChunks.add(new FsChunkFromFile(master, currentBuffer.getLong(), this,i));
-			canRead--;
+			canRead-=2;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
+				canRead = goToNext(currentBuffer)*2;
 			}
 		}
+		//note: it works because i write longs before ints
+		
 		//read chunk pos
 		canRead = canRead*2;
 		for(int i=0;i<nbChunks;i++){
@@ -91,8 +92,8 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		buffer.putInt(0); //not used (yet)
 		buffer.putInt(allChunks.size());
 		buffer.putInt(chunks.size());
-		
-		int canRead = 80*2; //80 long, 160 ints
+
+		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-3; //4int (=2long) +nextSector
 		ByteBuffer currentBuffer = buffer;
 		Ref<Long> currentSector = new Ref<>(this.getSector());
 		//write chunks
@@ -137,7 +138,6 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 
 	@Override
 	public List<FsChunk> getChunks() {
-		System.out.println("chunks:"+chunks);
 //		return new ListeningArrayList<FsChunk>(chunks, e->{setDirty(true);},e->{setDirty(true);});
 		return chunks;
 	}
@@ -176,18 +176,22 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 
 	@Override
 	public FsChunk createNewChunk(long id) {
-		System.out.println("Create new chunk");
-		long newId = master.requestNewSector();
-		FsChunkFromFile newChunk = new FsChunkFromFile(master, newId, this, -1);
+		System.out.println("Create new chunk from id : "+id);
+		long newSectorId = master.requestNewSector();
+		FsChunkFromFile newChunk = new FsChunkFromFile(master, newSectorId, this, -1);
 		newChunk.id = id;
 		newChunk.loaded = true;
 		if(id<=0){
-			newChunk.id = ((long)master.getComputerId())<<48 | (this.sector&0xFFFFFFFFFFFFL);
+			newChunk.id = ((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL);
+//			System.out.println("Create new id : "+master.getComputerId()+" => "+(((long)master.getComputerId())<<48)+", sector = "+newSectorId +" => "+(newSectorId&0xFFFFFFFFFFFFL)
+//					+" , so | ="+(((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL))+", + = "+((((long)master.getComputerId())<<48) + (newSectorId&0xFFFFFFFFFFFFL)));
 			newChunk.lastChange = System.currentTimeMillis();
 			newChunk.isValid = true;
 		}
 		allChunks.add(newChunk);
 		setDirty(true);
+		System.out.println("Create new chunk : sector="+newSectorId+", id = "+newChunk.id);
+//		new Exception().printStackTrace();
 		return newChunk;
 	}
 

@@ -17,13 +17,12 @@ import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectVisitor;
-import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.fs.FileSystemManager;
 
 public class FsTableLocal implements StorageManager{
 
-	public static final byte ERASED = 0; // no data
+	public static final byte ERASED = -1; // no data
 	public static final byte DIRECTORY = 1;
 	public static final byte FILE = 2;
 	public static final byte CHUNK = 3;
@@ -34,7 +33,7 @@ public class FsTableLocal implements StorageManager{
 	FileSystemManager manager;
 	
 	FsDirectory root;
-	
+
 	static final int FS_SECTOR_SIZE = 512; // bytes, at least 384 to have enough place to allocate other sector in a linked chain way
 	ByteBuffer buffer;
 	
@@ -120,18 +119,17 @@ public class FsTableLocal implements StorageManager{
 				try{
 					System.out.println("contains "+dir.getName());
 					visit(dir);
-				}catch(LoadErasedException ex){
+				}catch(WrongSectorTypeException ex){
 					ex.printStackTrace();
 					//recover : del this
 					dirParent.getDirs().remove(dir);
 					((FsDirectoryFromFile)dirParent).setDirty(true);
-					dirParent.flush();
+//					dirParent.flush();
 				}
 				System.out.println(dir.getPath() + " "+dir.getId());
 			}
 			for(FsFile fic : dirParent.getFiles()){
 				visit(fic);
-				System.out.println(fic.getPath()+" (F) " + fic.getId());
 			}
 			for(FsObject obj : dirParent.getDelete()){
 				if(obj == dirParent) System.err.println("error, dir is inside deletes");
@@ -143,7 +141,17 @@ public class FsTableLocal implements StorageManager{
 
 		@Override
 		public void visit(FsFile fic) {
-			objectId2LocalCluster.put(fic.getId(), fic);
+			try{
+				fic.getName(); // important, to trigger a load
+				System.out.println(fic.getPath()+" (F) " + fic.getId());
+				objectId2LocalCluster.put(fic.getId(), fic);
+			}catch(WrongSectorTypeException ex){
+				ex.printStackTrace();
+				//recover : del this
+				fic.getParent().getDirs().remove(fic);
+				((FsDirectoryFromFile)fic.getParent()).setDirty(true);
+//				fic.getParent().flush();
+			}
 		}
 		
 	}
@@ -268,7 +276,7 @@ public class FsTableLocal implements StorageManager{
 		}
 	}
 
-	public long requestNewSector() {
+	public synchronized long requestNewSector() {
 		//check if we have an unused one
 		long idRet = -1;
 		synchronized (unusedSectors) {

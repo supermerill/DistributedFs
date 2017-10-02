@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
-import remi.distributedFS.datastruct.LoadErasedException;
 
 public class FsDeletedObject extends FsObjectImplFromFile{
 	
@@ -18,7 +17,7 @@ public class FsDeletedObject extends FsObjectImplFromFile{
 		byte type = buffer.get();
 		if(type != FsTableLocal.DELETED){
 			System.err.println("Error, not a deleted object at "+getSector());
-			throw new LoadErasedException("Error, not a deleted object at "+getSector());
+			throw new WrongSectorTypeException("Error, not a deleted object at "+getSector());
 		}
 		super.load(buffer);
 	}

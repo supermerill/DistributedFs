@@ -18,13 +18,14 @@ import jnr.ffi.types.off_t;
 import jnr.ffi.types.size_t;
 import jnr.ffi.types.u_int32_t;
 import jnr.ffi.types.uid_t;
+import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.*;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
-import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.datastruct.PUGA;
 import remi.distributedFS.db.impl.FsDirectoryFromFile;
+import remi.distributedFS.db.impl.WrongSectorTypeException;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.util.ByteBuff;
 import ru.serce.jnrfuse.ErrorCodes;
@@ -99,6 +100,19 @@ public class JnrfuseImpl extends FuseStubFS {
 		return puga.toShort();
 	}
 
+	public static PUGA modeToPUGAObj(long mode){
+		PUGA puga = new PUGA((short)0);
+		puga.computerRead = true;
+		puga.computerWrite = true;
+		puga.userRead = (FileStat.S_IRUSR & mode) != 0;
+		puga.userWrite = (FileStat.S_IWUSR & mode) != 0;
+		puga.groupRead = (FileStat.S_IRGRP & mode) != 0;
+		puga.groupWrite = (FileStat.S_IWGRP & mode) != 0;
+		puga.allRead = (FileStat.S_IROTH & mode) != 0;
+		puga.allWrite = (FileStat.S_IWOTH & mode) != 0;
+		return puga;
+	}
+
 	public static long PUGAToMode(FsObject obj){
 		PUGA puga = new PUGA(obj.getPUGA());
 		puga.computerRead = true;
@@ -122,10 +136,12 @@ public class JnrfuseImpl extends FuseStubFS {
     public int getattr(String path, FileStat stat) {
     	try{
         	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+//        	System.out.println(">>>>NC getattr for (path) : "+path);
 //        	System.out.println(/*">>>>NC */"get attr for (path) : "+path);
     	FsObject obj = getPathObj(manager.getRoot(), path);
 //    	System.out.println("get attr for (obj) : "+obj);
     	if(obj ==null){
+//    		System.out.println(">> getattr : error: can't find "+path);
     		return -ErrorCodes.ENOENT();
     	}
     	long mode = PUGAToMode(obj);
@@ -138,6 +154,7 @@ public class JnrfuseImpl extends FuseStubFS {
     	if(obj instanceof FsFile){
         	stat.st_size.set(Long.valueOf(((FsFile)obj).getSize()));
     	}
+//		System.out.println(">> getattr : mode "+mode+" == "+modeToPUGAObj(mode)+", uid : "+stat.st_uid);
 //    	System.out.println(" bad file perm = "+stat.st_mode.intValue());
 //    	mode = 0777;
 //    	if(obj instanceof FsDirectory) mode |= FileStat.S_IFDIR;
@@ -154,6 +171,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int readlink(String path, Pointer buf, @size_t long size) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+    	System.out.println(">>>>NC readlink for (path) : "+path);
         return 0;
     }
 
@@ -161,6 +179,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int mknod(String path, @mode_t long mode, @dev_t long rdev) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+    	System.out.println(">>>>NC mknod for (path) : "+path);
         return create(path, mode, null);
     }
 
@@ -174,21 +193,29 @@ public class JnrfuseImpl extends FuseStubFS {
         	if(dir == null){
         		return -ErrorCodes.ENOENT();
         	}
+	    	String name = getPathObjectName(manager.getRoot(), path);
+    		//check it doesn't exist
+	    	if(getObj(dir, name) != null){
+	    		return -ErrorCodes.EEXIST();
+	    	}
         	FsFile fic = dir.createSubFile(getPathObjectName(manager.getRoot(), path));
 //        	fic.rearangeChunks(128, 1);
-        	fic.createNewChunk(-1);
+        	FsChunk newCHunk = fic.createNewChunk(-1);
+        	System.out.println(">> set userid to "+getContext().uid.get());
         	fic.setUserId(getContext().uid.get());
+        	System.out.println(">> set groupid to "+getContext().gid.get());
         	fic.setGroupId(getContext().gid.get());
 
 			// modification(s) ? -> set timestamp!
 	    	dir.setModifyDate(System.currentTimeMillis());
-			System.out.println("new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
+			System.out.println(">> new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
 			dir.setModifyUID(manager.getUserId());
 			
 			// set id
         	fic.setId();
         	
         	//flush (should be done here or in db engine?)
+        	newCHunk.flush();
         	fic.flush();
         	dir.flush();
         	manager.propagateChange(fic);
@@ -349,6 +376,11 @@ public class JnrfuseImpl extends FuseStubFS {
 	        	System.out.println("rename : path problem : "+obj+", "+oldDir+", "+newDir);
 	    		return -ErrorCodes.ENOENT();
 	    	}
+	    	String name = getPathObjectName(newDir, newpath);
+    		//check it doesn't exist
+	    	if(getObj(newDir, name) != null){
+	    		return -ErrorCodes.EEXIST();
+	    	}
         	System.out.println("rename : path : "+obj.getPath()+", "+oldDir.getPath()+", "+newDir.getPath());
         	System.out.println("rename : obj : "+obj+", "+oldDir+", "+newDir);
 //	    	if(obj instanceof FsDirectory){
@@ -488,11 +520,12 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int open(String path, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-//    	System.out.println(">>>>NC Open for (path) : "+path);
+    	System.out.println(">>>>NC Open for (path) : "+path);
         if (getPathFile(manager.getRoot(), path) == null) {
-        	System.out.println("can't open this file");
+        	System.err.println("can't open this file");
             return -ErrorCodes.ENOENT();
         }
+    	System.out.println("open : ok, no problem");
         return 0;
     }
 
@@ -502,9 +535,11 @@ public class JnrfuseImpl extends FuseStubFS {
     	System.out.println(">>>>NC Read for (path) : "+path+", for off/size "+offset+" / "+size);
     	FsFile fic = getPathFile(manager.getRoot(), path);
     	if(fic==null){
+    		System.err.println("can't read: no file");
             return -ErrorCodes.ENOENT();
     	}
     	if(size > Integer.MAX_VALUE){
+    		System.err.println("can't read: size >2gio");
             return -ErrorCodes.EMSGSIZE();
     	}
     	int readsize = (int) size;
@@ -522,7 +557,8 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	FsFile.read(fic, buff, offset);
 	
 	    	buf.put(0, buff.array(), 0, readsize);
-	    	System.out.println("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
+//	    	System.out.println("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
+	    	System.out.println("read : size = "+ buff.array().length);
 	    	return readsize;
     	}catch(Exception e){
     		e.printStackTrace();
@@ -548,7 +584,7 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	
 	    	FsFile.write(fic, buff, offset);
 	
-	    	System.out.println("write : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
+//	    	System.out.println("write : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
 
 	    	// save/propagate
 	    	fic.flush();
@@ -565,15 +601,20 @@ public class JnrfuseImpl extends FuseStubFS {
     
     @Override
     public int statfs(String path, Statvfs stbuf) {
+    	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+    	System.out.println(">>>>NC statfs for (path) : "+path);
         if (Platform.getNativePlatform().getOS() == jnr.ffi.Platform.OS.WINDOWS) {
             // statfs needs to be implemented on Windows in order to allow for copying
             // data from other devices because winfsp calculates the volume size based
             // on the statvfs call.
             // see https://github.com/billziss-gh/winfsp/blob/14e6b402fe3360fdebcc78868de8df27622b565f/src/dll/fuse/fuse_intf.c#L654
             if ("/".equals(path)) {
+            	System.out.println(">>>>NC statfs OK");
                 stbuf.f_blocks.set(1024 * 1024); // total data blocks in file system
                 stbuf.f_frsize.set(1024);        // fs block size
                 stbuf.f_bfree.set(1024 * 1024);  // free blocks in fs
+            }else{
+            	System.err.println(">>>>NC statfs KO");
             }
         }
         return super.statfs(path, stbuf);
@@ -631,11 +672,13 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int readdir(String path, Pointer buf, FuseFillDir filter, @off_t long offset, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+    	System.out.println(">>>>NC readdir for (path) : "+path);
     	FsDirectory dir = getPathDir(manager.getRoot(), path);
     	if(dir == null && path.equals("/")){
     		dir = manager.getRoot();
     	}
     	if(dir==null){
+    		System.err.println("Error, can't read not-existant dir "+path);
     		return -ErrorCodes.ENOENT();
     	}
     	try{
@@ -649,7 +692,7 @@ public class JnrfuseImpl extends FuseStubFS {
 	        	System.out.println(dir.getName()+" have a file");
 	        	filter.apply(buf, childFile.getName(), null, 0);
 	    	}
-    	}catch(LoadErasedException e)
+    	}catch(WrongSectorTypeException e)
     	{
     		autocorrectProblems(dir);
     		return readdir(path, buf, filter, offset, fi);

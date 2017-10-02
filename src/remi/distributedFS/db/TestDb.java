@@ -165,6 +165,7 @@ public class TestDb {
 			d1 = parent.createSubFile(name);
 //			d1.rearangeChunks(128, 1);
 			d1.createNewChunk(-1);
+			d1.flush();
 		}
 		System.out.println(name+" = "+d1);
 		System.out.println(name+" = "+d1.getPath());

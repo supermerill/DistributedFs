@@ -11,7 +11,6 @@ import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectVisitor;
-import remi.distributedFS.datastruct.LoadErasedException;
 import remi.distributedFS.util.Ref;
 
 public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDirectory{
@@ -64,7 +63,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 			System.err.println("Error, "+type+" not a directory at "+getSector()+" "+buffer.position());
 			super.load(buffer);
 			System.err.println("Error, "+type+" not a directory with name "+getName());
-			throw new LoadErasedException("Error, "+type+" not a directory at "+getSector());
+			throw new WrongSectorTypeException("Error, "+type+" not a directory at "+getSector());
 		}
 		
 		super.load(buffer);
@@ -79,11 +78,13 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		long nbDir = buffer.getLong();
 		long nbFile = buffer.getLong();
 		long nbDel = buffer.getLong();
+		System.out.println("read dir  "+name+" : "+nbDir+", "+nbFile+", "+nbDel);
 		
 		// 360 : position set behind
 		// /8 -> long type
-		// -3 -> remove nbdir read, nbfiel read, nbDel read,  and "next sector" read
+		// -4 -> remove nbdir read, nbfile read, nbDel read,  and "next sector" read
 		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-4;
+		System.out.println("Canread = "+canRead);
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
 		//read folder
@@ -118,9 +119,11 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		//i have 656 bytes in this sector. 82 long
 		long nbDir = buffer.getLong();
 		long nbFile = buffer.getLong();
+		long nbDel = buffer.getLong();
 		System.out.println("nbDir = "+nbDir);
-		
-		int canRead = 80;
+
+		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-4;
+		System.out.println("Canread = "+canRead);
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
 		//read folder
@@ -169,8 +172,11 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		buffer.putLong(dirs.size());
 		buffer.putLong(files.size());
 		buffer.putLong(deleteObjs.size());
-		
-		int canRead = 80;
+
+		// 360 : position set behind
+		// /8 -> long type
+		// -4 -> remove nbdir read, nbfile read, nbDel read,  and "next sector" read
+		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-4;
 		ByteBuffer currentBuffer = buffer;
 		Ref<Long> currentSector = new Ref<>(this.getSector());
 		//read folder

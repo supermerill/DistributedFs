@@ -59,9 +59,10 @@ public class FsChunkFromFile implements FsChunk {
 			try {
 				FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ);
 				
-				System.out.println("pos before = "+toAppend.position());
+				System.out.println("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
 				ByteBuffer buff = toAppend.toByteBuffer();
 				buff.limit(buff.position()+size);
+//				buff.position(buff.position()); //already done in toByteBuffer()
 				dataChannel.read(buff, offset);
 				dataChannel.close();
 
@@ -88,8 +89,8 @@ public class FsChunkFromFile implements FsChunk {
 				FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
 				
 				ByteBuffer buff = toWrite.toByteBuffer();
-				buff.limit(buff.position()+size);
-				toWrite.rewind();
+				buff.limit(toWrite.position()+size);
+//				buff.position(toWrite.position()); //already done in toByteBuffer()
 				dataChannel.write(buff, offset);
 				//sometimes it's not correct (if we re-use a file we didn't delete)
 //				currentSize = (int) dataChannel.size();
@@ -99,6 +100,7 @@ public class FsChunkFromFile implements FsChunk {
 				}
 				dataChannel.close();
 
+				System.out.println("toWrite.position = "+toWrite.position()+"+"+size+"=="+(toWrite.position()+size));
 				toWrite.position(toWrite.position()+size);
 				lastChange = System.currentTimeMillis();
 				return true;
@@ -172,22 +174,18 @@ public class FsChunkFromFile implements FsChunk {
 	
 	protected void ensureDatafield(){
 		System.out.println("ensureDatafield "+getId()+" isLocal="+isValid);
-		new Exception().printStackTrace();
 		if(data==null){
 			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
 			data=new File(master.getRootRep()+"/"+getId());
 			//create folder path
 			if(!data.exists()){
 				try {
-					//ensure dirs exists
-//					File myDir = new File(master.getRootRep()+parent.getParent().getPath());
-//					if(!myDir.exists()) myDir.mkdirs();
-					//useless, we now store all on our root folder
-					
-					
+					//we now store all on our root folder, no need to check if the dir exist
+					//TODO: create more rep to not make too much files in the same rep.
+					//		for example, a rep for each 1000 sectorid.
 					//create file
 					data.createNewFile();
-					System.err.println("data '"+data.getPath()+"'is now created");
+//					System.out.println("data '"+data.getPath()+"' is now created");
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -198,6 +196,7 @@ public class FsChunkFromFile implements FsChunk {
 				FsChunk meWithData = master.getManager().requestChunk(this.parent, this, serverIdPresent());
 				System.out.println("ensureDatafield(2) "+getId());
 				this.currentSize = meWithData.currentSize();
+				this.maxSize = meWithData.getMaxSize();
 				//create file & copy data
 //				if(!data.exists()){
 //					try {
@@ -225,6 +224,10 @@ public class FsChunkFromFile implements FsChunk {
 		}
 	}
 	
+	@Override
+	public String toString() {
+		return id+" size:"+currentSize+"/"+maxSize;
+	}
 
 	
 	public void flush() {

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
+import remi.distributedFS.db.impl.WrongSectorTypeException;
 import ru.serce.jnrfuse.ErrorCodes;
 
 public interface FsDirectory extends FsObject {
@@ -179,7 +180,7 @@ public interface FsDirectory extends FsObject {
 					childDir.getDirs();
 					childDir.getFiles();
 					autocorrectProblems(childDir);
-				}catch(LoadErasedException e){
+				}catch(WrongSectorTypeException e){
 					itDir.remove();
 					dir.flush();
 				}
@@ -192,7 +193,7 @@ public interface FsDirectory extends FsObject {
 					file.getName();
 					file.getChunks();
 					file.getSize();
-				}catch(LoadErasedException e){
+				}catch(WrongSectorTypeException e){
 					it.remove();
 					dir.flush();
 				}

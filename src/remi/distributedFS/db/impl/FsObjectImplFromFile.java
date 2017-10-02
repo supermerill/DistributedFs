@@ -151,6 +151,10 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		buffer.putLong(parentId);
 		buffer.putLong(creationDate);
 		buffer.putLong(creatorUserId);
+		if(creatorUserId==0){
+			System.err.println("error, trying to save a null user id");
+			new IllegalArgumentException("userid for "+getPath()+", "+id+" is =0").printStackTrace();
+		}
 		buffer.putLong(modifyDate);
 		buffer.putLong(modifyUserId);
 		buffer.putLong(deleteDate);
@@ -163,6 +167,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		buffer.putShort(size);
 		buffer.put(nameBuff.array(), 0, size);
 		buffer.position(pos+336);
+		System.out.println("-- save "+getPath());
 	}
 
 //	public int goToNext(ByteBuffer buff){
@@ -177,9 +182,11 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	public int goToNextOrCreate(ByteBuffer buff, Ref<Long> currentSector){
 		int pos = buff.position();
 		long nextsector = buff.getLong();
+		System.out.println("--get (save) sector "+nextsector);
 		buff.position(pos);
 		if(nextsector<=0){
 			long newSectorId = master.requestNewSector();
+			System.out.println("--create (read) sector "+newSectorId);
 			buff.putLong(newSectorId);
 			buff.rewind();
 			master.saveSector(buff, currentSector.get());
@@ -204,14 +211,16 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	 */
 	public int goToNext(ByteBuffer buff){
 		long nextsector = buff.getLong();
+		System.out.println("--get (read) sector "+nextsector);
 		if(nextsector<=0){
-				System.err.println("Error, no more sector to parse for obj "+this.getPath());
+				System.err.println("--Error, no more sector to parse for obj "+this.getPath()+" : "+nextsector);
 				throw new RuntimeException("Error, no more sector to parse for obj "+this.getPath());
 			
 		}
 		buff.rewind();
 		master.loadSector(buff, nextsector);
-		if(buff.get()==FsTableLocal.EXTENSION){
+		byte type = buff.get();
+		if(type==FsTableLocal.EXTENSION){
 			//ok
 			//verify it's mine
 			long storedSec = buff.getLong();
@@ -224,8 +233,8 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			buff.position(16);
 			return (FsTableLocal.FS_SECTOR_SIZE / 8) - 3; //128 -2(prefix) -1(suffix)
 		}else{
-			System.err.println("Error, my next sector is not picked for me !!!");
-			throw new RuntimeException("Error, my next sector is not picked for me !!!");
+			System.err.println("Error, my next sector is not picked for me !!! sector id: "+nextsector+" has a type of "+type);
+			throw new WrongSectorTypeException("Error, my next sector is not picked for me !!!");
 		}
 	}
 
