@@ -126,6 +126,12 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public void delete() {
+			// TODO Auto-generated method stub
+			
+		}
 		
 	}
 	static class FsFic extends FsObjectImpl implements FsFile{
@@ -192,6 +198,12 @@ public class Testjnr {
 
 		@Override
 		public void setChunks(List<FsChunk> newList) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void delete() {
 			// TODO Auto-generated method stub
 			
 		}
@@ -311,6 +323,12 @@ public class Testjnr {
 
 		@Override
 		public void changes() {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void delete() {
 			// TODO Auto-generated method stub
 			
 		}

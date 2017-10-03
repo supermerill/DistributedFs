@@ -41,7 +41,8 @@ public interface FsObject {
 	void setId(long newId); //set id to create a new one from distant peer
 	
 	/**
-	 * Perform deletion operation : delete sub-thing, delete content, put it in "deleted" status
+	 * Perform deletion operation : delete sub-thing, delete content, delete entry in fs.
+	 * It's final and irrecoverable. If you want just mark this as "deleted", use removeDir/removeFile/removeChunk instead.
 	 */
 	public void delete(); 
 	

@@ -109,7 +109,7 @@ public class TestDb {
 				return null;
 			}
 		};
-		testeur.db = new FsTableLocal(".", "fs.data", manager);
+		testeur.db = new FsTableLocal(".", "fs.data", manager, true);
 		testeur.test();
 		
 	}

@@ -326,7 +326,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 					message.putLong(-1);
 				}
 				message.putInt(chunk.currentSize());
-				System.out.println(this.manager.getComputerId()%100+"emit for file his "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.lastModificationTimestamp():-1));
+				System.out.println(this.manager.getComputerId()%100+"emit for file "+fic.getPath()+" his "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.lastModificationTimestamp():-1));
 			}else{
 				System.err.println(this.manager.getComputerId()%100+" SEND FILE ERROR: null chunk!! (pos "+i+")");
 				message.putLong(-1);

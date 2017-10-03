@@ -2,15 +2,15 @@ package remi.distributedFS.db.impl;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.GenericArrayType;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.util.ByteBuff;
 import remi.distributedFS.util.Ref;
@@ -173,7 +173,6 @@ public class FsChunkFromFile implements FsChunk {
 	}
 	
 	protected void ensureDatafield(){
-		System.out.println("ensureDatafield "+getId()+" isLocal="+isValid);
 		if(data==null){
 			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
 			data=new File(master.getRootRep()+"/"+getId());
@@ -194,7 +193,6 @@ public class FsChunkFromFile implements FsChunk {
 				//request it
 				System.out.println("REQUEST DATA FOR CHUNK "+getId());
 				FsChunk meWithData = master.getManager().requestChunk(this.parent, this, serverIdPresent());
-				System.out.println("ensureDatafield(2) "+getId());
 				this.currentSize = meWithData.currentSize();
 				this.maxSize = meWithData.getMaxSize();
 				//create file & copy data
@@ -205,16 +203,28 @@ public class FsChunkFromFile implements FsChunk {
 //						e.printStackTrace();
 //					}
 //				}
-				System.out.println("ensureDatafield(3) "+getId());
 				//copy
 				synchronized(this){
 					isValid = true; //to not proc this method again
-					ByteBuff buff = new ByteBuff(Math.min(currentSize,1024*16));
-					for(int i=0;i<meWithData.currentSize();i+=buff.limit()){
-						buff.rewind();
-						meWithData.read(buff, i*buff.limit(), buff.limit());
-						this.write(buff, i*buff.limit(), buff.limit());
-					}
+					//too complicated, TODO : useful?
+//					ByteBuff buff = null;
+//					if(currentSize<=1024*1024){
+//						buff = new ByteBuff(currentSize);
+//					}else{
+//						int fact = currentSize / (1024*1024);
+//						buff = new ByteBuff(currentSize / fact);
+//					}
+//					for(int i=0;i<meWithData.currentSize();i+=buff.limit()){
+//						buff.rewind();
+//						meWithData.read(buff, i*buff.limit(), buff.limit());
+//						this.write(buff, i*buff.limit(), buff.limit());
+//					}
+					
+					//simplier version
+					ByteBuff buff = new ByteBuff(currentSize);
+					meWithData.read(buff, 0, buff.limit());
+					this.write(buff, 0, buff.limit());
+					
 				}
 				//ready!
 //				lastChange = meWithData.lastModificationTimestamp();
@@ -287,6 +297,8 @@ public class FsChunkFromFile implements FsChunk {
 			}
 		}
 
+		//fill last sector with zeros
+		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
 		//write last sector
 		currentBuffer.rewind();
 		master.saveSector(currentBuffer, currentSector.get());
@@ -456,6 +468,56 @@ public class FsChunkFromFile implements FsChunk {
 	public void changes() {
 		ensureLoaded();
 		lastChange = System.currentTimeMillis();
+	}
+
+	@Override
+	public void delete(){
+		//delete file if present
+		if(data == null) data = new File(master.getRootRep()+"/"+getId());
+		if(data.exists()) data.delete();
+		
+		//delete self
+		deleteSectors();
+	}
+	
+	
+
+	public void deleteSectors(){
+		if(sector<=0){
+			System.err.println("Error, trying to del chunk "+id+" with sector id of "+getSector()+" :  impossible!");
+			throw new RuntimeException("Error, trying to del chunk "+id+" with sector id of "+getSector()+" :  impossible!");
+		}
+		//delete entry into fs table
+		//get last long in our fs
+		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
+		master.loadSector(buff, getSector());
+		load(buff);
+		buff.position(buff.limit()-8);
+		long nextSector = buff.getLong();
+		if(nextSector>0){
+			LongList sectorsToDel = new LongArrayList();
+			while(nextSector>0){
+				sectorsToDel.add(nextSector);
+				master.loadSector(buff, nextSector);
+				long type = buff.getLong();
+				if(type != FsTableLocal.EXTENSION){
+					System.err.println("Warn : deleted object "+id+" has an extedned sector occupied by somethign else. Sector id: "+nextSector+" : "+type);
+					break;
+				}
+				buff.position(buff.limit()-8);
+				nextSector = buff.getLong();
+			}
+			Arrays.fill(buff.array(), (byte)0);
+			//del other ones
+			for(int i=sectorsToDel.size()-1;i>=0;i--){
+				master.saveSector(buff, sectorsToDel.getLong(i));
+			}
+		}else{
+			Arrays.fill(buff.array(), (byte)0);
+		}
+		
+		//del main sector
+		master.saveSector(buff, getSector());
 	}
 
 }

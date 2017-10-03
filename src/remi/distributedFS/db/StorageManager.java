@@ -19,4 +19,10 @@ public interface StorageManager {
 	
 	FsObject getDirect(long id);
 
+	/**
+	 * Remove deleted dirs since since
+	 * @param since All object which are deleted since this timestamp will be deleted.
+	 */
+	public void removeOldDelItem(long since);
+
 }

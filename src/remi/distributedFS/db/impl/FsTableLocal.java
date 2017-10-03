@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -13,6 +14,7 @@ import org.omg.CORBA.VisibilityHelper;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
@@ -22,13 +24,14 @@ import remi.distributedFS.fs.FileSystemManager;
 
 public class FsTableLocal implements StorageManager{
 
-	public static final byte ERASED = -1; // no data
+	public static final byte ERASED = 0; // no data
 	public static final byte DIRECTORY = 1;
 	public static final byte FILE = 2;
 	public static final byte CHUNK = 3;
 	public static final byte EXTENSION = 4;
-	public static final byte DELETED = 5; //deleted object (but it's kept here)
-	public static final byte MOVING = 6;
+	@Deprecated
+	public static final byte DELETED = 5; //deleted object (but it's kept here) (NOT USED)
+	public static final byte MOVING = 6; //not used (yet) -> to mark sectors which are in construction, but the swap hasn't been done yet. (useful for shutdown-resistant fs)
 
 	FileSystemManager manager;
 	
@@ -49,7 +52,7 @@ public class FsTableLocal implements StorageManager{
 	//this is a stub to help me tracking pos of objects.
 	Long2ObjectMap<FsObject> objectId2LocalCluster = new Long2ObjectOpenHashMap<>();
 	
-	public FsTableLocal(String rootRep, String filename, FileSystemManager manager) throws IOException{
+	public FsTableLocal(String rootRep, String filename, FileSystemManager manager, boolean cleanIt) throws IOException{
 		this.manager = manager;
 		this.rootRep = rootRep;
 		//check root rep 
@@ -74,6 +77,9 @@ public class FsTableLocal implements StorageManager{
 		//it's a stub, this content should be stored in a 'small' separate file.
 //		getRoot().accept(new Visu());
 		getRoot().accept(new Loader());
+		if(cleanIt){
+			cleanUnusedSectors(true);
+		}
 	}
 	class Visu implements FsObjectVisitor{
 		
@@ -313,7 +319,9 @@ public class FsTableLocal implements StorageManager{
 
 
 	public void releaseSector(long id) {
-		unusedSectors.add(id);
+		synchronized (unusedSectors) {
+			unusedSectors.add(id);
+		}
 	}
 	
 	@Override
@@ -357,5 +365,79 @@ public class FsTableLocal implements StorageManager{
 		objectId2LocalCluster.put(id, fsObjectImplFromFile);
 	}
 	
+	/**
+	 * remove content from sector which are not used
+	 * @param removeMoving set to true if you haven't start yet. It will remove "MOVING" sector
+	 */
+	public void cleanUnusedSectors(boolean removeMoving){
+		Long2ObjectMap<FsChunk> id2Chunk = new Long2ObjectOpenHashMap<FsChunk>();
+		//get all chunks
+		for(FsObject obj : objectId2LocalCluster.values()){
+			if(obj instanceof FsFileFromFile){
+				FsFileFromFile fic = (FsFileFromFile) obj;
+				for(FsChunk ch : fic.getChunks()){
+					id2Chunk.put(ch.getId(), ch);
+				}
+			}
+		}
+		
+		
+		ByteBuffer buff = ByteBuffer.allocate(9);
+		ByteBuffer buffDel = ByteBuffer.allocate(FS_SECTOR_SIZE);
+		Arrays.fill(buffDel.array(), (byte)0);
+		//look at all sectors
+		long maxSects = fileSize/FS_SECTOR_SIZE;
+		for(long i=0;i<maxSects;i++){
+			//getId
+			try {
+				fsFile.read(buff, i*FS_SECTOR_SIZE);
+			} catch (IOException e) {
+				e.printStackTrace();
+				continue;
+			}
+			byte type = buff.get();
+			long id = buff.getLong();
+			if(type == 0){
+				//nothing, it's empty
+			}else if(type == EXTENSION){
+				//check if root exist?
+				if(getDirect(id) == null){
+					//remove!
+					saveSector(buffDel, i);
+					System.out.println("Cleaning: remove extension sector (obj_id:"+id+") @"+i);
+				}
+			}else if(type == FILE || type == DIRECTORY){
+				//check if root exist?
+				FsObject obj = getDirect(id);
+				if(obj == null || ((FsObjectImplFromFile)obj).getSector() != i){
+					//remove!
+					saveSector(buffDel, i);
+					System.out.println("Cleaning: remove object (obj_id:"+id+"@"+((FsObjectImplFromFile)obj).getSector()+") @"+i);
+				}
+			}else if(removeMoving && type == MOVING){
+				//remove!
+				saveSector(buffDel, i);
+				System.out.println("Cleaning: remove moving sector @"+i);
+			}else if(type == DELETED){
+				//remove!
+				saveSector(buffDel, i);
+				System.out.println("Cleaning: remove deleted sector (because the type is not used and i don't know what to do with it) @"+i);
+			}else if(type == CHUNK){
+				FsChunk obj = id2Chunk.get(id);
+				if(obj == null || ((FsChunkFromFile)obj).getSector() != i){
+					//remove!
+					saveSector(buffDel, i);
+					System.out.println("Cleaning: remove chunk (chunk_id:"+id+"@"+((FsChunkFromFile)obj)+") @"+i);
+				}
+			}
+		}
+		
+	}
+	
+	public void removeOldDelItem(long since){
+		RemoveOldDeletedItems remover = new RemoveOldDeletedItems();
+		remover.dateThreshold = since;
+		remover.visit(root);
+	}
 	
 }

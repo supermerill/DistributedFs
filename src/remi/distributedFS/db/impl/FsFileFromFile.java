@@ -3,6 +3,7 @@ package remi.distributedFS.db.impl;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -116,6 +117,8 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 			}
 		}
 
+		//fill last sector with zeros
+		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
 		//write last sector
 		currentBuffer.rewind();
 		master.saveSector(currentBuffer, currentSector.get());
@@ -240,6 +243,15 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 //		}
 //	}
 
+	@Override
+	public void delete(){
+		//delete content
+		for(int i=0;i<chunks.size();i++){
+			chunks.get(i).delete();
+		}
+		//delete self
+		super.delete();
+	}
 
 
 }

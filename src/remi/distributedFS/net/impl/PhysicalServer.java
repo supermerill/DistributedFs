@@ -178,7 +178,7 @@ public class PhysicalServer implements ClusterManager {
 										getId() % 100 + " 'warn' PROPAGATE to " + oldPeer.getConnectionId() % 100);
 								// MyServerList.get().write(peers, oldPeer);
 								messageManager.sendServerList(oldPeer.getConnectionId(), peers);
-								oldPeer.getOut().flush();
+								oldPeer.flush();
 							}
 						} else {
 							peers.add(peer);
@@ -464,27 +464,7 @@ public class PhysicalServer implements ClusterManager {
 	}
 
 	public void writeMessage(Peer p, byte messageId, ByteBuff message) {
-		try {
-			OutputStream out = p.getOut();
-			out.write(5);
-			out.write(5);
-			out.write(messageId);
-			// System.out.println("WRITE 5 5 "+myId.id);
-			ByteBuff buffInt = new ByteBuff();
-			if (message != null) {
-				buffInt.putInt(message.limit()).flip();
-			} else {
-				buffInt.putInt(0).flip();
-			}
-			out.write(buffInt.array(), 0, 4);
-			if (message != null) {
-				out.write(message.array(), message.position(), message.limit() - message.position());
-			}
-			out.flush();
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
+		p.writeMessage(messageId, message);
 	}
 
 	public Peer getPeer(long senderId) {

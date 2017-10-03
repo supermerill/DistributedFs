@@ -26,8 +26,8 @@ public class FsChunkBuffer implements FsChunk{
 
 	@Override
 	public boolean read(ByteBuff toAppend, int offset, int size) {
-		System.err.println(buffer.array().length+" : ["+(buffer.position()+offset)+" ; "+(buffer.position()+offset+size)+"] "
-				+ " => "+toAppend.array().length+" : ["+(toAppend.position())+" ; "+(toAppend.position()+size)+"] ");
+//		System.out.println(buffer.array().length+" : ["+(buffer.position()+offset)+" ; "+(buffer.position()+offset+size)+"] "
+//				+ " => "+toAppend.array().length+" : ["+(toAppend.position())+" ; "+(toAppend.position()+size)+"] ");
 		System.arraycopy(buffer.array(), buffer.position()+offset, toAppend.array(), toAppend.position(), size);
 		return true;
 	}
@@ -94,6 +94,11 @@ public class FsChunkBuffer implements FsChunk{
 
 	@Override
 	public void changes() {
+	}
+
+	@Override
+	public void delete() {
+		
 	}
 
 }

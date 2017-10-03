@@ -2,7 +2,10 @@ package remi.distributedFS.db.impl;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObjectImpl;
 import remi.distributedFS.util.Ref;
@@ -152,8 +155,8 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		buffer.putLong(creationDate);
 		buffer.putLong(creatorUserId);
 		if(creatorUserId==0){
-			System.err.println("error, trying to save a null user id");
-			new IllegalArgumentException("userid for "+getPath()+", "+id+" is =0").printStackTrace();
+			System.err.println("warn, trying to save a null user id");
+//			new IllegalArgumentException("userid for "+getPath()+", "+id+" is =0").printStackTrace();
 		}
 		buffer.putLong(modifyDate);
 		buffer.putLong(modifyUserId);
@@ -194,7 +197,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			//master.loadSector(buff, newSectorId); //useless, it's not created yet!
 			buff.rewind();
 			buff.put(FsTableLocal.EXTENSION);
-			buff.putLong(this.getSector());
+			buff.putLong(this.getId());
 			buff.position(FsTableLocal.FS_SECTOR_SIZE-8);
 			buff.putLong(-1);
 			buff.position(16);
@@ -224,7 +227,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			//ok
 			//verify it's mine
 			long storedSec = buff.getLong();
-			if(storedSec != this.getSector()){
+			if(storedSec != this.getId()){
 				System.err.println("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
 				throw new RuntimeException("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
 			}
@@ -249,8 +252,8 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			
 			if(parentId<0){
 				//delete this one
-	//			this.delete();
-				master.releaseSector(this.getSector());
+				this.delete();
+//				master.releaseSector(this.getSector());
 			}
 			
 			//flush parent if useful (if i have changed)
@@ -398,4 +401,47 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		setDirty(true);
 		flush();
 	}
+	
+
+	@Override
+	public void delete(){
+		if(sector<=0){
+			System.err.println("Error, trying to del object "+getPath()+" with sector id of "+getSector()+" :  impossible!");
+			throw new RuntimeException("Error, trying to del object "+getPath()+" with sector id of "+getSector()+" :  impossible!");
+		}
+		//delete entry into fs table
+		//get last long in our fs
+		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
+		master.loadSector(buff, getSector());
+		load(buff);
+		buff.position(buff.limit()-8);
+		long nextSector = buff.getLong();
+		if(nextSector>0){
+			LongList sectorsToDel = new LongArrayList();
+			while(nextSector>0){
+				sectorsToDel.add(nextSector);
+				master.loadSector(buff, nextSector);
+				long type = buff.getLong();
+				if(type != FsTableLocal.EXTENSION){
+					System.err.println("Warn : deleted object "+getPath()+" has an extedned sector occupied by somethign else. Sector id: "+nextSector+" : "+type);
+					break;
+				}
+				buff.position(buff.limit()-8);
+				nextSector = buff.getLong();
+			}
+			Arrays.fill(buff.array(), (byte)0);
+			//del other ones
+			for(int i=sectorsToDel.size()-1;i>=0;i--){
+				master.saveSector(buff, sectorsToDel.getLong(i));
+				master.releaseSector(sectorsToDel.getLong(i));
+			}
+		}else{
+			Arrays.fill(buff.array(), (byte)0);
+		}
+		
+		//del main sector
+		master.saveSector(buff, getSector());
+		master.releaseSector(getSector());
+	}
+	
 }

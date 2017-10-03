@@ -6,6 +6,7 @@ import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 
+@Deprecated
 public class FsDeletedObject extends FsObjectImplFromFile{
 	
 	public FsDeletedObject(FsTableLocal master, long sectorId, FsDirectory parent) {
@@ -36,4 +37,5 @@ public class FsDeletedObject extends FsObjectImplFromFile{
 	@Override
 	public void accept(FsObjectVisitor visitor) {
 	}
+	
 }

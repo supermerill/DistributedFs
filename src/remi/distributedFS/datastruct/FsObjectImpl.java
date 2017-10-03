@@ -128,11 +128,6 @@ public abstract class FsObjectImpl implements FsObject {
 	}
 	
 	
-	public void delete(){
-		
-	}
-	
-	
 	@Override
 	public FsDirectory asDirectory() {
 		return this instanceof FsDirectory ? (FsDirectory) this : null;

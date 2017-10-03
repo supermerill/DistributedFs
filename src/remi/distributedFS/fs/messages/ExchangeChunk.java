@@ -150,7 +150,7 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 
 	private void sendChunk(long senderId, FsFile fic, FsChunk chunkOk) {
 
-		System.out.println(this.manager.getComputerId()+"$ SEND CHUNK : send it!");
+		System.out.println(this.manager.getComputerId()+"$ SEND CHUNK : send it! : "+chunkOk.currentSize()+" / "+chunkOk.getMaxSize());
 		ByteBuff buff = new ByteBuff();
 		buff.put((byte)1);
 		buff.putLong(fic.getId());

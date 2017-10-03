@@ -13,6 +13,7 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 	public FsUnknownObject(FsTableLocal master, long sectorId, FsDirectory parent) {
 		super(master, sectorId, parent);
 		me = null;
+		this.getId();
 	}
 
 	public void load(ByteBuffer buffer){

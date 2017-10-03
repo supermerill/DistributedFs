@@ -325,37 +325,103 @@ public class Peer implements Runnable {
 			myCurrentThread.start();
 		}
 	}
+	
 
-	private void readMessage() {
+
+	public synchronized void writeMessage(byte messageId, ByteBuff message) {
+		if(message==null){
+			System.err.println("Warn : emit null message, id :"+messageId);
+		}
+		try {
+			OutputStream out = this.getOut();
+			out.write(5);
+			out.write(5);
+			out.write(5);
+			out.write(5);
+			out.write(messageId);
+			out.write(messageId);
+			// System.out.println("WRITE 5 5 "+myId.id);
+			ByteBuff buffInt = new ByteBuff();
+			if (message != null) {
+				buffInt.putInt(message.limit() - message.position())
+						.putInt(message.limit() - message.position())
+						.flip();
+			} else {
+				buffInt.putInt(0)
+						.putInt(0)
+						.flip();
+			}
+			out.write(buffInt.array(), 0, 8);
+			if (message != null) {
+				out.write(message.array(),  message.position(), message.limit() - message.position());
+			}
+			out.flush();
+			if(message != null && message.position() != 0){
+				System.err.println("Warn, you want to send a buffer which is not rewinded : " + message.position());
+			}
+			System.out.println("WRITE MESSAGE : "+messageId+" : "+(message==null?"null":(message.limit() - message.position())));
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
+
+	protected void readMessage() {
 		try {
 			// go to a pos where there are the two byte [5,5]
 			int newByte = 0;
+			int nb5 = 0;
 			do {
-				do {
-					newByte = streamIn.read();
-//					System.out.println(myServer.getId() % 100 + " read first 5 :" + newByte);
-					if (newByte == -1)
-						throw new IOException("End of stream");
-				} while (newByte != 5);
 
 				newByte = streamIn.read();
+				if(newByte==5){
+					nb5++;
+				}else{
+					nb5 = 0;
+					System.err.println("stream error: receive "+newByte+" isntead of 5");
+				}
 //				System.out.println(myServer.getId() % 100 + " read second 5 :" + newByte);
 				if (newByte == -1)
 					throw new IOException("End of stream");
-			} while (newByte != 5);
+			} while (nb5 < 4);
 
 			// read messagetype
 			newByte = streamIn.read();
+			int sameByte = streamIn.read();
+			if(sameByte != newByte){
+				System.err.println("Stream error: not same byte for message id : "+newByte+" != "+sameByte);
+				return;
+			}
 			System.out.println(myServer.getId() % 100 + " read message id :" + newByte);
 			if (newByte == -1)
 				throw new IOException("End of stream");
+			if(newByte<0 || newByte >50){
+				System.err.println("error, receive byte: "+newByte);
+				return;
+			}
 			// read message
 			try {
-				ByteBuff buffIn = new ByteBuff(4);
-				streamIn.read(buffIn.array(), 0, 4);
+				ByteBuff buffIn = new ByteBuff(8);
+				streamIn.read(buffIn.array(), 0, 8);
 				int nbBytes = buffIn.getInt();
+				int nbBytes2 = buffIn.getInt();
+				if(nbBytes<0){
+					System.err.println("Stream error: stream want me to read a negative number of bytes");
+					return;
+				}
+				if(nbBytes!=nbBytes2){
+					System.err.println("Stream error: not same number of bytes to read : "+nbBytes+" != "+nbBytes2);
+					return;
+				}
+				System.out.println("Read "+nbBytes+" from the stream");
 				buffIn.limit(nbBytes).rewind();
-				if(nbBytes>0) streamIn.read(buffIn.array(), 0, nbBytes);
+				if(nbBytes>0) {
+					int pos = 0;
+					//while mandatory, because it's not a buffered stream.
+					while(pos<nbBytes){
+						pos += streamIn.read(buffIn.array(), pos, nbBytes-pos);
+					}
+				}
 				if (newByte == AbstractMessageManager.GET_SERVER_ID) {
 					// special case, give the peer object directly.
 					myServer.message().sendServerId(this);
@@ -439,11 +505,11 @@ public class Peer implements Runnable {
 		return myServer;
 	}
 
-	public OutputStream getOut() {
+	protected OutputStream getOut() {
 		return streamOut;
 	}
 
-	public InputStream getIn() {
+	protected InputStream getIn() {
 		return streamIn;
 	}
 
@@ -491,6 +557,10 @@ public class Peer implements Runnable {
 
 	public short getComputerId() {
 		return distComputerId;
+	}
+
+	public void flush() throws IOException {
+		getOut().flush();
 	}
 
 }

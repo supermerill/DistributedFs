@@ -33,6 +33,7 @@ public class StandardManager implements FileSystemManager {
 	char driveletter;
 	String rootFolder = ".";
 	
+	Cleaner cleaner;
 	
 	public static void main(String[] args) throws IOException {
 		//TODO: read config file
@@ -78,6 +79,17 @@ public class StandardManager implements FileSystemManager {
 //		}).start();
 	}
 	
+	
+	public StandardManager() {
+		super();
+		//TODO: serialize & gui
+		cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
+		cleaner.start();
+	}
+
+
+
+
 	public void initializeNewCluster() {
 		//check if we havn't any id
 		if(getComputerId() < 0){
@@ -99,7 +111,7 @@ public class StandardManager implements FileSystemManager {
 			}
 			
 			System.out.println("begin");
-			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this);
+			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this, true);
 	
 			if(port>0){
 				net = new PhysicalServer(this, false, dataPath);

@@ -2,6 +2,7 @@ package remi.distributedFS.db.impl;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -202,6 +203,8 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 			}
 		}
 		//save last sector (previous are saved in goToNextOrCreate)
+		//fill last sector with zeros
+		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
 		currentBuffer.rewind();
 		master.saveSector(currentBuffer, currentSector.get());
 		setDirty(false);
@@ -283,7 +286,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	public void removeFile(FsFile fic) {
 		fic.setDeleteDate(System.currentTimeMillis()); 
 		fic.setDeleteUID(master.getUserId());
-		fic.delete();
+//		fic.delete();
 //		FsErasedObject eobj = new FsErasedObject(master, e.getId(), FsDirectoryFromFile.this);
 		files.remove(fic);
 		if(!deleteObjs.contains(fic)){
@@ -303,7 +306,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	public void removeDir(FsDirectory dir) {
 		dir.setDeleteDate(System.currentTimeMillis()); 
 		dir.setDeleteUID(master.getUserId());
-		dir.delete();
+//		dir.delete();
 //		FsErasedObject eobj = new FsErasedObject(master, e.getId(), FsDirectoryFromFile.this);
 		dirs.remove(dir);
 		if(!deleteObjs.contains(dir)){
@@ -411,6 +414,27 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		if(parent != this && parent != null){
 			parent.setLastChangeUID(lastChangeUid);
 		}
+	}
+
+	
+	@Override
+	public void delete(){
+		//delete content
+		for(int i=0;i<dirs.size();i++){
+			dirs.get(i).delete();
+		}
+		for(int i=0;i<files.size();i++){
+			files.get(i).delete();
+		}
+		for(int i=0;i<deleteObjs.size();i++){
+			deleteObjs.get(i).delete();
+		}
+		dirs.clear();
+		files.clear();
+		deleteObjs.clear();
+		
+		//delete self
+		super.delete();
 	}
 	
 }

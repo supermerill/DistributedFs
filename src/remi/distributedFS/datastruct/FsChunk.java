@@ -45,4 +45,6 @@ public abstract interface FsChunk {
 
 	public void changes();
 
+	public void delete();
+
 }
