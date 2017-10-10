@@ -254,4 +254,15 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 	}
 
 
+
+	@Override
+	public FsDirectory asDirectory() {
+		return null;
+	}
+	
+	@Override
+	public FsFile asFile() {
+		return this;
+	}
+
 }

@@ -94,12 +94,12 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 					manager.getNet().writeMessage(senderId, SEND_FILE_CHUNK, buff);
 					return;
 				}
-				if(chunk.isPresent() && chunk.lastModificationTimestamp()>=chunkModDate){
+				if(chunk.isPresent() && chunk.getModifyDate()>=chunkModDate){
 					System.out.println(this.manager.getComputerId()+"$ Good chunk "+senderId);
 					//find
 					chunkOk = chunk;
 				}else{
-					System.out.println(this.manager.getComputerId()+"$ Old/nothere chunk: our:"+chunk.lastModificationTimestamp()+">=their:"+chunkModDate+", present:"+chunk.isPresent());
+					System.out.println(this.manager.getComputerId()+"$ Old/nothere chunk: our:"+chunk.getModifyDate()+">=their:"+chunkModDate+", present:"+chunk.isPresent());
 				}
 			}
 			
@@ -158,8 +158,8 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		buff.putLong(fic.getModifyDate());
 		buff.putLong(fic.getModifyUID());
 		buff.putLong(chunkOk.getId());
-		buff.putLong(chunkOk.lastModificationTimestamp());
-		buff.putLong(chunkOk.lastModificationUID());
+		buff.putLong(chunkOk.getModifyDate());
+		buff.putLong(chunkOk.getModifyUID());
 		buff.putInt(chunkOk.getMaxSize());
 		//send chunk data
 		buff.putTrailInt(chunkOk.currentSize());
@@ -176,7 +176,7 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		buff.putUTF8(fic.getPath());
 		buff.putLong(fic.getModifyDate());
 		buff.putLong(chunk.getId());
-		buff.putLong(chunk.lastModificationTimestamp());
+		buff.putLong(chunk.getModifyDate());
 		buff.flip();
 		manager.getNet().writeBroadcastMessage(GET_FILE_CHUNK, buff);
 	}

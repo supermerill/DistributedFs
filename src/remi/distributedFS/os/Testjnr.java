@@ -79,13 +79,13 @@ public class Testjnr {
 		}
 
 		@Override
-		public long lastModificationTimestamp() {
+		public long getModifyDate() {
 			// TODO Auto-generated method stub
 			return 0;
 		}
 
 		@Override
-		public long lastModificationUID() {
+		public long getModifyUID() {
 			// TODO Auto-generated method stub
 			return 0;
 		}
@@ -131,6 +131,17 @@ public class Testjnr {
 		public void delete() {
 			// TODO Auto-generated method stub
 			
+		}
+
+		@Override
+		public void accept(FsObjectVisitor visitor) {
+			visitor.visit(this);
+		}
+
+		@Override
+		public long getLastAccessDate() {
+			// TODO Auto-generated method stub
+			return 0;
 		}
 		
 	}

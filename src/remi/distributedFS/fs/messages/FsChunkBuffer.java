@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import remi.distributedFS.datastruct.FsChunk;
+import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.util.ByteBuff;
 
 public class FsChunkBuffer implements FsChunk{
@@ -62,12 +63,12 @@ public class FsChunkBuffer implements FsChunk{
 	}
 
 	@Override
-	public long lastModificationTimestamp() {
+	public long getModifyDate() {
 		return timemod;
 	}
 
 	@Override
-	public long lastModificationUID() {
+	public long getModifyUID() {
 		return modUID;
 	}
 
@@ -99,6 +100,17 @@ public class FsChunkBuffer implements FsChunk{
 	@Override
 	public void delete() {
 		
+	}
+
+	@Override
+	public void accept(FsObjectVisitor visitor) {
+		visitor.visit(this);
+	}
+
+	@Override
+	public long getLastAccessDate() {
+		// TODO Auto-generated method stub
+		return 0;
 	}
 
 }

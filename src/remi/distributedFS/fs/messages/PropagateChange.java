@@ -321,12 +321,12 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			if(chunk!=null){
 				message.putLong(chunk.getId());
 				if(chunk.isPresent()){
-					message.putLong(chunk.lastModificationTimestamp());
+					message.putLong(chunk.getModifyDate());
 				}else{
 					message.putLong(-1);
 				}
 				message.putInt(chunk.currentSize());
-				System.out.println(this.manager.getComputerId()%100+"emit for file "+fic.getPath()+" his "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.lastModificationTimestamp():-1));
+				System.out.println(this.manager.getComputerId()%100+"emit for file "+fic.getPath()+" his "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.getModifyDate():-1));
 			}else{
 				System.err.println(this.manager.getComputerId()%100+" SEND FILE ERROR: null chunk!! (pos "+i+")");
 				message.putLong(-1);
@@ -393,7 +393,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 						used = false;
 					}
 					if(chunk!=null){
-						System.out.println(this.manager.getComputerId()%100+"mine version: "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.lastModificationTimestamp():-1));
+						System.out.println(this.manager.getComputerId()%100+"mine version: "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.getModifyDate():-1));
 					}
 					if(chunk == null){
 						//if can't retrieve by id, maybe new?
@@ -411,20 +411,20 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 //						requestDirPath(senderId, dir.getPath()+"/"+dirName, childDir.getId()); //this one should get us the two files, one from path, one from id
 					}else{
 						//check lastChangeDate & modifyDate
-						if(chunk.lastModificationTimestamp()<chunkDate && !used){
+						if(chunk.getModifyDate()<chunkDate && !used){
 							System.out.println(this.manager.getComputerId()%100+" FILECG oh, a chunk was re-used : "+chunk.getId());
 							//this dir has something modified (inside or deep inside)
 							//request a recursive check. NOT FOR CHUNK
 //							requestDirPath(senderId, childDir.getPath(), childDir.getId());
 						}
-						if(chunk.lastModificationTimestamp()<chunkDate){
+						if(chunk.getModifyDate()<chunkDate){
 							System.out.println(this.manager.getComputerId()%100+" FILECG oh, a chunk was updated : "+chunk.getId());
 							chunk.setPresent(false);
 							chunk.setCurrentSize(chunkSize);
 							if(!chunk.serverIdPresent().contains(senderId))
 								chunk.serverIdPresent().add(senderId);
 							chunk.flush();
-							System.out.println(this.manager.getComputerId()%100+"mine new version: "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.lastModificationTimestamp():-1));
+							System.out.println(this.manager.getComputerId()%100+"mine new version: "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.getModifyDate():-1));
 						}
 //						direxist.add(childDir);
 					}
@@ -443,7 +443,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 				fic.flush();
 				for(int i=0;i<fic.getChunks().size();i++){
 					FsChunk chunk = fic.getChunks().get(i);
-					System.out.println(this.manager.getComputerId()%100+" FILECG : chunk "+i+" : "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.lastModificationTimestamp():-1));
+					System.out.println(this.manager.getComputerId()%100+" FILECG : chunk "+i+" : "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.getModifyDate():-1));
 				}
 			}
 
@@ -568,7 +568,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			if(obj != null){
 				searchedObj = func.asObject(obj);
 				if(searchedObj == null){
-					System.err.println(this.manager.getComputerId()%100+" OBJCG Finded a displaced thing! : "+obj+" which isn't a dir : "+obj.getPath()+" -> "+path);
+					System.err.println(this.manager.getComputerId()%100+" OBJCG Finded a displaced thing! : "+obj+" which isn't a ? : "+obj.getPath()+" -> "+path);
 					System.err.println("TODO: correct the error");
 					return null;
 				}else{
@@ -875,9 +875,9 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			long idDir = message.getLong();
 			System.out.println(this.manager.getComputerId()+"$ RECEIVE GET DIR "+path+"  from "+senderId);
 			FsDirectory dirByPath = getPathDir(manager.getRoot(), path);
-			FsObject dirById = dirByPath;
+			FsDirectory dirById = dirByPath;
 			if(dirByPath==null || dirByPath.getId() != idDir){
-				dirById = manager.getDb().getDirect(idDir);
+				dirById = manager.getDb().getDirDirect(idDir);
 			}
 			ByteBuff messageRet = null;
 			if(dirByPath==null && (dirById == null || dirById.asDirectory() == null)){
@@ -907,7 +907,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 						messageRet = createDirectoryMessage(dirById.asDirectory());
 						manager.getNet().writeMessage(senderId, SEND_DIR, messageRet);
 						System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR "+path+"  (conflict, id) for "+senderId);
-					}else if(dirById.asFile() != null){
+					}else if(dirById.asFile() != null){ //note: this was possible when we used dirById = manager.getDb().getObjDirect(idDir);, dirById was an FSObject ==> and if it was a chunk?
 						messageRet = createFileDescrMessage(dirById.asFile());
 						manager.getNet().writeMessage(senderId, SEND_FILE_DESCR, messageRet);
 						System.out.println(this.manager.getComputerId()+"$ WRITE SEND DIR->FILE "+path+"  (conflict, id) for "+senderId);
@@ -939,6 +939,12 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		net.registerListener(GET_FILE_DESCR, this);
 		net.registerListener(SEND_DIR, this);
 		net.registerListener(SEND_FILE_DESCR, this);
+	}
+
+	//nothing ?
+	@Override
+	public void visit(FsChunk chunk) {
+		
 	}
 	
 

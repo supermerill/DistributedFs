@@ -5,7 +5,7 @@ import java.util.List;
 
 import remi.distributedFS.util.ByteBuff;
 
-public abstract interface FsChunk {
+public abstract interface FsChunk extends FsId{
 
 	//data
 	/**
@@ -36,8 +36,9 @@ public abstract interface FsChunk {
 	public boolean isPresent();
 	public void setPresent(boolean isPresentLocally);
 	public List<Long> serverIdPresent();
-	public long lastModificationTimestamp();
-	public long lastModificationUID();
+	public long getModifyDate();
+	public long getModifyUID();
+	public long getLastAccessDate();
 
 	public long getId();
 

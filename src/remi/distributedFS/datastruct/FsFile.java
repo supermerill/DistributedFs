@@ -230,14 +230,14 @@ public interface FsFile extends FsObject {
 				file.setChunks(newLst);
 			}
 		}
-	
+
+	public static int newMaxSizeChunk = 1024*4; //min 4kio
 
 	public static void growFile(FsFile file, long newSize) {
 		System.out.println("WRITE FILE : growFile "+newSize);
 		synchronized (file) { //TODO : think more about sync 
 			if(file.getChunks().size()==0){
 				System.out.println("WRITE FILE : createFirstChunk ");
-				int newMaxSizeChunk = 1024*4; //min 4kio
 				FsChunk newChunk = file.createNewChunk(-1);
 				System.out.println("WRITE FILE : flush1 ");
 				newChunk.setMaxSize(newMaxSizeChunk);

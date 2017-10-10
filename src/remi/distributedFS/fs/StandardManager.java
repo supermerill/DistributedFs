@@ -58,6 +58,7 @@ public class StandardManager implements FileSystemManager {
 				}
 				
 				manager.initOs("./data"+args[0], args[0].charAt(0));
+
 			}).start();
 		}
 		

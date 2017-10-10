@@ -2,11 +2,9 @@ package remi.distributedFS.datastruct;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiFunction;
 
 import remi.distributedFS.db.impl.WrongSectorTypeException;
-import ru.serce.jnrfuse.ErrorCodes;
 
 public interface FsDirectory extends FsObject {
 
@@ -54,6 +52,10 @@ public interface FsDirectory extends FsObject {
 		@Override
 		public void visit(FsFile obj) {
 			obj.getParent().removeFile(obj);
+		}
+
+		@Override
+		public void visit(FsChunk chunk) {
 		}
 		
 	}
@@ -108,7 +110,7 @@ public interface FsDirectory extends FsObject {
 		 */
 		public static <N> N getPath(FsDirectory dir, String path, BiFunction<FsDirectory,String,N> func){
 			if(path.equals("/") && dir.getParent()==dir){
-	//			System.out.println("getroot");
+//				System.out.println("getroot");
 				return func.apply(dir, ".");
 			}
 			while(path.startsWith("/")){
@@ -120,25 +122,29 @@ public interface FsDirectory extends FsObject {
 				String name = path.substring(0,slashPos);
 				String otherPath = path.substring(slashPos+1);
 				if(name.equals(".")){
-	//				System.out.println("getMe");
+//					System.out.println("getMe");
 					return getPath(dir, otherPath, func);
 				}
 				if(name.equals("..")){
-	//				System.out.println("getparent");
+//					System.out.println("getparent");
 					return getPath(dir.getParent(), otherPath, func);
 				}
-	//			System.out.println("getchild "+name);
+//				System.out.println("getchild "+name);
 				FsDirectory dirChild = getDir(dir, name);
 				if(dirChild!=null) return getPath(dirChild, otherPath, func);
-				else return null;
+				else{
+//					System.out.println("childdir null ");
+					return null;
+				}
 			}else{
 				//find a file
-	//			System.out.println("getfile "+path);
+//				System.out.println("getfile "+path);
 				return func.apply(dir, path);
 			}
 		}
 		
 		public static FsDirectory getDir(FsDirectory dir, String name) {
+//			System.out.println("getDir : "+dir+" : "+name);
 			if(name.equals(".")){
 	//			System.out.println("getme");
 				return dir;

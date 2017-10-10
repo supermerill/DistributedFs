@@ -12,6 +12,7 @@ import java.util.List;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import remi.distributedFS.datastruct.FsChunk;
+import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.util.ByteBuff;
 import remi.distributedFS.util.Ref;
 
@@ -25,9 +26,10 @@ public class FsChunkFromFile implements FsChunk {
 	protected int maxSize;
 	protected boolean isValid; // false if data isn't available locally
 	protected long lastChange = 0;
+	protected long lastaccess = 0;
 
 	protected boolean loaded = false;
-	protected File data;
+	protected File data; //don't load data on memory, just on-demand. => maybe that's the problem with wmp : too much latency?
 
 	public FsChunkFromFile(FsTableLocal master, long sectorId, FsFileFromFile parent, int idx) {
 		this.sector = sectorId;
@@ -68,6 +70,7 @@ public class FsChunkFromFile implements FsChunk {
 
 				toAppend.position(toAppend.position()+size);
 				System.out.println("pos after = "+toAppend.position());
+				lastaccess = System.currentTimeMillis();
 				return true;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -103,6 +106,7 @@ public class FsChunkFromFile implements FsChunk {
 				System.out.println("toWrite.position = "+toWrite.position()+"+"+size+"=="+(toWrite.position()+size));
 				toWrite.position(toWrite.position()+size);
 				lastChange = System.currentTimeMillis();
+				lastaccess = System.currentTimeMillis();
 				return true;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -127,8 +131,8 @@ public class FsChunkFromFile implements FsChunk {
 		//check if it's a chunk
 		byte type = buffer.get(); //1
 		if(type != FsTableLocal.CHUNK){
-			System.err.println("Error, not a file at "+getId());
-			throw new RuntimeException("Error, not a file at "+getId());
+//			System.err.println("Error, not a file at "+getId());
+			throw new WrongSectorTypeException("Error, not a chunk @"+sector+", type="+type+" != "+FsTableLocal.CHUNK+"=CHUNK");
 		}
 		
 		//check  id
@@ -142,16 +146,18 @@ public class FsChunkFromFile implements FsChunk {
 		currentSize = buffer.getInt(); //13
 		maxSize = buffer.getInt(); //17
 		idx = buffer.getInt(); //21
-		isValid = buffer.get()==1; //22
+		lastChange = buffer.getLong(); //29
+		lastaccess = buffer.getLong(); //37
+		isValid = buffer.get()==1; //38
 		
 		
 		//get filename  (useless... for now)
-		int nbBytes = buffer.getInt(); //26
+		int nbBytes = buffer.getInt(); //42
 		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytes);
 		
-		buffer.position(buffInitPos + 32);
+		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
 		
-		int canRead = FsTableLocal.FS_SECTOR_SIZE-32-8;
+		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
 		//read folder
@@ -190,7 +196,7 @@ public class FsChunkFromFile implements FsChunk {
 				}
 			}
 			if(!isValid){
-				//request it
+				//request it (via network)
 				System.out.println("REQUEST DATA FOR CHUNK "+getId());
 				FsChunk meWithData = master.getManager().requestChunk(this.parent, this, serverIdPresent());
 				this.currentSize = meWithData.currentSize();
@@ -249,7 +255,7 @@ public class FsChunkFromFile implements FsChunk {
 		if(parent==null){
 			//delete this one
 //			this.delete();
-			master.releaseSector(this.getSector());
+			master.removeSector(this.getSector());
 		}else{
 			//alread saved in save()
 //			master.saveSector(buff, this.getSector());
@@ -271,20 +277,24 @@ public class FsChunkFromFile implements FsChunk {
 		buffer.putInt(currentSize);
 		buffer.putInt(maxSize);
 		buffer.putInt(idx);
-		buffer.put((byte)(isValid?1:0));
+		buffer.putLong(lastChange); 
+		buffer.putLong(lastaccess); 
+		buffer.put((byte)(isValid?1:0)); 
 
 		//get name buffer
 //		ensureDatafield(); //don't do that, it create a dead loop
-		ByteBuffer buffName = FsObjectImplFromFile.CHARSET.encode("");
+		ByteBuffer buffName = null;
 		if(data!=null){
 			buffName = FsObjectImplFromFile.CHARSET.encode(data.getPath());
+		}else{
+			buffName = FsObjectImplFromFile.CHARSET.encode("");
 		}
 		
 		//buffName.flip(); already done in encode()
 		buffer.putInt(buffName.limit());
 
-		buffer.position(buffInitPos + 32);
-		int canRead = FsTableLocal.FS_SECTOR_SIZE-32-8;
+		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
+		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
 		
 		ByteBuffer currentBuffer = buffer;
 		Ref<Long> currentSector = new Ref<>(this.getSector());
@@ -321,8 +331,8 @@ public class FsChunkFromFile implements FsChunk {
 			buff.putLong(this.getSector());
 			buff.position(FsTableLocal.FS_SECTOR_SIZE-8);
 			buff.putLong(-1);
-			buff.position(16);
-			return (FsTableLocal.FS_SECTOR_SIZE / 8) - 3;
+			buff.position(9);
+			return (FsTableLocal.FS_SECTOR_SIZE) - (8+8+1);
 		}else{
 			return goToNext(buff);
 		}
@@ -353,8 +363,8 @@ public class FsChunkFromFile implements FsChunk {
 			}
 			//now i should be at pos 9
 			//go to ok pos
-			buff.position(16);
-			return (FsTableLocal.FS_SECTOR_SIZE / 8) - 3; //128 -2(prefix) -1(suffix)
+			buff.position(9);
+			return (FsTableLocal.FS_SECTOR_SIZE) - (8+8+1); 
 		}else{
 			System.err.println("Error, my next sector is not picked for me !!!");
 			throw new RuntimeException("Error, my next sector is not picked for me !!!");
@@ -403,13 +413,13 @@ public class FsChunkFromFile implements FsChunk {
 	}
 
 	@Override
-	public long lastModificationTimestamp() {
+	public long getModifyDate() {
 		ensureLoaded();
 		return lastChange;
 	}
 
 	@Override
-	public long lastModificationUID() {
+	public long getModifyUID() {
 		ensureLoaded();
 		return master.getUserId();
 	}
@@ -422,7 +432,7 @@ public class FsChunkFromFile implements FsChunk {
 		buff.put((byte)0);
 		buff.rewind();
 		master.saveSector(buff, sector);
-		master.releaseSector(sector);
+		master.removeSector(sector);
 	}
 
 	public void setCurrentSize(int newSize) {
@@ -510,6 +520,7 @@ public class FsChunkFromFile implements FsChunk {
 			Arrays.fill(buff.array(), (byte)0);
 			//del other ones
 			for(int i=sectorsToDel.size()-1;i>=0;i--){
+				buff.rewind();
 				master.saveSector(buff, sectorsToDel.getLong(i));
 			}
 		}else{
@@ -517,7 +528,18 @@ public class FsChunkFromFile implements FsChunk {
 		}
 		
 		//del main sector
+		buff.rewind();
 		master.saveSector(buff, getSector());
+	}
+
+	@Override
+	public void accept(FsObjectVisitor visitor) {
+		visitor.visit(this);
+	}
+
+	@Override
+	public long getLastAccessDate() {
+		return lastaccess;
 	}
 
 }
