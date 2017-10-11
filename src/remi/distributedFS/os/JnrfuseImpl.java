@@ -26,6 +26,8 @@ import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.*;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.PUGA;
+import remi.distributedFS.db.TimeoutException;
+import remi.distributedFS.db.UnreachableChunkException;
 import remi.distributedFS.db.impl.FsDirectoryFromFile;
 import remi.distributedFS.db.impl.WrongSectorTypeException;
 import remi.distributedFS.fs.FileSystemManager;
@@ -569,6 +571,10 @@ public class JnrfuseImpl extends FuseStubFS {
 //	    	System.out.println("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
 	    	System.out.println("read : size = "+ buff.array().length);
 	    	return readsize;
+    	}catch(TimeoutException e){
+    		return -ErrorCodes.ETIME();
+    	}catch(UnreachableChunkException e){
+    		return -ErrorCodes.EOWNERDEAD(); //ENODATA? EFAULT? ECOMM?
     	}catch(Exception e){
     		e.printStackTrace();
     		return -ErrorCodes.EIO();
@@ -601,6 +607,10 @@ public class JnrfuseImpl extends FuseStubFS {
         	
         	System.out.println("write "+writesize+" bytes / "+size);
 	    	return writesize;
+    	}catch(TimeoutException e){
+    		return -ErrorCodes.ETIME();
+    	}catch(UnreachableChunkException e){
+    		return -ErrorCodes.EOWNERDEAD(); //ENODATA? EFAULT? ECOMM?
     	}catch(Exception e){
     		e.printStackTrace();
     		return -ErrorCodes.EIO();

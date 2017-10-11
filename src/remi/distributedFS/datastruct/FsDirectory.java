@@ -153,24 +153,40 @@ public interface FsDirectory extends FsObject {
 	//			System.out.println("getparent");
 				return dir.getParent();
 			}
+			FsDirectory bestCandidate = null;
 			for(FsDirectory dirChild : dir.getDirs()){
 				if(dirChild.getName().equals(name)){
-					return dirChild;
+					if(bestCandidate== null){
+						bestCandidate = dirChild;
+					}else if(bestCandidate.getModifyDate() < dirChild.getModifyDate() && dirChild.getDeleteDate()<=0){
+						bestCandidate = dirChild;
+						System.out.println("WARN : conflict in "+dirChild.getPath()+" : multiple directory with the same name!");
+					}else{
+						System.out.println("WARN : conflict in "+dirChild.getPath()+" : multiple directory with the same name!");
+					}
 				}
 			}
 	//		System.out.println("erf, '"+name+"'");
-			return null;
+			return bestCandidate;
 		}
 		
 		public static FsFile getFile(FsDirectory dir, String name) {
+			FsFile bestCandidate = null;
 			Iterator<FsFile> it = dir.getFiles().iterator();
 			while(it.hasNext()){
 				FsFile file = it.next();
 				if(file.getName().equals(name)){
-					return file;
+					if(bestCandidate== null){
+						bestCandidate = file;
+					}else if(bestCandidate.getModifyDate() < file.getModifyDate() && file.getDeleteDate()<=0){
+						bestCandidate = file;
+						System.out.println("WARN : conflict in "+file.getPath()+" : multiple file with the same name!");
+					}else{
+						System.out.println("WARN : conflict in "+file.getPath()+" : multiple file with the same name!");
+					}
 				}
 			}
-			return null;
+			return bestCandidate;
 		}
 
 		/**

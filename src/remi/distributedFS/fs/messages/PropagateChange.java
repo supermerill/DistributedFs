@@ -379,6 +379,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			int nbChunks = message.getTrailInt();
 			System.out.println(this.manager.getComputerId()%100+" FILECG "+fic.getPath()+" has "+nbChunks+" chunks");
 			List<FsChunk> chunksToSet = new ArrayList<>();
+			final long peerServerId = manager.getNet().getComputerId(senderId);
 			for(int i=0;i<nbChunks;i++){
 				long chunkId = message.getLong();
 				long chunkDate = message.getLong();
@@ -401,8 +402,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 //						requestDirPath(senderId, dir.getPath()+"/"+dirName, chunkId);
 						chunk = fic.createNewChunk(chunkId);
 //						chunk.setLastModificationTimestamp()
-						if(!chunk.serverIdPresent().contains(senderId))
-							chunk.serverIdPresent().add(senderId);
+						if(!chunk.serverIdPresent().contains(peerServerId)) chunk.serverIdPresent().add(peerServerId);
 						chunk.setCurrentSize(chunkSize);
 						chunk.flush();
 					}else if(chunk.getId() != chunkId){
@@ -410,6 +410,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 						// bad id: request the two of them.
 //						requestDirPath(senderId, dir.getPath()+"/"+dirName, childDir.getId()); //this one should get us the two files, one from path, one from id
 					}else{
+						boolean modified = false;
 						//check lastChangeDate & modifyDate
 						if(chunk.getModifyDate()<chunkDate && !used){
 							System.out.println(this.manager.getComputerId()%100+" FILECG oh, a chunk was re-used : "+chunk.getId());
@@ -417,14 +418,25 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 							//request a recursive check. NOT FOR CHUNK
 //							requestDirPath(senderId, childDir.getPath(), childDir.getId());
 						}
-						if(chunk.getModifyDate()<chunkDate){
-							System.out.println(this.manager.getComputerId()%100+" FILECG oh, a chunk was updated : "+chunk.getId());
-							chunk.setPresent(false);
-							chunk.setCurrentSize(chunkSize);
-							if(!chunk.serverIdPresent().contains(senderId))
-								chunk.serverIdPresent().add(senderId);
+						if(chunkDate<0){
+							//not present, be sure to not have the peerServerId in our server id in the chunk
+							chunk.serverIdPresent().rem(peerServerId);
+							modified = true;
+						}else{
+							if(!chunk.serverIdPresent().contains(peerServerId)){
+								chunk.serverIdPresent().add(peerServerId);
+								modified = true;
+							}
+							if(chunk.getModifyDate()<chunkDate){
+								System.out.println(this.manager.getComputerId()%100+" FILECG oh, a chunk was updated : "+chunk.getId());
+								chunk.setPresent(false);
+								chunk.setCurrentSize(chunkSize);
+								modified = true;
+								System.out.println(this.manager.getComputerId()%100+"mine new version: "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.getModifyDate():-1));
+							}
+						}
+						if(modified){
 							chunk.flush();
-							System.out.println(this.manager.getComputerId()%100+"mine new version: "+i+"° Chunk "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.getModifyDate():-1));
 						}
 //						direxist.add(childDir);
 					}
@@ -576,14 +588,33 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 				}
 			}
 		}
+		if(searchedObj != null && searchedObj.getId() != dummy.getId()){
+			System.err.println("WARN : we have a collision!!");
+			searchedObj = null;
+			//we should rename the most ancien one, and check if it was not deleted (it will be done by sopmehting else). => be sure than our renaming don't avoid the deletion!!
+			//try to get the right one
+			FsObject obj = manager.getDb().getDirect(objId);
+			if(obj != null){
+				searchedObj = func.asObject(obj);
+				if(searchedObj == null){
+					System.err.println(this.manager.getComputerId()%100+" OBJCG Finded a replaced thing! : "+obj+" which isn't a ? : "+path);
+					System.err.println("TODO: correct the error");
+					return null;
+				}else{
+					System.err.println(this.manager.getComputerId()%100+" WARN :  OBJCG Finded a displaced/deleted dir : "+obj.getPath()+" -> "+path+" (and a different item in the old place)");
+				}
+			}else{
+				System.err.println(this.manager.getComputerId()%100+" WARN :  OBJCG Finded a new thing in the place of an other thing! @ "+path);
+			}
+		}
 		if(searchedObj == null){
 			//check if it's not a delete notification
 			if(dummy.getDeleteDate()>0){
 				System.out.println(this.manager.getComputerId()%100+" OBJCG notif of detion on an not-existant folder -> no-event!");
 				return null;
 			}else{
-				System.out.println(this.manager.getComputerId()%100+" OBJCG can't find dir "+path);
-				//Create new dir!
+				System.out.println(this.manager.getComputerId()%100+" OBJCG can't find obj "+path);
+				//Create new obj!
 				FsDirectory dirParent = getPathParentDir(root, path);
 				if(dirParent==null){
 					dirParent = getPathDir(root, path.substring(0, path.lastIndexOf('/')));

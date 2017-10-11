@@ -400,11 +400,9 @@ public class FsTableLocal implements StorageManager{
 
 	@Override
 	public FsChunk getChunkDirect(long id) {
-		if(objectId2LoadedObj.containsKey(id)){
-			FsChunk obj = chunkId2LoadedObj.get(id);
-			return obj;
-		}
-		return null;
+		FsChunk obj = chunkId2LoadedObj.get(id);
+		if(obj==null) System.out.println("bad file : "+id+" from "+chunkId2LoadedObj.keySet());
+		return obj;
 	}
 
 

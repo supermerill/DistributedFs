@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsObjectVisitor;
+import remi.distributedFS.db.UnreachableChunkException;
 import remi.distributedFS.util.ByteBuff;
 import remi.distributedFS.util.Ref;
 
@@ -27,6 +28,7 @@ public class FsChunkFromFile implements FsChunk {
 	protected boolean isValid; // false if data isn't available locally
 	protected long lastChange = 0;
 	protected long lastaccess = 0;
+	protected LongList serverIdPresent = new LongArrayList(2);
 
 	protected boolean loaded = false;
 	protected File data; //don't load data on memory, just on-demand. => maybe that's the problem with wmp : too much latency?
@@ -125,59 +127,6 @@ public class FsChunkFromFile implements FsChunk {
 		}
 	}
 	
-
-	public void load(ByteBuffer buffer){
-		int buffInitPos = buffer.position();
-		//check if it's a chunk
-		byte type = buffer.get(); //1
-		if(type != FsTableLocal.CHUNK){
-//			System.err.println("Error, not a file at "+getId());
-			throw new WrongSectorTypeException("Error, not a chunk @"+sector+", type="+type+" != "+FsTableLocal.CHUNK+"=CHUNK");
-		}
-		
-		//check  id
-		this.id = buffer.getLong(); //9
-//		if(myId != id){
-//			System.err.println("Error, wrong chunk id : "+id + " <> "+myId);
-//			throw new RuntimeException("Error, wrong chunk id : "+id + " <> "+myId);
-//		}
-		
-		//datas
-		currentSize = buffer.getInt(); //13
-		maxSize = buffer.getInt(); //17
-		idx = buffer.getInt(); //21
-		lastChange = buffer.getLong(); //29
-		lastaccess = buffer.getLong(); //37
-		isValid = buffer.get()==1; //38
-		
-		
-		//get filename  (useless... for now)
-		int nbBytes = buffer.getInt(); //42
-		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytes);
-		
-		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
-		
-		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
-		ByteBuffer currentBuffer = buffer;
-//		long currentSector = this.getId();
-		//read folder
-		for(int i=0;i<nbBytes;i++){
-			nameBuffer.put(currentBuffer.get());
-			canRead--;
-			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
-			}
-		}
-		nameBuffer.flip();
-		//lol it's not used as we use the id!!!
-//		data = new File(FsObjectImplFromFile.CHARSET.decode(nameBuffer).toString());
-//		ensureDatafield();
-//		System.out.println("chunk has data in "+data.getPath());
-		
-		this.loaded = true;
-		
-	}
-	
 	protected void ensureDatafield(){
 		if(data==null){
 			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
@@ -199,6 +148,10 @@ public class FsChunkFromFile implements FsChunk {
 				//request it (via network)
 				System.out.println("REQUEST DATA FOR CHUNK "+getId());
 				FsChunk meWithData = master.getManager().requestChunk(this.parent, this, serverIdPresent());
+				if(meWithData == null){
+					//can't find it!
+					throw new UnreachableChunkException("Error: can't find the chunk "+this.getId()+" in the cluster. Maybe you should reconnect with more peers.");
+				}
 				this.currentSize = meWithData.currentSize();
 				this.maxSize = meWithData.getMaxSize();
 				//create file & copy data
@@ -261,6 +214,71 @@ public class FsChunkFromFile implements FsChunk {
 //			master.saveSector(buff, this.getSector());
 		}
 	}
+	
+
+	public void load(ByteBuffer buffer){
+		int buffInitPos = buffer.position();
+		//check if it's a chunk
+		byte type = buffer.get(); //1
+		if(type != FsTableLocal.CHUNK){
+//			System.err.println("Error, not a file at "+getId());
+			throw new WrongSectorTypeException("Error, not a chunk @"+sector+", type="+type+" != "+FsTableLocal.CHUNK+"=CHUNK");
+		}
+		
+		//check  id
+		this.id = buffer.getLong(); //9
+//		if(myId != id){
+//			System.err.println("Error, wrong chunk id : "+id + " <> "+myId);
+//			throw new RuntimeException("Error, wrong chunk id : "+id + " <> "+myId);
+//		}
+		
+		//datas
+		currentSize = buffer.getInt(); //13
+		maxSize = buffer.getInt(); //17
+		idx = buffer.getInt(); //21
+		lastChange = buffer.getLong(); //29
+		lastaccess = buffer.getLong(); //37
+		isValid = buffer.get()==1; //38
+		
+		
+		//get filename  (useless... for now)
+		int nbServerId = buffer.getInt(); //42
+		int nbBytesFilename = buffer.getInt(); //46
+		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytesFilename);
+		
+		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
+		
+		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
+		ByteBuffer currentBuffer = buffer;
+		
+		//read serverlist
+		for(int i=0;i<nbServerId;i++){
+			serverIdPresent.add(currentBuffer.getLong());
+			canRead-=8;
+			if(canRead == 0){
+				canRead = goToNext(currentBuffer);
+			}
+		}
+		
+		//read filename
+//		long currentSector = this.getId();
+		//read folder
+		for(int i=0;i<nbBytesFilename;i++){
+			nameBuffer.put(currentBuffer.get());
+			canRead--;
+			if(canRead == 0){
+				canRead = goToNext(currentBuffer);
+			}
+		}
+		nameBuffer.flip();
+		//lol it's not used as we use the id!!!
+//		data = new File(FsObjectImplFromFile.CHARSET.decode(nameBuffer).toString());
+//		ensureDatafield();
+//		System.out.println("chunk has data in "+data.getPath());
+		
+		this.loaded = true;
+		
+	}
 
 	
 	public synchronized void save(ByteBuffer buffer){
@@ -291,6 +309,7 @@ public class FsChunkFromFile implements FsChunk {
 		}
 		
 		//buffName.flip(); already done in encode()
+		buffer.putInt(serverIdPresent.size());
 		buffer.putInt(buffName.limit());
 
 		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
@@ -298,6 +317,14 @@ public class FsChunkFromFile implements FsChunk {
 		
 		ByteBuffer currentBuffer = buffer;
 		Ref<Long> currentSector = new Ref<>(this.getSector());
+		//save serverlist
+		for(int i=0;i<serverIdPresent.size();i++){
+			currentBuffer.putLong(serverIdPresent.getLong(i));
+			canRead-=8;
+			if(canRead == 0){
+				canRead = goToNextOrCreate(currentBuffer, currentSector);
+			}
+		}
 		//save folder
 		for(int i=0;i<buffName.limit();i++){
 			currentBuffer.put(buffName.get(i));
@@ -406,10 +433,9 @@ public class FsChunkFromFile implements FsChunk {
 	}
 
 	@Override
-	public List<Long> serverIdPresent() {
+	public LongList serverIdPresent() {
 		ensureLoaded();
-		// TODO Auto-generated method stub
-		return new ArrayList<Long>();
+		return serverIdPresent;
 	}
 
 	@Override

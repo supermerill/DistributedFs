@@ -1,22 +1,18 @@
 package remi.distributedFS.fs;
 
 import java.io.File;
+import java.util.Random;
 import java.util.regex.Pattern;
 
 import it.unimi.dsi.fastutil.longs.Long2LongAVLTreeMap;
+import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongMap.Entry;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongSortedMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrays;
 import it.unimi.dsi.fastutil.longs.LongList;
-import it.unimi.dsi.fastutil.longs.LongLists;
 import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
 import remi.distributedFS.datastruct.FsChunk;
-import remi.distributedFS.datastruct.FsFile;
-import remi.distributedFS.datastruct.FsObject;
-import remi.distributedFS.db.impl.FsChunkFromFile;
 
 /**
  * A thread used for :
@@ -71,6 +67,7 @@ public class Cleaner extends Thread{
 		
 	}
 
+	//TODO: this impl is linked strongly with the basic impl fromm bd (use files as chunk), you HAVE TO change that to make an implen-independant impl
 	protected void checkLiberateSpace() {
 		Pattern patternNumeral = Pattern.compile("^[0-9]+$");
 		
@@ -103,33 +100,51 @@ public class Cleaner extends Thread{
 			for(File fic : rootFolder.listFiles()){
 				if(!fic.isDirectory() && patternNumeral.matcher(fic.getName()).matches()){
 					chunkNames.add(Long.parseLong(fic.getName()));
+					System.out.println("chunkname : "+fic.getName());
 				}
 			}
 
 			//order lastcasses list by lowerbefore
 			Long2LongSortedMap lastAccess2id = new Long2LongAVLTreeMap();
-			
+			Random aleat = new Random();
 			//for each:
 			for(long chunkId : chunkNames){
 				FsChunk chunk = manager.getDb().getChunkDirect(chunkId);
 				// if it's not in the fs (bad file) , del it.
 				if(chunk == null){
-					new File(rootFolder.getAbsolutePath()+"/"+chunkId).delete();
+					System.out.println("bad file : "+chunkId);
+//					new File(rootFolder.getAbsolutePath()+"/"+chunkId).delete();
 				}else if(chunk.serverIdPresent().isEmpty()){
 					// if i'm the only one to have it, do not del
-						
+					System.out.println("chunk "+chunkId+" is alone");
 				}else{
 					// if i'm not the only one to have it, put it in the map (last access -> filename)
-					lastAccess2id.put(chunk.getModifyDate(), chunkId);
+					
+					long timeWithFlavor = chunk.getModifyDate()*10+aleat.nextInt(1000);
+					int stop = 0;
+					while(lastAccess2id.containsKey(timeWithFlavor) && stop<1000){
+						//add some flavour
+						timeWithFlavor = chunk.getModifyDate()*10+aleat.nextInt(1000);
+						stop++;
+						System.out.println("chunk "+chunkId+" is not alone (with flavour"+timeWithFlavor+")");
+					}
+					lastAccess2id.put(timeWithFlavor, chunkId);
+					System.out.println("chunk "+chunkId+" is not alone");
 				}
 			}
 		
 			//remove all files from this list -> map as long as my space isn't low enough (or no more file)
+			long sizeToRemove = Math.max(fsSpace+chunkSpace-maxSize, chunkSpace-idealSize);
+			System.out.println("Need to remove "+sizeToRemove+" bytes ("+(sizeToRemove/1000)+"KB) "+lastAccess2id.size());
 			ObjectBidirectionalIterator<it.unimi.dsi.fastutil.longs.Long2LongMap.Entry> it = lastAccess2id.long2LongEntrySet().iterator();
-			while(it.hasNext()){
-				long idDel = it.next().getLongValue();
+			while(it.hasNext() && sizeToRemove>0){
+				Entry entry = it.next();
+				long idDel = entry.getLongValue();
 				FsChunk chunk = manager.getDb().getChunkDirect(idDel);
-				chunk.setPresent(false);
+				System.out.print("chunk "+idDel+" is removed, for a size of "+chunk.currentSize()+", access date = "+entry.getLongKey());
+				sizeToRemove -= chunk.currentSize();
+				System.out.println(", reste "+sizeToRemove+", "+it.hasNext());
+//				chunk.setPresent(false);
 			}
 			
 			//end!

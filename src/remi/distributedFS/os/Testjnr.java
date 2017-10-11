@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import it.unimi.dsi.fastutil.longs.LongList;
 import jnr.ffi.Platform;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
@@ -73,7 +74,7 @@ public class Testjnr {
 		}
 
 		@Override
-		public List<Long> serverIdPresent() {
+		public LongList serverIdPresent() {
 			// TODO Auto-generated method stub
 			return null;
 		}

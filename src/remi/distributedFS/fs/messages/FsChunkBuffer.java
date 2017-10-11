@@ -1,8 +1,7 @@
 package remi.distributedFS.fs.messages;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.util.ByteBuff;
@@ -58,8 +57,8 @@ public class FsChunkBuffer implements FsChunk{
 	}
 
 	@Override
-	public List<Long> serverIdPresent() {
-		return new ArrayList<>();
+	public LongList serverIdPresent() {
+		return new LongArrayList();
 	}
 
 	@Override

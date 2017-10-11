@@ -14,7 +14,13 @@ public interface ClusterManager {
 	
 	
 	//used
-	public void writeBroadcastMessage(byte sendFileDescr, ByteBuff message);
+	/**
+	 * 
+	 * @param sendFileDescr
+	 * @param message
+	 * @return number of peer conteacted (do not assumed they will all answer)
+	 */
+	public int writeBroadcastMessage(byte sendFileDescr, ByteBuff message);
 	public void writeMessage(long senderId, byte sendDir, ByteBuff messageRet);
 	public void registerListener(byte getDir, AbstractMessageManager propagateChange);
 	public void init(int listenPort);

@@ -84,7 +84,8 @@ public class StandardManager implements FileSystemManager {
 	public StandardManager() {
 		super();
 		//TODO: serialize & gui
-		cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
+//		cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
+		cleaner = new Cleaner(this, 1024*10, 1024*1024*1024, 1000*60);
 		cleaner.start();
 	}
 
@@ -230,15 +231,15 @@ public class StandardManager implements FileSystemManager {
 
 	@Override
 	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
-		System.out.println("REQUEST CHUNK");
+		System.out.println("REQUEST CHUNK "+chunk.getId());
 		//request chunk to all servers
-		chunkRequester.requestchunk(file, chunk);
+		int nbReq = chunkRequester.requestchunk(file, chunk);
 		//register to the chunk requester
 		boolean ok = false;
 		FsChunk chunkReceived = null;
 		try{
 //			while(!ok){
-			chunkReceived = chunkRequester.waitReceiveChunk(chunk.getId(), file.getId(), file.getModifyDate());
+			chunkReceived = chunkRequester.waitReceiveChunk(chunk.getId(), file.getId(), file.getModifyDate(), nbReq);
 //				if(chunk.)
 				//TODO : check if it's our chunk
 				if(chunkReceived != null){
