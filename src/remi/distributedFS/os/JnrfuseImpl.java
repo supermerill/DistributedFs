@@ -3,7 +3,9 @@ package remi.distributedFS.os;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import com.kenai.jffi.MemoryIO;
 
@@ -24,6 +26,8 @@ import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.*;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.PUGA;
+import remi.distributedFS.db.TimeoutException;
+import remi.distributedFS.db.UnreachableChunkException;
 import remi.distributedFS.db.impl.FsDirectoryFromFile;
 import remi.distributedFS.db.impl.WrongSectorTypeException;
 import remi.distributedFS.fs.FileSystemManager;
@@ -200,7 +204,12 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	}
         	FsFile fic = dir.createSubFile(getPathObjectName(manager.getRoot(), path));
 //        	fic.rearangeChunks(128, 1);
-        	FsChunk newCHunk = fic.createNewChunk(-1);
+        	FsChunk newChunk = fic.createNewChunk(-1);
+			newChunk.setMaxSize(FsFile.newMaxSizeChunk);
+			newChunk.setCurrentSize(0);
+			List<FsChunk> lst = new ArrayList<>(fic.getChunks());
+			lst.add(newChunk);
+			fic.setChunks(lst);
         	System.out.println(">> set userid to "+getContext().uid.get());
         	fic.setUserId(getContext().uid.get());
         	System.out.println(">> set groupid to "+getContext().gid.get());
@@ -215,7 +224,7 @@ public class JnrfuseImpl extends FuseStubFS {
         	fic.setId();
         	
         	//flush (should be done here or in db engine?)
-        	newCHunk.flush();
+        	newChunk.flush();
         	fic.flush();
         	dir.flush();
         	manager.propagateChange(fic);
@@ -376,8 +385,10 @@ public class JnrfuseImpl extends FuseStubFS {
 	        	System.out.println("rename : path problem : "+obj+", "+oldDir+", "+newDir);
 	    		return -ErrorCodes.ENOENT();
 	    	}
-	    	String name = getPathObjectName(newDir, newpath);
+//	    	String name = getPathObjectName(newDir, newpath);
+	    	String name = newpath.substring(newpath.lastIndexOf("/")+1);
     		//check it doesn't exist
+			System.out.println("check it doesn't exist : "+name);
 	    	if(getObj(newDir, name) != null){
 	    		return -ErrorCodes.EEXIST();
 	    	}
@@ -560,6 +571,10 @@ public class JnrfuseImpl extends FuseStubFS {
 //	    	System.out.println("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
 	    	System.out.println("read : size = "+ buff.array().length);
 	    	return readsize;
+    	}catch(TimeoutException e){
+    		return -ErrorCodes.ETIME();
+    	}catch(UnreachableChunkException e){
+    		return -ErrorCodes.EOWNERDEAD(); //ENODATA? EFAULT? ECOMM?
     	}catch(Exception e){
     		e.printStackTrace();
     		return -ErrorCodes.EIO();
@@ -592,6 +607,10 @@ public class JnrfuseImpl extends FuseStubFS {
         	
         	System.out.println("write "+writesize+" bytes / "+size);
 	    	return writesize;
+    	}catch(TimeoutException e){
+    		return -ErrorCodes.ETIME();
+    	}catch(UnreachableChunkException e){
+    		return -ErrorCodes.EOWNERDEAD(); //ENODATA? EFAULT? ECOMM?
     	}catch(Exception e){
     		e.printStackTrace();
     		return -ErrorCodes.EIO();

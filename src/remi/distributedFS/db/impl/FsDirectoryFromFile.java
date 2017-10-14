@@ -364,6 +364,16 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		//ned to flush me because obj isn't my child anymore -> his flush doesn't flush me
     	flush();
 	}
+
+	@Override
+	public FsDirectory asDirectory() {
+		return this;
+	}
+	
+	@Override
+	public FsFile asFile() {
+		return null;
+	}
 	
 	protected class Deleter<E extends FsObjectImplFromFile> implements Consumer<E>{
 

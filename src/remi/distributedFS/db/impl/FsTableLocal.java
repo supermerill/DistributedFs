@@ -7,13 +7,12 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-
-import org.omg.CORBA.VisibilityHelper;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
@@ -42,7 +41,7 @@ public class FsTableLocal implements StorageManager{
 	
 	FileChannel fsFile;
 	
-	List<Long> unusedSectors = new ArrayList<>();
+	LongSet unusedSectors = new LongOpenHashSet();
 	
 	long fileSize = 0;
 	private String rootRep;
@@ -50,7 +49,9 @@ public class FsTableLocal implements StorageManager{
 	//TODO: create a separate thread for flushing/updating
 
 	//this is a stub to help me tracking pos of objects.
-	Long2ObjectMap<FsObject> objectId2LocalCluster = new Long2ObjectOpenHashMap<>();
+	Long2ObjectMap<FsObject> objectId2LoadedObj = new Long2ObjectOpenHashMap<>();
+	Long2ObjectMap<FsChunk> chunkId2LoadedObj = new Long2ObjectOpenHashMap<>();
+	
 	
 	public FsTableLocal(String rootRep, String filename, FileSystemManager manager, boolean cleanIt) throws IOException{
 		this.manager = manager;
@@ -110,7 +111,12 @@ public class FsTableLocal implements StorageManager{
 
 		@Override
 		public void visit(FsFile fic) {
-			objectId2LocalCluster.put(fic.getId(), fic);
+//			objectId2LocalCluster.put(fic.getId(), fic);
+			
+		}
+
+		@Override
+		public void visit(FsChunk chunk) {
 		}
 		
 	}
@@ -119,7 +125,7 @@ public class FsTableLocal implements StorageManager{
 
 		@Override
 		public void visit(FsDirectory dirParent) {
-			objectId2LocalCluster.put(dirParent.getId(), dirParent);
+			objectId2LoadedObj.put(dirParent.getId(), dirParent);
 			System.out.println(" dir "+dirParent.getPath());
 			for(FsDirectory dir : new ArrayList<>(dirParent.getDirs())){
 				try{
@@ -141,7 +147,7 @@ public class FsTableLocal implements StorageManager{
 				if(obj == dirParent) System.err.println("error, dir is inside deletes");
 				System.out.println(obj.getPath()+" (D) " + obj.getId());
 				obj.accept(this);
-				objectId2LocalCluster.put(obj.getId(), obj);
+//				objectId2LocalCluster.put(obj.getId(), obj);
 			}
 		}
 
@@ -150,7 +156,10 @@ public class FsTableLocal implements StorageManager{
 			try{
 				fic.getName(); // important, to trigger a load
 				System.out.println(fic.getPath()+" (F) " + fic.getId());
-				objectId2LocalCluster.put(fic.getId(), fic);
+				objectId2LoadedObj.put(fic.getId(), fic);
+				for(FsChunk ch : fic.getAllChunks()){
+					visit(ch);
+				}
 			}catch(WrongSectorTypeException ex){
 				ex.printStackTrace();
 				//recover : del this
@@ -158,6 +167,11 @@ public class FsTableLocal implements StorageManager{
 				((FsDirectoryFromFile)fic.getParent()).setDirty(true);
 //				fic.getParent().flush();
 			}
+		}
+
+		@Override
+		public void visit(FsChunk chunk) {
+			chunkId2LoadedObj.put(chunk.getId(), chunk);
 		}
 		
 	}
@@ -287,7 +301,12 @@ public class FsTableLocal implements StorageManager{
 		long idRet = -1;
 		synchronized (unusedSectors) {
 			if(!unusedSectors.isEmpty()){
-				idRet = unusedSectors.remove(unusedSectors.size()-1);
+				//get one and remove it.
+				LongIterator it = unusedSectors.iterator();
+				if(it.hasNext()){
+					idRet = it.nextLong();
+					it.remove();
+				}
 			}
 		}
 	
@@ -307,7 +326,7 @@ public class FsTableLocal implements StorageManager{
 //		System.out.println("Save buffer : "+buff.limit()+" @"+sectorId);
 		if(buff.limit()-buff.position()!=FS_SECTOR_SIZE){
 			System.err.println("Error, someone want me to write an incomplete sector!");
-			throw new RuntimeException("Error, someone want me to write an incomplete sector!: ");
+			throw new RuntimeException("Error, someone want me to write an incomplete sector! : "+(buff.limit()-buff.position())+" != "+FS_SECTOR_SIZE);
 		}
 		try {
 			fsFile.write(buff, sectorId*FS_SECTOR_SIZE);
@@ -318,7 +337,9 @@ public class FsTableLocal implements StorageManager{
 	
 
 
-	public void releaseSector(long id) {
+	public void removeSector(long id) {
+		buffDel.rewind();
+		saveSector(buffDel, id);
 		synchronized (unusedSectors) {
 			unusedSectors.add(id);
 		}
@@ -349,85 +370,131 @@ public class FsTableLocal implements StorageManager{
 
 	@Override
 	public FsObject getDirect(long id) {
-		if(objectId2LocalCluster.containsKey(id)){
-			FsObject obj =  objectId2LocalCluster.get(id);
+		if(objectId2LoadedObj.containsKey(id)){
+			FsObject obj = objectId2LoadedObj.get(id);
 			return obj;
 		}
 		return null;
 	}
 
 
+	@Override
+	public FsFile getFileDirect(long id) {
+		if(objectId2LoadedObj.containsKey(id)){
+			FsObject obj = objectId2LoadedObj.get(id);
+			return obj.asFile();
+		}
+		return null;
+	}
+
+
+	@Override
+	public FsDirectory getDirDirect(long id) {
+		if(objectId2LoadedObj.containsKey(id)){
+			FsObject obj = objectId2LoadedObj.get(id);
+			return obj.asDirectory();
+		}
+		return null;
+	}
+
+
+	@Override
+	public FsChunk getChunkDirect(long id) {
+		FsChunk obj = chunkId2LoadedObj.get(id);
+		if(obj==null) System.out.println("bad file : "+id+" from "+chunkId2LoadedObj.keySet());
+		return obj;
+	}
+
+
 
 	public void unregisterFile(long id, FsObject fsObjectImplFromFile) {
-		objectId2LocalCluster.remove(id);
+		objectId2LoadedObj.remove(id);
 	}
 	public void registerNewFile(long id, FsObject fsObjectImplFromFile) {
-		objectId2LocalCluster.put(id, fsObjectImplFromFile);
+		objectId2LoadedObj.put(id, fsObjectImplFromFile);
 	}
-	
+
+	ByteBuffer buffDel = ByteBuffer.allocate(FS_SECTOR_SIZE);
 	/**
 	 * remove content from sector which are not used
 	 * @param removeMoving set to true if you haven't start yet. It will remove "MOVING" sector
 	 */
 	public void cleanUnusedSectors(boolean removeMoving){
-		Long2ObjectMap<FsChunk> id2Chunk = new Long2ObjectOpenHashMap<FsChunk>();
-		//get all chunks
-		for(FsObject obj : objectId2LocalCluster.values()){
-			if(obj instanceof FsFileFromFile){
-				FsFileFromFile fic = (FsFileFromFile) obj;
-				for(FsChunk ch : fic.getChunks()){
-					id2Chunk.put(ch.getId(), ch);
-				}
-			}
-		}
+//		Long2ObjectMap<FsChunk> id2Chunk = new Long2ObjectOpenHashMap<FsChunk>();
+//		//get all chunks
+//		for(FsObject obj : objectId2LocalCluster.values()){
+//			FsFile fic = obj.asFile();
+//			if(fic != null){
+//				for(FsChunk ch : fic.getChunks()){
+//					try{
+//						System.out.println("add chunk "+ch.getId()+"  @"+((FsChunkFromFile)ch).getSector()+" from file "+fic.getName());
+//						chunkId2LocalCluster.put(ch.getId(), ch);
+//					}catch(Exception e){
+//						System.out.println("add NOT error chunk  @"+((FsChunkFromFile)ch).getSector()+" from file "+fic.getName());
+//					}
+//				}
+//			}
+//		}
 		
 		
 		ByteBuffer buff = ByteBuffer.allocate(9);
-		ByteBuffer buffDel = ByteBuffer.allocate(FS_SECTOR_SIZE);
 		Arrays.fill(buffDel.array(), (byte)0);
 		//look at all sectors
 		long maxSects = fileSize/FS_SECTOR_SIZE;
-		for(long i=0;i<maxSects;i++){
+		int nbread = 0;
+		for(long sector=0;sector<maxSects;sector++){
+			buff.rewind();
 			//getId
 			try {
-				fsFile.read(buff, i*FS_SECTOR_SIZE);
+				nbread = fsFile.read(buff, sector*FS_SECTOR_SIZE);
 			} catch (IOException e) {
 				e.printStackTrace();
 				continue;
 			}
+			if(nbread<9){
+				System.err.println("Error: can't read more than "+nbread+"/9 !! (cleanUnusedSectors) at sector "+sector+"/"+maxSects);
+				return;
+			}
+			buff.rewind();
 			byte type = buff.get();
 			long id = buff.getLong();
 			if(type == 0){
 				//nothing, it's empty
+				if(!unusedSectors.contains(sector)){
+					synchronized (unusedSectors) {
+						System.out.println("add unused sector "+sector);
+						unusedSectors.add(sector);
+					}
+				}
 			}else if(type == EXTENSION){
 				//check if root exist?
 				if(getDirect(id) == null){
 					//remove!
-					saveSector(buffDel, i);
-					System.out.println("Cleaning: remove extension sector (obj_id:"+id+") @"+i);
+					System.out.println("Cleaning: remove extension sector (obj_id:"+id+") @"+sector);
+					removeSector(sector);
 				}
 			}else if(type == FILE || type == DIRECTORY){
 				//check if root exist?
 				FsObject obj = getDirect(id);
-				if(obj == null || ((FsObjectImplFromFile)obj).getSector() != i){
+				if(obj == null || ((FsObjectImplFromFile)obj).getSector() != sector){
 					//remove!
-					saveSector(buffDel, i);
-					System.out.println("Cleaning: remove object (obj_id:"+id+"@"+((FsObjectImplFromFile)obj).getSector()+") @"+i);
+					System.out.println("Cleaning: remove object (obj_id:"+id+"@"+(obj==null?"null":((FsObjectImplFromFile)obj).getSector())+") @"+sector);
+					removeSector(sector);
 				}
 			}else if(removeMoving && type == MOVING){
 				//remove!
-				saveSector(buffDel, i);
-				System.out.println("Cleaning: remove moving sector @"+i);
+				System.out.println("Cleaning: remove moving sector @"+sector);
+				removeSector(sector);
 			}else if(type == DELETED){
 				//remove!
-				saveSector(buffDel, i);
-				System.out.println("Cleaning: remove deleted sector (because the type is not used and i don't know what to do with it) @"+i);
+				System.out.println("Cleaning: remove deleted sector (because the type is not used and i don't know what to do with it) @"+sector);
+				removeSector(sector);
 			}else if(type == CHUNK){
-				FsChunk obj = id2Chunk.get(id);
-				if(obj == null || ((FsChunkFromFile)obj).getSector() != i){
+				FsChunk obj = chunkId2LoadedObj.get(id);
+				if(obj == null || ((FsChunkFromFile)obj).getSector() != sector){
 					//remove!
-					saveSector(buffDel, i);
-					System.out.println("Cleaning: remove chunk (chunk_id:"+id+"@"+((FsChunkFromFile)obj)+") @"+i);
+					System.out.println("Cleaning: remove chunk (chunk_id:"+id+"@"+(obj==null?"null":((FsChunkFromFile)obj))+") @"+sector);
+					removeSector(sector);
 				}
 			}
 		}

@@ -185,7 +185,8 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		newChunk.id = id;
 		newChunk.loaded = true;
 		if(id<=0){
-			newChunk.id = ((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL);
+//			newChunk.id = ((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL);
+			newChunk.id = ((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL); //assume only 2^48 sector will be ever needed
 //			System.out.println("Create new id : "+master.getComputerId()+" => "+(((long)master.getComputerId())<<48)+", sector = "+newSectorId +" => "+(newSectorId&0xFFFFFFFFFFFFL)
 //					+" , so | ="+(((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL))+", + = "+((((long)master.getComputerId())<<48) + (newSectorId&0xFFFFFFFFFFFFL)));
 			newChunk.lastChange = System.currentTimeMillis();
@@ -253,5 +254,16 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		super.delete();
 	}
 
+
+
+	@Override
+	public FsDirectory asDirectory() {
+		return null;
+	}
+	
+	@Override
+	public FsFile asFile() {
+		return this;
+	}
 
 }

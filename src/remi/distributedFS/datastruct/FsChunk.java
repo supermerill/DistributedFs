@@ -1,11 +1,10 @@
 package remi.distributedFS.datastruct;
 
 
-import java.util.List;
-
+import it.unimi.dsi.fastutil.longs.LongList;
 import remi.distributedFS.util.ByteBuff;
 
-public abstract interface FsChunk {
+public abstract interface FsChunk extends FsId{
 
 	//data
 	/**
@@ -35,9 +34,10 @@ public abstract interface FsChunk {
 	public void setMaxSize(int newMaxSize);
 	public boolean isPresent();
 	public void setPresent(boolean isPresentLocally);
-	public List<Long> serverIdPresent();
-	public long lastModificationTimestamp();
-	public long lastModificationUID();
+	public LongList serverIdPresent();
+	public long getModifyDate();
+	public long getModifyUID();
+	public long getLastAccessDate();
 
 	public long getId();
 
@@ -46,5 +46,6 @@ public abstract interface FsChunk {
 	public void changes();
 
 	public void delete();
+
 
 }

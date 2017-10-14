@@ -1,6 +1,6 @@
 package remi.distributedFS.datastruct;
 
-public interface FsObject {
+public interface FsObject extends FsId {
 	
 	public long getDeleteDate();
 	public void setDeleteDate(long deleteDate);

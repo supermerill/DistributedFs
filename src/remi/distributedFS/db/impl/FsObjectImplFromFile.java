@@ -432,16 +432,18 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			Arrays.fill(buff.array(), (byte)0);
 			//del other ones
 			for(int i=sectorsToDel.size()-1;i>=0;i--){
+				buff.rewind();
 				master.saveSector(buff, sectorsToDel.getLong(i));
-				master.releaseSector(sectorsToDel.getLong(i));
+				master.removeSector(sectorsToDel.getLong(i));
 			}
 		}else{
 			Arrays.fill(buff.array(), (byte)0);
 		}
 		
 		//del main sector
+		buff.rewind();
 		master.saveSector(buff, getSector());
-		master.releaseSector(getSector());
+		master.removeSector(getSector());
 	}
 	
 }
