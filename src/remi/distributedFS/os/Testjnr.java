@@ -344,6 +344,12 @@ public class Testjnr {
 			// TODO Auto-generated method stub
 			
 		}
+
+		@Override
+		public void removeCompletely(FsObject obj) {
+			// TODO Auto-generated method stub
+			
+		}
 	}
 	
 	public static void main(String[] args) {

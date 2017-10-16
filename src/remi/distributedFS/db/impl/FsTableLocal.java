@@ -123,29 +123,41 @@ public class FsTableLocal implements StorageManager{
 
 	class Loader implements FsObjectVisitor{
 
+		String pref = "";
+		
 		@Override
 		public void visit(FsDirectory dirParent) {
 			objectId2LoadedObj.put(dirParent.getId(), dirParent);
-			System.out.println(" dir "+dirParent.getPath());
+//			System.out.print(" dir "+((FsObjectImplFromFile)dirParent).getSectorsUsed()); System.out.println(" : "+dirParent.getPath());
 			for(FsDirectory dir : new ArrayList<>(dirParent.getDirs())){
 				try{
-					System.out.println("contains "+dir.getName());
+					System.out.print(pref+"(D) "+((FsObjectImplFromFile)dir).getSectorsUsed()); System.out.println(" :"+dir.getName()+" ("+dir.getPath()+")");
+					pref = pref + "    ";
 					visit(dir);
+					pref = pref.substring(4);
 				}catch(WrongSectorTypeException ex){
 					ex.printStackTrace();
 					//recover : del this
 					dirParent.getDirs().remove(dir);
 					((FsDirectoryFromFile)dirParent).setDirty(true);
-//					dirParent.flush();
+					dirParent.flush();
 				}
-				System.out.println(dir.getPath() + " "+dir.getId());
 			}
 			for(FsFile fic : dirParent.getFiles()){
-				visit(fic);
+				try{
+					System.out.print(pref+"(F) "+((FsObjectImplFromFile)fic).getSectorsUsed()); System.out.println(" :"+fic.getName());
+					visit(fic);
+				}catch(WrongSectorTypeException ex){
+					ex.printStackTrace();
+					//recover : del this
+					dirParent.getFiles().remove(fic);
+					((FsDirectoryFromFile)dirParent).setDirty(true);
+					dirParent.flush();
+				}
 			}
 			for(FsObject obj : dirParent.getDelete()){
 				if(obj == dirParent) System.err.println("error, dir is inside deletes");
-				System.out.println(obj.getPath()+" (D) " + obj.getId());
+				System.out.print(pref+"(R) "+((FsObjectImplFromFile)obj).getSectorsUsed()); System.out.println(obj.getPath()+" : " + obj.getId());
 				obj.accept(this);
 //				objectId2LocalCluster.put(obj.getId(), obj);
 			}
@@ -155,7 +167,7 @@ public class FsTableLocal implements StorageManager{
 		public void visit(FsFile fic) {
 			try{
 				fic.getName(); // important, to trigger a load
-				System.out.println(fic.getPath()+" (F) " + fic.getId());
+//				System.out.println(fic.getPath()+" (F) " + fic.getId());
 				objectId2LoadedObj.put(fic.getId(), fic);
 				for(FsChunk ch : fic.getAllChunks()){
 					visit(ch);

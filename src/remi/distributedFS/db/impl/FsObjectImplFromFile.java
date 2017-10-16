@@ -2,6 +2,7 @@ package remi.distributedFS.db.impl;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -17,6 +18,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	FsTableLocal master;
 	boolean loaded;
 	long sector;
+	LongList sectors = null;
 
 	public FsObjectImplFromFile(FsTableLocal master, long sectorId, FsDirectory parent){
 		this.master = master;
@@ -64,7 +66,6 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		id = newId;
 		master.registerNewFile(id, this);
 	}
-
 
 
 	public void load(ByteBuffer buffer){
@@ -169,8 +170,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		short size = (short) Math.min(256,nameBuff.limit());
 		buffer.putShort(size);
 		buffer.put(nameBuff.array(), 0, size);
-		buffer.position(pos+336);
-		System.out.println("-- save "+getPath());
+		buffer.position(pos+340);
 	}
 
 //	public int goToNext(ByteBuffer buff){
@@ -182,18 +182,23 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		super.setDirty(dirty);
 	}
 	
-	public int goToNextOrCreate(ByteBuffer buff, Ref<Long> currentSector){
-		int pos = buff.position();
-		long nextsector = buff.getLong();
-		System.out.println("--get (save) sector "+nextsector);
-		buff.position(pos);
-		if(nextsector<=0){
+	public int goToNextOrCreate(ByteBuffer buff, Ref<Integer> sectorNum){//Ref<Long> currentSector){
+		assert buff.position() == FsTableLocal.FS_SECTOR_SIZE-8 : "Error: try to goToNextOrCreate next sector id at wrong pos ("+buff.position()+" != "+(FsTableLocal.FS_SECTOR_SIZE-8);
+		final long nextSector = (sectors==null || sectors.size()<sectorNum.get())? -1 : sectors.getLong(sectorNum.get());
+//		System.out.println("--get (save) sector "+nextSector+" "+(nextSector <= 0)+" @"+(buff.position())+" ? "+(FsTableLocal.FS_SECTOR_SIZE-8));
+		if(nextSector <= 0){
 			long newSectorId = master.requestNewSector();
-			System.out.println("--create (read) sector "+newSectorId);
+//			System.out.println("--create (read) sector "+newSectorId);
 			buff.putLong(newSectorId);
 			buff.rewind();
-			master.saveSector(buff, currentSector.get());
-			currentSector.set(newSectorId);
+			long currentSector = sectorNum.get()==0? sector : sectors.getLong(sectorNum.get()-1);
+//			System.out.println("--save my sector "+currentSector);
+			master.saveSector(buff, currentSector);
+			if(sectors==null) sectors = new LongArrayList(2);
+			assert sectors.size()<=sectorNum.get() :"Error, trying to add sector n°"+sectorNum.get()+" : "+newSectorId+" when my sector array is "+sectors;
+			sectors.add(newSectorId);
+			sectorNum.set(sectorNum.get()+1);
+			
 			//master.loadSector(buff, newSectorId); //useless, it's not created yet!
 			buff.rewind();
 			buff.put(FsTableLocal.EXTENSION);
@@ -203,8 +208,54 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 			buff.position(16);
 			return (FsTableLocal.FS_SECTOR_SIZE / 8) - 3;
 		}else{
-			return goToNext(buff);
+			//save
+			long newSectorId = sectors.getLong(sectorNum.get());
+//			System.out.println("--infer (read) sector "+newSectorId+" from array "+sectors);
+			buff.putLong(newSectorId);
+			buff.rewind();
+			long currentSector = sectorNum.get()==0? sector : sectors.getLong(sectorNum.get()-1);
+			master.saveSector(buff, currentSector);
+			//increment
+			sectorNum.set(sectorNum.get()+1);
+			//format sector header
+			buff.rewind();
+			buff.put(FsTableLocal.EXTENSION);
+			buff.putLong(this.getId());
+			buff.position(FsTableLocal.FS_SECTOR_SIZE-8);
+			buff.putLong(-1);
+			buff.position(16);
+			return (FsTableLocal.FS_SECTOR_SIZE / 8) - 3;
 		}
+	}
+
+
+	public void flushLastSector(ByteBuffer buff, Ref<Integer> sectorNum){
+		System.out.println("TEST: flushLastSector "+(sectorNum.get()==0?sector:sectors.getLong(sectorNum.get()-1))+" @"+sectorNum.get()+" is my last sector, flushed");
+		//fill remaining with zeros
+		Arrays.fill(buff.array(), buff.position(), buff.limit(), (byte)0);
+		//save it
+		buff.rewind();
+		master.saveSector(buff, (sectorNum.get()==0?sector:sectors.getLong(sectorNum.get()-1)));
+		if(sectors!=null)
+		for(int i=sectorNum.get();i<sectors.size();i++){
+			long releasedSect = sectors.removeLong(i);
+			master.removeSector(releasedSect);
+			System.out.println("TEST: sector "+releasedSect+" has ben released because i don't need it anymore");
+		}
+	}
+	
+	public LongList getSectorsUsed(){
+		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
+		long lastSec = getSector();
+		LongArrayList lstLng = new LongArrayList();
+		while(lastSec>0){
+			lstLng.add(lastSec);
+			buff.rewind();
+			master.loadSector(buff, lastSec);
+			buff.position(buff.limit()-8);
+			lastSec = buff.getLong();
+		}
+		return lstLng;
 	}
 
 	/**
@@ -212,9 +263,14 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	 * @param buff
 	 * @return nb long to read (max)
 	 */
-	public int goToNext(ByteBuffer buff){
+	public int goToNextAndLoad(ByteBuffer buff, Ref<Integer> sectNumBefore){
+		assert buff.position() == FsTableLocal.FS_SECTOR_SIZE-8 : "Error: try to get next sector id at wrong pos ("+buff.position()+" != "+(FsTableLocal.FS_SECTOR_SIZE-8);
 		long nextsector = buff.getLong();
-		System.out.println("--get (read) sector "+nextsector);
+//		System.out.print(" <nxtSec:"+nextsector+"> ");
+		if(nextsector<=0 && sectors!=null && sectors.size()>sectNumBefore.get()){
+//			System.out.print(" <STnxtSec:"+nextsector+"> ");
+			nextsector = sectors.getLong(sectNumBefore.get());
+		}
 		if(nextsector<=0){
 				System.err.println("--Error, no more sector to parse for obj "+this.getPath()+" : "+nextsector);
 				throw new RuntimeException("Error, no more sector to parse for obj "+this.getPath());
@@ -231,6 +287,21 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 				System.err.println("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
 				throw new RuntimeException("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
 			}
+			
+			//add it to storage array
+			if(sectors==null){
+				sectors = new LongArrayList(2);
+			}
+			if(sectors.size()<=sectNumBefore.get()){
+				if(sectors.size()<=sectNumBefore.get()-1){
+					throw new WrongSectorTypeException("Error, i have a sector id but not the previous one in my arrray, it's imposssible and i'm lost! size: "+sectors.size()+", my pos : "+sectNumBefore);
+				}
+				sectors.add(nextsector);
+			}else{
+				sectors.set(sectNumBefore.get().intValue(), nextsector);
+			}
+			sectNumBefore.set(sectNumBefore.get()+1);
+			
 			//now i should be at pos 9
 			//go to ok pos
 			buff.position(16);

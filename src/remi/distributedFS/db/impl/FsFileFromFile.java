@@ -39,23 +39,26 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		//now, it should be at pos ~337
 		
 		//now read entries.
-		//go to fixed pos (because it's simpler)
-		buffer.position(360);
 		//i have 656 bytes in this sector. 82 long
 		currentChunkSize = buffer.getInt();
 		buffer.getInt(); //not used
 		int nbAllChunks = buffer.getInt();
 		int nbChunks = buffer.getInt();
 
-		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-3; //4int (=2long) +nextSector
+		//ensure long-distance from end
+		buffer.position(buffer.position() + 8 - (buffer.position()%8));
+		//get how many int read we can do
+		int canRead =  FsTableLocal.FS_SECTOR_SIZE/4 - (buffer.position()/4 + 2);
+		
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
+		Ref<Integer> sectorNum = new Ref<>(0);
 		//read AllChunks
 		for(int i=0;i<nbAllChunks;i++){
 			allChunks.add(new FsChunkFromFile(master, currentBuffer.getLong(), this,i));
 			canRead-=2;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer)*2;
+				canRead = goToNextAndLoad(currentBuffer, sectorNum)*2;
 			}
 		}
 		//note: it works because i write longs before ints
@@ -66,7 +69,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 			chunks.add(allChunks.get(currentBuffer.getInt()));
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer)*2;
+				canRead = goToNextAndLoad(currentBuffer, sectorNum)*2;
 			}
 		}
 	}
@@ -86,23 +89,26 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		//now, it should be at pos ~337
 		
 		//now read entries.
-		//go to fixed pos (because it's simpler)
-		buffer.position(360);
 		//i have 656 bytes in this sector. 82 long
 		buffer.putInt(currentChunkSize);
 		buffer.putInt(0); //not used (yet)
 		buffer.putInt(allChunks.size());
 		buffer.putInt(chunks.size());
 
-		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-3; //4int (=2long) +nextSector
+		//ensure long-distance from end
+		buffer.position(buffer.position() + 8 - (buffer.position()%8));
+		//get how many int read we can do
+		int canRead =  FsTableLocal.FS_SECTOR_SIZE/4 - (buffer.position()/4 + 2);
+		
 		ByteBuffer currentBuffer = buffer;
-		Ref<Long> currentSector = new Ref<>(this.getSector());
+//		Ref<Long> currentSector = new Ref<>(this.getSector());
+		Ref<Integer> sectorNum = new Ref<>(0);
 		//write chunks
 		for(int i=0;i<allChunks.size();i++){
 			currentBuffer.putLong((allChunks.get(i)).getSector());
 			canRead-=2; //1 long  = 2 ints
 			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector)*2; // *2 to pass in int
+				canRead = goToNextOrCreate(currentBuffer, sectorNum)*2; // *2 to pass in int
 			}
 		}
 		
@@ -113,15 +119,16 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 			currentBuffer.putInt(allChunks.indexOf(chunks.get(i)));
 			canRead--; // 1 int
 			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector)*2; // *2 to pass in int
+				canRead = goToNextOrCreate(currentBuffer, sectorNum)*2; // *2 to pass in int
 			}
 		}
 
-		//fill last sector with zeros
-		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
-		//write last sector
-		currentBuffer.rewind();
-		master.saveSector(currentBuffer, currentSector.get());
+//		//fill last sector with zeros
+		flushLastSector(currentBuffer, sectorNum);
+//		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
+//		//write last sector
+//		currentBuffer.rewind();
+//		master.saveSector(currentBuffer, currentSector.get());
 		
 
 		

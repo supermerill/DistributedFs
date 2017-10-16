@@ -32,7 +32,20 @@ public class Cleaner extends Thread{
 	long nextRemoveOp = 0;
 	
 	StandardManager manager;
-	
+
+	public Cleaner(StandardManager manager) {
+		super();
+		this.manager = manager;
+		
+		Parameters params = new Parameters(manager.getRootFolder()+"/cleaner.properties");
+		this.idealSize = params.getLongOrDef("idealSize", 1024*1024*10);
+		this.maxSize = params.getLongOrDef("maxSize", 1024*1024*1024);
+		this.mstimeBeforeDelete = params.getLongOrDef("mstimeBeforeDelete", 1000*60);
+		
+		//scheduled next remove op in 100sec from creation, to elt time for the fs to load and rest
+		nextCleaningOp = System.currentTimeMillis() + 100000 *0;
+		nextRemoveOp = System.currentTimeMillis();
+	}
 	
 	public Cleaner(StandardManager manager, long idealSize, long maxSize, long mstimeBeforeDelete) {
 		super();
@@ -69,6 +82,7 @@ public class Cleaner extends Thread{
 
 	//TODO: this impl is linked strongly with the basic impl fromm bd (use files as chunk), you HAVE TO change that to make an implen-independant impl
 	protected void checkLiberateSpace() {
+		System.out.println("CHeckLiberateSpace");
 		Pattern patternNumeral = Pattern.compile("^[0-9]+$");
 		
 		File rootFolder = new File(manager.rootFolder);
@@ -144,7 +158,8 @@ public class Cleaner extends Thread{
 				System.out.print("chunk "+idDel+" is removed, for a size of "+chunk.currentSize()+", access date = "+entry.getLongKey());
 				sizeToRemove -= chunk.currentSize();
 				System.out.println(", reste "+sizeToRemove+", "+it.hasNext());
-//				chunk.setPresent(false);
+				chunk.setPresent(false);
+				chunk.flush();
 			}
 			
 			//end!

@@ -48,8 +48,7 @@ public class RemoveOldDeletedItems implements FsObjectVisitor{
 			if(objToDel!=null){
 				for(FsObject obj : objToDel){
 					System.out.println("Delete definitively  : "+obj.getPath()+" , diff of date : "+(obj.getDeleteDate() - dateThreshold));
-					dirParent.getDelete().remove(obj);
-					obj.delete();
+					dirParent.removeCompletely(obj);
 					modified = true;
 				}
 			}

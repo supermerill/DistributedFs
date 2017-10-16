@@ -126,10 +126,17 @@ public class FsChunkFromFile implements FsChunk {
 			load(buff);
 		}
 	}
+
+	
+	protected void ensureDataPath(){
+		if(data==null){
+			data=new File(master.getRootRep()+"/"+getId());
+		}
+	}
 	
 	protected void ensureDatafield(){
 		if(data==null){
-			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
+			//it never change & is unique (TODO: multiple dirs to not e with 1million files in the same dir)
 			data=new File(master.getRootRep()+"/"+getId());
 			//create folder path
 			if(!data.exists()){
@@ -243,8 +250,8 @@ public class FsChunkFromFile implements FsChunk {
 		
 		//get filename  (useless... for now)
 		int nbServerId = buffer.getInt(); //42
-		int nbBytesFilename = buffer.getInt(); //46
-		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytesFilename);
+//		int nbBytesFilename = buffer.getInt(); //46
+//		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytesFilename);
 		
 		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
 		
@@ -263,14 +270,14 @@ public class FsChunkFromFile implements FsChunk {
 		//read filename
 //		long currentSector = this.getId();
 		//read folder
-		for(int i=0;i<nbBytesFilename;i++){
-			nameBuffer.put(currentBuffer.get());
-			canRead--;
-			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
-			}
-		}
-		nameBuffer.flip();
+//		for(int i=0;i<nbBytesFilename;i++){
+//			nameBuffer.put(currentBuffer.get());
+//			canRead--;
+//			if(canRead == 0){
+//				canRead = goToNext(currentBuffer);
+//			}
+//		}
+//		nameBuffer.flip();
 		//lol it's not used as we use the id!!!
 //		data = new File(FsObjectImplFromFile.CHARSET.decode(nameBuffer).toString());
 //		ensureDatafield();
@@ -300,17 +307,17 @@ public class FsChunkFromFile implements FsChunk {
 		buffer.put((byte)(isValid?1:0)); 
 
 		//get name buffer
-//		ensureDatafield(); //don't do that, it create a dead loop
-		ByteBuffer buffName = null;
-		if(data!=null){
-			buffName = FsObjectImplFromFile.CHARSET.encode(data.getPath());
-		}else{
-			buffName = FsObjectImplFromFile.CHARSET.encode("");
-		}
+//		ensureDataPath(); //it's not useful to save the path name, as it's constructed from id. TODO: remove saving name
+//		ByteBuffer buffName = null;
+//		if(data!=null){
+//			buffName = FsObjectImplFromFile.CHARSET.encode(data.getPath());
+//		}else{
+//			buffName = FsObjectImplFromFile.CHARSET.encode("");
+//		}
 		
 		//buffName.flip(); already done in encode()
 		buffer.putInt(serverIdPresent.size());
-		buffer.putInt(buffName.limit());
+//		buffer.putInt(buffName.limit());
 
 		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
 		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
@@ -325,22 +332,21 @@ public class FsChunkFromFile implements FsChunk {
 				canRead = goToNextOrCreate(currentBuffer, currentSector);
 			}
 		}
-		//save folder
-		for(int i=0;i<buffName.limit();i++){
-			currentBuffer.put(buffName.get(i));
-			canRead--;
-			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector);
-			}
-		}
+		//save name
+//		for(int i=0;i<buffName.limit();i++){
+//			currentBuffer.put(buffName.get(i));
+//			canRead--;
+//			if(canRead == 0){
+//				canRead = goToNextOrCreate(currentBuffer, currentSector);
+//			}
+//		}
 
-		//fill last sector with zeros
-		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
 		//write last sector
-		currentBuffer.rewind();
-		master.saveSector(currentBuffer, currentSector.get());
+		flushLastSector(currentBuffer, currentSector);
+//		currentBuffer.rewind();
+//		master.saveSector(currentBuffer, currentSector.get());
 	}
-	
+
 
 	public int goToNextOrCreate(ByteBuffer buff, Ref<Long> currentSector){
 		int pos = buff.position();
@@ -362,6 +368,26 @@ public class FsChunkFromFile implements FsChunk {
 			return (FsTableLocal.FS_SECTOR_SIZE) - (8+8+1);
 		}else{
 			return goToNext(buff);
+		}
+	}
+
+
+	public void flushLastSector(ByteBuffer buff, Ref<Long> currentSector){
+		//get nextSector
+		buff.mark();
+		buff.position(buff.limit()-8);
+		long nextSector = buff.getLong();
+		buff.reset();
+		//fill remaining with zeros
+		Arrays.fill(buff.array(), buff.position(), buff.limit(), (byte)0);
+		//save it
+		buff.rewind();
+		master.saveSector(buff, currentSector.get());
+		if(nextSector>0){
+			//need to clean other sectors
+			buff.rewind();
+			flushLastSector(buff, new Ref<Long>(nextSector));
+			master.removeSector(nextSector);
 		}
 	}
 	
@@ -452,7 +478,7 @@ public class FsChunkFromFile implements FsChunk {
 
 	public void unallocate() {
 		ensureLoaded();
-		ensureDatafield();
+		ensureDataPath();
 		data.delete();
 		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
 		buff.put((byte)0);
@@ -490,10 +516,13 @@ public class FsChunkFromFile implements FsChunk {
 	@Override
 	public void setPresent(boolean isPresentLocally) {
 		ensureLoaded();
+		System.out.println("Chunk : setPresent "+isValid+" -> "+isPresentLocally);
 		isValid = isPresentLocally;
 		//if invalidate, remove local datafile
 		if(!isValid){
-			if(data!=null && data.exists()){
+			ensureDataPath();
+			if(data.exists()){
+				System.out.println("Chunk : delete data on disk");
 				data.delete();
 			}
 			data = null;

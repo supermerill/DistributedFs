@@ -74,15 +74,15 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 	}
 
 	@Override
-	public int goToNextOrCreate(ByteBuffer buff, Ref<Long> currentSector) {
+	public int goToNextOrCreate(ByteBuffer buff, Ref<Integer> sectorIdx) {
 		checkLoaded();
-		return me.goToNextOrCreate(buff, currentSector);
+		return me.goToNextOrCreate(buff, sectorIdx);
 	}
 
 	@Override
-	public int goToNext(ByteBuffer buff) {
+	public int goToNextAndLoad(ByteBuffer buff, Ref<Integer> sectorIdx) {
 		checkLoaded();
-		return me.goToNext(buff);
+		return me.goToNextAndLoad(buff, sectorIdx);
 	}
 
 	@Override

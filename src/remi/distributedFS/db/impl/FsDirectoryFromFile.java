@@ -61,58 +61,56 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		//check if it's a dir
 		byte type = buffer.get();
 		if(type !=FsTableLocal.DIRECTORY){
-			System.err.println("Error, "+type+" not a directory at "+getSector()+" "+buffer.position());
+			System.err.println("Error, "+type+" not a directory @"+getSector()+" "+buffer.position());
 			super.load(buffer);
 			System.err.println("Error, "+type+" not a directory with name "+getName());
-			throw new WrongSectorTypeException("Error, "+type+" not a directory at "+getSector());
+			throw new WrongSectorTypeException("Error, "+type+" not a directory @"+getSector());
 		}
-		
+
 		super.load(buffer);
 		//now, it should be at pos ~337
 		lastChange = buffer.getLong();
 		lastChangeUid = buffer.getLong();
 		
 		//now read entries.
-		//go to fixed pos (because it's simpler)
-		buffer.position(360);
 		//i have 656 bytes in this sector. 82 long
 		long nbDir = buffer.getLong();
 		long nbFile = buffer.getLong();
 		long nbDel = buffer.getLong();
-		System.out.println("read dir  "+name+" : "+nbDir+", "+nbFile+", "+nbDel);
 		
-		// 360 : position set behind
-		// /8 -> long type
-		// -4 -> remove nbdir read, nbfile read, nbDel read,  and "next sector" read
-		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-4;
-		System.out.println("Canread = "+canRead);
+		//ensure long-distance from end
+		buffer.position(buffer.position() + 8 - (buffer.position()%8));
+		//get how many long read we can do
+		int canRead =  FsTableLocal.FS_SECTOR_SIZE/8 - (buffer.position()/8 + 1);
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
+		Ref<Integer> sectorNum = new Ref<>(0);
 		//read folder
 		for(int i=0;i<nbDir;i++){
 			dirs.add(new FsDirectoryFromFile(master, currentBuffer.getLong(), this));
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
+				canRead = goToNextAndLoad(currentBuffer, sectorNum);
 			}
 		}
 		for(int i=0;i<nbFile;i++){
 			files.add(new FsFileFromFile(master, currentBuffer.getLong(), this));
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
+				canRead = goToNextAndLoad(currentBuffer, sectorNum);
 			}
 		}
 		for(int i=0;i<nbDel;i++){
 			deleteObjs.add(new FsUnknownObject(master, currentBuffer.getLong(), this));
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
+				canRead = goToNextAndLoad(currentBuffer, sectorNum);
 			}
 		}
 	}
 
 	@Override
+	@Deprecated
 	public void print(ByteBuffer buffer) {
 		super.print(buffer);
 
@@ -127,18 +125,19 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		System.out.println("Canread = "+canRead);
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
+		Ref<Integer> sectorNum = new Ref<>(0);
 		//read folder
 		for(int i=0;i<nbDir;i++){
 			System.out.println("Dir : "+currentBuffer.getLong());
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
+				canRead = goToNextAndLoad(currentBuffer, sectorNum);
 			}
 		}
 		for(int i=0;i<nbFile;i++){
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
+				canRead = goToNextAndLoad(currentBuffer, sectorNum);
 			}
 		}
 	}
@@ -167,9 +166,6 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		buffer.putLong(lastChangeUid);
 		
 		//now read entries.
-		//go to fixed pos (because it's simpler)
-		buffer.position(360);
-		//i have 656 bytes in this sector. 82 long
 		buffer.putLong(dirs.size());
 		buffer.putLong(files.size());
 		buffer.putLong(deleteObjs.size());
@@ -177,37 +173,58 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		// 360 : position set behind
 		// /8 -> long type
 		// -4 -> remove nbdir read, nbfile read, nbDel read,  and "next sector" read
-		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-4;
+//		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-4;
+		
+		//ensure it's a long -distance from the end
+		buffer.position(buffer.position() + 8 - (buffer.position()%8));
+		//how many long before end?
+		int canRead = FsTableLocal.FS_SECTOR_SIZE/8 - (buffer.position()/8 + 1);
+		
+		//write arrays
 		ByteBuffer currentBuffer = buffer;
-		Ref<Long> currentSector = new Ref<>(this.getSector());
+//		Ref<Long> currentSector = new Ref<>(this.getSector());
+		currentBuffer.mark();
+		currentBuffer.position(FsTableLocal.FS_SECTOR_SIZE-8);
+		System.out.println("first sec end with "+currentBuffer.getLong());
+		currentBuffer.reset();
+		Ref<Integer> sectorNum = new Ref<>(0);
 		//read folder
 		for(int i=0;i<dirs.size();i++){
 			currentBuffer.putLong(dirs.get(i).getSector());
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector);
+				canRead = goToNextOrCreate(currentBuffer, sectorNum);
 			}
 		}
 		for(int i=0;i<files.size();i++){
 			currentBuffer.putLong(files.get(i).getSector());
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector);
+				canRead = goToNextOrCreate(currentBuffer, sectorNum);
 			}
 		}
 		for(int i=0;i<deleteObjs.size();i++){
 			currentBuffer.putLong(deleteObjs.get(i).getSector());
 			canRead--;
 			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector);
+				canRead = goToNextOrCreate(currentBuffer, sectorNum);
 			}
 		}
+		
+
+		int pos = currentBuffer.position();
+		currentBuffer.position(FsTableLocal.FS_SECTOR_SIZE-8);
+		System.out.println("last sec end with "+currentBuffer.getLong());
+		currentBuffer.position(pos);
+		
 		//save last sector (previous are saved in goToNextOrCreate)
 		//fill last sector with zeros
-		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
-		currentBuffer.rewind();
-		master.saveSector(currentBuffer, currentSector.get());
+		flushLastSector(currentBuffer, sectorNum);
+//		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
+//		currentBuffer.rewind();
+//		master.saveSector(currentBuffer, currentSector.get());
 		setDirty(false);
+		System.out.println("end save folder"+getPath()+" with id "+id+" and parentid "+parentId);
 	}
 
 	@Override
@@ -320,6 +337,16 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		((FsObjectImplFromFile)dir).setDirty(true);
 		dir.flush();
 		flush();
+	}
+
+	@Override
+	public void removeCompletely(FsObject obj) {
+		if(deleteObjs.contains(obj)){
+			deleteObjs.remove(obj);
+			obj.delete();
+			setDirty(true);
+			flush();
+		}
 	}
 
 	@Override

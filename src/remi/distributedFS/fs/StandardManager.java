@@ -83,10 +83,6 @@ public class StandardManager implements FileSystemManager {
 	
 	public StandardManager() {
 		super();
-		//TODO: serialize & gui
-//		cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
-		cleaner = new Cleaner(this, 1024*10, 1024*1024*1024, 1000*60);
-		cleaner.start();
 	}
 
 
@@ -121,6 +117,13 @@ public class StandardManager implements FileSystemManager {
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
 			}
+			
+
+			//TODO: serialize & gui
+//			cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
+			cleaner = new Cleaner(this);
+			cleaner.start();
+			
 		}catch (Exception e) {
 			e.printStackTrace();
 			close();
