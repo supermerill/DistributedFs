@@ -2,17 +2,16 @@ package remi.distributedFS.fs;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
-import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
+import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
+import remi.distributedFS.db.impl.readable.FsChunkOneFile;
 import remi.distributedFS.fs.messages.ExchangeChunk;
 import remi.distributedFS.fs.messages.PropagateChange;
 import remi.distributedFS.net.ClusterManager;
@@ -109,7 +108,14 @@ public class StandardManager implements FileSystemManager {
 			}
 			
 			System.out.println("begin");
-			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this, true);
+			FsTableLocalFactory storageFactory = new FsTableLocal.FsTableLocalFactory();
+			storageFactory.rootRep = dataPath;
+			storageFactory.filename = dataPath+"/"+"localdb.data";
+			storageFactory.manager = this;
+			storageFactory.factory = new FsChunkOneFile.StorageFactory();
+			storage = storageFactory.create();
+//			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this, true);
+			storage.cleanUnusedSectors(true);
 	
 			if(port>0){
 				net = new PhysicalServer(this, false, dataPath);
@@ -233,10 +239,10 @@ public class StandardManager implements FileSystemManager {
 	}
 
 	@Override
-	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
+	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
 		System.out.println("REQUEST CHUNK "+chunk.getId());
 		//request chunk to all servers
-		int nbReq = chunkRequester.requestchunk(file, chunk);
+		int nbReq = chunkRequester.requestchunk(serverIdPresent, file, chunk);
 		//register to the chunk requester
 		boolean ok = false;
 		FsChunk chunkReceived = null;

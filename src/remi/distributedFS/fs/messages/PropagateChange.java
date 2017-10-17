@@ -379,7 +379,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			int nbChunks = message.getTrailInt();
 			System.out.println(this.manager.getComputerId()%100+" FILECG "+fic.getPath()+" has "+nbChunks+" chunks");
 			List<FsChunk> chunksToSet = new ArrayList<>();
-			final long peerServerId = manager.getNet().getComputerId(senderId);
+			final short peerServerId = manager.getNet().getComputerId(senderId);
 			for(int i=0;i<nbChunks;i++){
 				long chunkId = message.getLong();
 				long chunkDate = message.getLong();

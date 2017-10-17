@@ -53,7 +53,7 @@ public class PhysicalServer implements ClusterManager {
 	@SuppressWarnings("unchecked")
 	public PhysicalServer(FileSystemManager fs, boolean update, String folderPath) {
 		id = new Random().nextLong();
-		if (id >= 0)
+		if (id <= 0)
 			id = -id;
 		this.myFs = fs;
 		listeners = new List[256];
@@ -103,7 +103,7 @@ public class PhysicalServer implements ClusterManager {
 		}
 		// toutes les heures
 		if (lastDirUpdate + 1000 * 60 * 60 < System.currentTimeMillis()) {
-			System.out.println(id % 100 + " REQUEST DIR UPDATE");
+			System.out.println(getId() % 100 + " REQUEST DIR UPDATE");
 			myFs.requestDirUpdate();
 			lastDirUpdate = System.currentTimeMillis();
 		}
@@ -377,7 +377,7 @@ public class PhysicalServer implements ClusterManager {
 		System.out.println("ERROR: i have to choose an other id....");
 		// change id
 		id = new Random().nextLong();
-		if (id >= 0)
+		if (id <= 0)
 			id = -id;
 		// reconnect all connections
 		ArrayList<Peer> oldConnection = null;
@@ -469,8 +469,14 @@ public class PhysicalServer implements ClusterManager {
 	}
 
 	@Override
-	public void writeMessage(long senderId, byte messageId, ByteBuff message) {
-		writeMessage(getPeer(senderId), messageId, message);
+	public boolean writeMessage(long senderId, byte messageId, ByteBuff message) {
+		Peer p = getPeer(senderId);
+		if(p != null){
+			writeMessage(p, messageId, message);
+			return true;
+		}else{
+			return false;
+		}
 	}
 
 	public void writeMessage(Peer p, byte messageId, ByteBuff message) {
@@ -639,6 +645,16 @@ public class PhysicalServer implements ClusterManager {
 		Peer p = getPeer(senderId);
 		if(p != null){
 			return p.getComputerId();
+		}
+		return -1;
+	}
+
+	@Override
+	public long getSenderId(short compId) {
+		for(Peer p : peers){
+			if(p.isAlive() && p.getComputerId() == compId){
+				return p.getConnectionId();
+			}
 		}
 		return -1;
 	}

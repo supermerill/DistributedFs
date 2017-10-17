@@ -15,10 +15,10 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	
 	public static Charset CHARSET = Charset.forName("UTF-8");
 	
-	FsTableLocal master;
-	boolean loaded;
-	long sector;
-	LongList sectors = null;
+	protected FsTableLocal master;
+	protected boolean loaded;
+	protected long sector;
+	protected LongList sectors = null;
 
 	public FsObjectImplFromFile(FsTableLocal master, long sectorId, FsDirectory parent){
 		this.master = master;

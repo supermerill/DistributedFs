@@ -9,6 +9,8 @@ import java.util.Arrays;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.shorts.ShortArrayList;
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.db.UnreachableChunkException;
@@ -26,21 +28,21 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	protected boolean isValid; // false if data isn't available locally
 	protected long lastChange = 0;
 	protected long lastaccess = 0;
-	protected LongList serverIdPresent = new LongArrayList(2);
+	protected ShortList serverIdPresent = new ShortArrayList(2);
 
 //	protected boolean loaded = false;
 	protected File data; //don't load data on memory, just on-demand. => maybe that's the problem with wmp : too much latency?
 
 	public FsChunkFromFile(FsTableLocal master, long sectorId, FsFileFromFile parent, long id) {
 		super(master, sectorId, parent.getParent());
-		this.sector = sectorId;
+//		this.sector = sectorId;
 		this.parentFile = parent;
 		this.idx = -1;
 		this.lastChange = 0;
 		this.maxSize = 0; //maybe we should use factories (with interface for them)
 		this.currentSize = 0;
 		this.isValid = false;
-		this.loaded = false;
+//		this.loaded = false;
 		this.id = id;//master.getComputerId()<<48 | ( sectorId&0xFFFFFFFFFFFFL);
 	}
 
@@ -58,15 +60,13 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 
 		synchronized (this) {
 
-			try {
-				FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ);
+			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ)){
 				
 				System.out.println("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
 				ByteBuffer buff = toAppend.toByteBuffer();
 				buff.limit(buff.position()+size);
 //				buff.position(buff.position()); //already done in toByteBuffer()
 				dataChannel.read(buff, offset);
-				dataChannel.close();
 
 				toAppend.position(toAppend.position()+size);
 				System.out.println("pos after = "+toAppend.position());
@@ -89,8 +89,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 		ensureFileExist();
 		synchronized (this) {
 
-			try {
-				FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
+			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.WRITE)){
 				
 				ByteBuffer buff = toWrite.toByteBuffer();
 				buff.limit(toWrite.position()+size);
@@ -150,7 +149,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //				}
 //			}
 			if(isValid){
-				data=new File(master.getRootRep()+"/"+getId());
+				ensureDataPath();
 			}else{
 				//request it (via network)
 				System.out.println("REQUEST DATA FOR CHUNK "+getId());
@@ -189,7 +188,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 					//simplier version
 					ByteBuff buff = new ByteBuff(currentSize);
 					meWithData.read(buff, 0, buff.limit());
-					data=new File(master.getRootRep()+"/"+getId());
+					ensureDataPath();
 					this.write(buff, 0, buff.limit());
 					
 				}
@@ -255,7 +254,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytesFilename);
 		
 		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
-		int canRead =  FsTableLocal.FS_SECTOR_SIZE/8 - (buffer.position()/8 + 1);
+		int canRead =  FsTableLocal.FS_SECTOR_SIZE - (buffer.position() + 8);
 		
 //		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
 		ByteBuffer currentBuffer = buffer;
@@ -263,10 +262,10 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 		Ref<Integer> sectorNum = new Ref<>(0);
 		//read serverlist
 		for(int i=0;i<nbServerId;i++){
-			serverIdPresent.add(currentBuffer.getLong());
-			canRead-=8;
+			serverIdPresent.add(currentBuffer.getShort());
+			canRead-=2;
 			if(canRead == 0){
-				canRead = goToNextAndLoad(currentBuffer, sectorNum);
+				canRead = goToNextAndLoad(currentBuffer, sectorNum)*8;
 			}
 		}
 		
@@ -277,7 +276,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //			nameBuffer.put(currentBuffer.get());
 //			canRead--;
 //			if(canRead == 0){
-//				canRead = goToNext(currentBuffer);
+//				canRead = goToNextAndLoad(currentBuffer)*8;
 //			}
 //		}
 //		nameBuffer.flip();
@@ -323,7 +322,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //		buffer.putInt(buffName.limit());
 
 		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
-		int canRead =  FsTableLocal.FS_SECTOR_SIZE/8 - (buffer.position()/8 + 1);
+		int canRead =  FsTableLocal.FS_SECTOR_SIZE - (buffer.position() + 8);
 //		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
 		
 		ByteBuffer currentBuffer = buffer;
@@ -331,10 +330,10 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 		Ref<Integer> sectorNum = new Ref<>(0);
 		//save serverlist
 		for(int i=0;i<serverIdPresent.size();i++){
-			currentBuffer.putLong(serverIdPresent.getLong(i));
-			canRead-=8;
+			currentBuffer.putShort(serverIdPresent.getShort(i));
+			canRead-=2;
 			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, sectorNum);
+				canRead = goToNextOrCreate(currentBuffer, sectorNum)*8;
 			}
 		}
 		//save name
@@ -342,7 +341,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //			currentBuffer.put(buffName.get(i));
 //			canRead--;
 //			if(canRead == 0){
-//				canRead = goToNextOrCreate(currentBuffer, currentSector);
+//				canRead = goToNextOrCreate(currentBuffer, currentSector)*8;
 //			}
 //		}
 
@@ -387,7 +386,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	}
 
 	@Override
-	public LongList serverIdPresent() {
+	public ShortList serverIdPresent() {
 		ensureLoaded();
 		return serverIdPresent;
 	}
@@ -442,7 +441,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 		}
 	}
 
-	private void ensureFileExist() {
+	protected void ensureFileExist() {
 		if(!data.exists()){
 			try {
 //				//we now store all on our root folder, no need to check if the dir exist

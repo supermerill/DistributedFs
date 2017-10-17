@@ -87,12 +87,33 @@ public class Parameters {
 	}
 	
 	public long getLongOrDef(String key, long def){
-		if(!data.containsKey(key)){
+		String obj = data.get(key);
+		if(obj == null){
 			data.put(key, ""+def);
 			save();
 			return def;
 		}
-		return Long.parseLong(data.get(key));
+		return Long.parseLong(obj);
+	}
+
+	public boolean getBoolOrDef(String key, boolean def) {
+		String obj = data.get(key);
+		if(obj == null){
+			data.put(key, ""+def);
+			save();
+			return def;
+		}
+		return Boolean.parseBoolean(obj);
+	}
+
+	public int getIntOrDef(String key, int def) {
+		String obj = data.get(key);
+		if(obj == null){
+			data.put(key, ""+def);
+			save();
+			return def;
+		}
+		return Integer.parseInt(obj);
 	}
 
 }

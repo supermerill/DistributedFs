@@ -53,7 +53,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		Ref<Integer> sectorNum = new Ref<>(0);
 		//read AllChunks
 		for(int i=0;i<nbAllChunks;i++){
-			allChunks.add(new FsChunkFromFile(master, currentBuffer.getLong(), this,i));
+			allChunks.add(master.factory.createChunk(master, currentBuffer.getLong(), this,i));
 			canRead-=2;
 			if(canRead == 0){
 				canRead = goToNextAndLoad(currentBuffer, sectorNum)*2;
@@ -193,7 +193,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 //			System.out.println("Create new id : "+master.getComputerId()+" => "+(((long)master.getComputerId())<<48)+", sector = "+newSectorId +" => "+(newSectorId&0xFFFFFFFFFFFFL)
 //					+" , so | ="+(((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL))+", + = "+((((long)master.getComputerId())<<48) + (newSectorId&0xFFFFFFFFFFFFL)));
 		}
-		FsChunkFromFile newChunk = new FsChunkFromFile(master, newSectorId, this, goodId);
+		FsChunkFromFile newChunk = master.factory.createChunk(master, newSectorId, this, goodId);
 		if(id<=0){
 			newChunk.lastChange = System.currentTimeMillis();
 			newChunk.isValid = true;

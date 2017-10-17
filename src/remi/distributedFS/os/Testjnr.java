@@ -1,18 +1,18 @@
 package remi.distributedFS.os;
 
+import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getDir;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
-import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import jnr.ffi.Platform;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
-import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.*;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectImpl;
@@ -74,7 +74,7 @@ public class Testjnr {
 		}
 
 		@Override
-		public LongList serverIdPresent() {
+		public ShortList serverIdPresent() {
 			// TODO Auto-generated method stub
 			return null;
 		}
@@ -456,7 +456,7 @@ public class Testjnr {
 			}
 
 			@Override
-			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
+			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
 				// TODO Auto-generated method stub
 				return null;
 			}

@@ -1,7 +1,6 @@
 package remi.distributedFS.fs;
 
-import java.util.List;
-
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObject;
@@ -30,7 +29,7 @@ public interface FileSystemManager {
 	public long getGroupId();
 	
 	public void requestDirUpdate();
-	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent);
+	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent);
 	
 	
 	

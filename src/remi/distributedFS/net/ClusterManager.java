@@ -21,7 +21,14 @@ public interface ClusterManager {
 	 * @return number of peer conteacted (do not assumed they will all answer)
 	 */
 	public int writeBroadcastMessage(byte sendFileDescr, ByteBuff message);
-	public void writeMessage(long senderId, byte sendDir, ByteBuff messageRet);
+	/**
+	 * 
+	 * @param senderId
+	 * @param sendDir
+	 * @param messageRet
+	 * @return true if the message should be emitted (no guaranty)
+	 */
+	public boolean writeMessage(long senderId, byte sendDir, ByteBuff messageRet);
 	public void registerListener(byte getDir, AbstractMessageManager propagateChange);
 	public void init(int listenPort);
 	
@@ -31,5 +38,6 @@ public interface ClusterManager {
 	public void launchUpdater();
 	public void initializeNewCluster();
 	public short getComputerId(long senderId); //get a computerId from a peerId (senderId)
+	public long getSenderId(short compId); //get a peerId (senderId) from a computerId
 
 }

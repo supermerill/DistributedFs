@@ -39,7 +39,7 @@ public class FsTableLocal implements StorageManager{
 	
 	FsDirectory root;
 
-	static final int FS_SECTOR_SIZE = 512; // bytes, at least 384 to have enough place to allocate other sector in a linked chain way
+	public static final int FS_SECTOR_SIZE = 512; // bytes, at least 384 to have enough place to allocate other sector in a linked chain way
 	ByteBuffer buffer;
 	
 	FileChannel fsFile;
@@ -48,6 +48,8 @@ public class FsTableLocal implements StorageManager{
 	
 	long fileSize = 0;
 	private String rootRep;
+
+	public ObjectFactory factory;
 	
 	//TODO: create a separate thread for flushing/updating
 
@@ -56,34 +58,52 @@ public class FsTableLocal implements StorageManager{
 	Long2ObjectMap<FsChunk> chunkId2LoadedObj = new Long2ObjectOpenHashMap<>();
 	
 	
-	public FsTableLocal(String rootRep, String filename, FileSystemManager manager, boolean cleanIt) throws IOException{
-		this.manager = manager;
-		this.rootRep = rootRep;
-		//check root rep 
-		File rootF = new File(rootRep);
-		if(!rootF.exists()){
-			rootF.mkdirs();
+	public static class FsTableLocalFactory{
+		public String rootRep = ".";
+		public String filename = "./fstab.data";
+		public FileSystemManager manager;
+		public ObjectFactory factory = new ObjectFactory.StandardFactory();
+		
+		public FsTableLocal create(){
+			try{
+				FsTableLocal obj = new FsTableLocal();
+				obj.manager = manager;
+				obj.rootRep = rootRep;
+				obj.factory = factory;
+				
+				//check root rep 
+				File rootF = new File(rootRep);
+				if(!rootF.exists()){
+					rootF.mkdirs();
+				}
+				
+				
+				obj.buffer = ByteBuffer.allocate(FS_SECTOR_SIZE);
+				
+				File fic = new File(filename);
+				if(!fic.exists()) fic.createNewFile();
+				obj.fsFile = FileChannel.open(fic.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
+				//read root
+				obj.root = obj.readOrCreateRoot(0);
+				//get each unused position inside
+				obj.fileSize = obj.fsFile.size();
+				
+				
+				//load all content from fs
+				//it's a stub, this content should be stored in a 'small' separate file.
+				//			getRoot().accept(new Visu());
+				obj.getRoot().accept(obj.new Loader());
+				return obj;
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
 		}
 		
+	}
+	
+	
+	protected FsTableLocal(){
 		
-		 buffer = ByteBuffer.allocate(FS_SECTOR_SIZE);
-		
-		 File fic = new File(filename);
-		 if(!fic.exists()) fic.createNewFile();
-		fsFile = FileChannel.open(fic.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
-		//read root
-		root = readOrCreateRoot(0);
-		//get each unused position inside
-		fileSize = fsFile.size();
-		
-
-		//load all content from fs
-		//it's a stub, this content should be stored in a 'small' separate file.
-//		getRoot().accept(new Visu());
-		getRoot().accept(new Loader());
-		if(cleanIt){
-			cleanUnusedSectors(true);
-		}
 	}
 	class Visu implements FsObjectVisitor{
 		
