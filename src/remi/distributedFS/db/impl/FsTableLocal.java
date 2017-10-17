@@ -7,10 +7,13 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import remi.distributedFS.datastruct.FsChunk;
@@ -145,7 +148,7 @@ public class FsTableLocal implements StorageManager{
 			}
 			for(FsFile fic : dirParent.getFiles()){
 				try{
-					System.out.print(pref+"(F) "+((FsObjectImplFromFile)fic).getSectorsUsed()); System.out.println(" :"+fic.getName());
+					System.out.print(pref+"(F) "+((FsObjectImplFromFile)fic).getSectorsUsed()); System.out.print(" :"+fic.getName());
 					visit(fic);
 				}catch(WrongSectorTypeException ex){
 					ex.printStackTrace();
@@ -166,12 +169,16 @@ public class FsTableLocal implements StorageManager{
 		@Override
 		public void visit(FsFile fic) {
 			try{
+				LongList sectUsed = new LongArrayList();
 				fic.getName(); // important, to trigger a load
 //				System.out.println(fic.getPath()+" (F) " + fic.getId());
 				objectId2LoadedObj.put(fic.getId(), fic);
 				for(FsChunk ch : fic.getAllChunks()){
 					visit(ch);
+					sectUsed.addAll(((FsChunkFromFile)ch).getSectorsUsed());
 				}
+				Collections.sort(sectUsed);
+				System.out.println(" (chunks : "+sectUsed+" )");
 			}catch(WrongSectorTypeException ex){
 				ex.printStackTrace();
 				//recover : del this

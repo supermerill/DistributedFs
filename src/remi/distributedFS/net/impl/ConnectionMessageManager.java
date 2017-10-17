@@ -38,7 +38,10 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 			clusterMananger.getServerIdDb().receivePublicKey(clusterMananger.getPeer(senderId), message);
 		}
 		if(messageId == GET_SERVER_LIST){
-			sendServerList(senderId, this.clusterMananger.getServerIdDb().getRegisteredPeers());
+			System.out.println(clusterMananger.getId()%100+"he ( "+senderId%100+" ) want my server list");
+			synchronized (this.clusterMananger.getServerIdDb().getRegisteredPeers()) {
+				sendServerList(senderId, this.clusterMananger.getServerIdDb().getRegisteredPeers());
+			}
 		}
 		if(messageId == SEND_LISTEN_PORT){
 			Peer p = clusterMananger.getPeer(senderId);

@@ -105,6 +105,7 @@ public class Cleaner extends Thread{
 			}
 		}
 		System.out.println("Chunks space used : "+((chunkSpace/(1000*1000*1000))%1000)+"go "+((chunkSpace/(1000*1000))%1000)+"mo "+((chunkSpace/1000)%1000)+"ko "+chunkSpace%1000+"o");
+		System.out.println("idealSize         : "+((idealSize/(1000*1000*1000))%1000)+"go "+((idealSize/(1000*1000))%1000)+"mo "+((idealSize/1000)%1000)+"ko "+idealSize%1000+"o");
 		
 		//do we need to deleted some things?
 		if(chunkSpace > idealSize || fsSpace + chunkSpace > maxSize){

@@ -23,6 +23,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -214,20 +215,22 @@ public class ServerIdDb {
 			
 			
 			//write peers
-			int nbPeers = registeredPeers.size();
-			bufferReac.reset().putInt(nbPeers).flip().write(out);
-			for(int i=0;i<nbPeers;i++){
-				Peer p = registeredPeers.get(i);
-				//save ip
-				bufferReac.reset().putInt(0).putUTF8(p.getIP()).flip();
-				bufferReac.putInt(bufferReac.limit()-4).rewind().write(out);	
-				//save port
-				bufferReac.reset().putInt(p.getPort()).flip().write(out);
-				//save id
-				bufferReac.reset().putShort(p.getComputerId()).flip().write(out);
-				//savePubKey
-				encodedPubKey = id2PublicKey.get(p.getComputerId()).getEncoded();
-				bufferReac.reset().putInt(encodedPubKey.length).put(encodedPubKey).flip().write(out);
+			synchronized (registeredPeers) {
+				int nbPeers = registeredPeers.size();
+				bufferReac.reset().putInt(nbPeers).flip().write(out);
+				for(int i=0;i<nbPeers;i++){
+					Peer p = registeredPeers.get(i);
+					//save ip
+					bufferReac.reset().putInt(0).putUTF8(p.getIP()).flip();
+					bufferReac.putInt(bufferReac.limit()-4).rewind().write(out);	
+					//save port
+					bufferReac.reset().putInt(p.getPort()).flip().write(out);
+					//save id
+					bufferReac.reset().putShort(p.getComputerId()).flip().write(out);
+					//savePubKey
+					encodedPubKey = id2PublicKey.get(p.getComputerId()).getEncoded();
+					bufferReac.reset().putInt(encodedPubKey.length).put(encodedPubKey).flip().write(out);
+				}
 			}
 			
 			
@@ -240,30 +243,30 @@ public class ServerIdDb {
 		String msg = emittedMsg.get(peer);
 		if(msg==null || force){
 			if(msg == null) msg = Long.toHexString(new Random().nextLong());
-			System.out.println(serv.getId()%100+" emit GET_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100+" with message "+msg);
+			System.out.println(serv.getId()%100+" (requestPublicKey) emit GET_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100+" with message "+msg);
 			emittedMsg.put(peer, msg);
 			serv.writeMessage(peer, AbstractMessageManager.GET_SERVER_PUBLIC_KEY, new ByteBuff().putUTF8(msg).flip());
 			//todo: encrypt it with our public key.
 		}else{
-			System.out.println("We already emit a GET_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100+" with message "+emittedMsg.get(peer));
+			System.out.println(" (requestPublicKey) We already emit a GET_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100+" with message "+emittedMsg.get(peer));
 		}
 	}
 
 	//send our public key to the peer, with the message encoded
 	public void sendPublicKey(Peer peer, String messageToEncrypt) {
-		System.out.println(serv.getId()%100+" emit SEND_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100+", with message 2encrypt : "+messageToEncrypt);
+		System.out.println(serv.getId()%100+" (sendPublicKey) emit SEND_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100+", with message 2encrypt : "+messageToEncrypt);
 		//check if we have the public key of this peer
 		if(peer.getComputerId()<0 
 				|| !this.id2PublicKey.containsKey(peer.getComputerId())
 				|| this.id2PublicKey.get(peer.getComputerId()) == null){
 			//request his key
-			System.out.println(serv.getId()%100+" and request his one ");
+			System.out.println(serv.getId()%100+" (sendPublicKey) and request his one ");
 			requestPublicKey(peer, false);
 		}
 		
 		//don't emit myId if it's -1
 		if(myId<0){
-			System.out.println(serv.getId()%100+" but i have on id!! ");
+			System.out.println(serv.getId()%100+" (sendPublicKey) but i have on id!! ");
 			ByteBuff buff = new ByteBuff();
 			buff.putShort((short) -1);
 			//send packet
@@ -284,11 +287,11 @@ public class ServerIdDb {
 			cipher.init(Cipher.ENCRYPT_MODE, privateKey);
 			ByteBuff buffEncoded = blockCipher(new ByteBuff().putUTF8(messageToEncrypt).flip().toArray(), Cipher.ENCRYPT_MODE, cipher);
 			buff.putInt(buffEncoded.limit()).put(buffEncoded);
-			System.out.println(serv.getId()%100+" message : "+messageToEncrypt);
-			System.out.println(serv.getId()%100+"Encryptmessage : "+Arrays.toString(buffEncoded.rewind().array()));
+			System.out.println(serv.getId()%100+" (sendPublicKey) message : "+messageToEncrypt);
+			System.out.println(serv.getId()%100+" (sendPublicKey) Encryptmessage : "+Arrays.toString(buffEncoded.rewind().array()));
 			cipher.init(Cipher.DECRYPT_MODE, publicKey);
 			ByteBuff buffDecoded = blockCipher(buffEncoded.array(), Cipher.DECRYPT_MODE, cipher);
-			System.out.println(serv.getId()%100+"DecryptMessage : "+buffDecoded.getUTF8());
+			System.out.println(serv.getId()%100+" (sendPublicKey) DecryptMessage : "+buffDecoded.getUTF8());
 			
 			//send packet
 			serv.writeMessage(peer, AbstractMessageManager.SEND_SERVER_PUBLIC_KEY, buff.flip());
@@ -299,18 +302,18 @@ public class ServerIdDb {
 	}
 
 	public void receivePublicKey(Peer p, ByteBuff buffIn) {
-		System.out.println(serv.getId()%100+" receive SEND_SERVER_PUBLIC_KEY to "+p.getConnectionId()%100);
+		System.out.println(serv.getId()%100+" (receivePublicKey) receive SEND_SERVER_PUBLIC_KEY to "+p.getConnectionId()%100);
 		try{
 		
 			//get id
 			short distId = buffIn.getShort();
 			if(distId <0 || !emittedMsg.containsKey(p)){
-				System.out.println(serv.getId()%100+" BAD receive computerid "+distId+" and i "+emittedMsg.containsKey(p)+" emmitted a message");
+				System.out.println(serv.getId()%100+" (receivePublicKey) BAD receive computerid "+distId+" and i "+emittedMsg.containsKey(p)+" emmitted a message");
 				//the other peer doesn't have an computerid (yet)
 				emittedMsg.remove(p);
 				return;
 			}else{
-				System.out.println(serv.getId()%100+" GOOD receive computerid "+distId+" and i "+emittedMsg.containsKey(p)+" emmitted a message");
+				System.out.println(serv.getId()%100+" (receivePublicKey) GOOD receive computerid "+distId+" and i "+emittedMsg.containsKey(p)+" emmitted a message");
 			}
 			//get pub Key
 			int nbBytes = buffIn.getInt();
@@ -328,23 +331,34 @@ public class ServerIdDb {
 			ByteBuff buffDecoded = blockCipher(dataIn, Cipher.DECRYPT_MODE, cipher);
 			String msgDecoded = buffDecoded.getUTF8();
 
-			System.out.println(serv.getId()%100+" i have sent to "+p.getConnectionId()%100+" the message "+emittedMsg.get(p)+" to encode. i have received "+msgDecoded +" !!!");
+			System.out.println(serv.getId()%100+" (receivePublicKey) i have sent to "+p.getConnectionId()%100+" the message "+emittedMsg.get(p)+" to encode. i have received "+msgDecoded +" !!!");
 			
 			//check if this message is inside our peer
 			if(emittedMsg.get(p).equals(msgDecoded)){
 				//now check if this id isn't already taken.
 				boolean alreadyTaken = false;
-				for(Peer storedP : this.registeredPeers){
-					if(storedP.getComputerId() == distId){
-						System.err.println("error, cluster id "+distId+" already taken for "+p.getConnectionId()%100+" ");
-						alreadyTaken = true;
-						break;
+				synchronized (this.registeredPeers) {
+					Iterator<Peer> it = registeredPeers.iterator();
+					while(it.hasNext()){
+						Peer storedP = it.next();
+						if(storedP.getComputerId() == distId){
+							if(!storedP.isAlive()){
+								it.remove();
+								storedP.close();
+								System.out.println("Seems like computer "+distId+" has reconnected!");
+							}else{
+								System.err.println("error, cluster id "+distId+" already taken for "+p.getConnectionId()%100+" ");
+								alreadyTaken = true;
+								//TODO: emit something to let it know we don't like his clusterId
+								break;
+							}
+						}
 					}
 				}
 				if(!alreadyTaken){
 					//check if the public key is the same
 					if(!this.id2PublicKey.containsKey(distId) || this.id2PublicKey.get(distId) == null){
-						System.out.println(serv.getId()%100+" assign new publickey  for computerid "+distId+" , connId="+p.getConnectionId()%100);
+						System.out.println(serv.getId()%100+" (receivePublicKey) assign new publickey  for computerid "+distId+" , connId="+p.getConnectionId()%100);
 						//validate this peer
 						this.id2PublicKey.put(distId, distPublicKey);
 						this.registeredPeers.add(p);
@@ -353,11 +367,11 @@ public class ServerIdDb {
 						requestSave();
 					}else{
 						if(!Arrays.equals(this.id2PublicKey.get(distId).getEncoded(), distPublicKey.getEncoded())){
-							System.err.println(serv.getId()%100+" error, cluster id "+distId+"has a wrong public key (not the one i registered) "+p.getConnectionId()%100+" ");
-							System.err.println(serv.getId()%100+" what i have : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
-							System.err.println(serv.getId()%100+" what i received : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
+							System.err.println(serv.getId()%100+" (receivePublicKey) error, cluster id "+distId+"has a wrong public key (not the one i registered) "+p.getConnectionId()%100+" ");
+							System.err.println(serv.getId()%100+" (receivePublicKey) what i have : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
+							System.err.println(serv.getId()%100+" (receivePublicKey) what i received : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
 						}else{
-							System.out.println(serv.getId()%100+" publickey ok for computerid "+distId);
+							System.out.println(serv.getId()%100+" (receivePublicKey) publickey ok for computerid "+distId);
 							p.setComputerId(distId);
 							if(!registeredPeers.contains(p)) this.registeredPeers.add(p);
 						}
@@ -365,7 +379,7 @@ public class ServerIdDb {
 					
 				}
 			}else{
-				System.err.println("Errror: message '"+emittedMsg.get(p)+"' emmited to "+p.getConnectionId()%100+" is different than "+msgDecoded+" received!");
+				System.err.println("Errror: (receivePublicKey) message '"+emittedMsg.get(p)+"' emmited to "+p.getConnectionId()%100+" is different than "+msgDecoded+" received!");
 			}
 
 		} catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeySpecException e1) {

@@ -1,9 +1,7 @@
 package remi.distributedFS.db.impl;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -188,20 +186,22 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 	public FsChunk createNewChunk(long id) {
 		System.out.println("Create new chunk from id : "+id);
 		long newSectorId = master.requestNewSector();
-		FsChunkFromFile newChunk = new FsChunkFromFile(master, newSectorId, this, -1);
-		newChunk.id = id;
-		newChunk.loaded = true;
+		long goodId = id;
 		if(id<=0){
 //			newChunk.id = ((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL);
-			newChunk.id = ((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL); //assume only 2^48 sector will be ever needed
+			goodId = (((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL)); //assume only 2^48 sector will be ever needed
 //			System.out.println("Create new id : "+master.getComputerId()+" => "+(((long)master.getComputerId())<<48)+", sector = "+newSectorId +" => "+(newSectorId&0xFFFFFFFFFFFFL)
 //					+" , so | ="+(((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL))+", + = "+((((long)master.getComputerId())<<48) + (newSectorId&0xFFFFFFFFFFFFL)));
+		}
+		FsChunkFromFile newChunk = new FsChunkFromFile(master, newSectorId, this, goodId);
+		if(id<=0){
 			newChunk.lastChange = System.currentTimeMillis();
 			newChunk.isValid = true;
 		}
+		newChunk.loaded = true;
 		allChunks.add(newChunk);
 		setDirty(true);
-		System.out.println("Create new chunk : sector="+newSectorId+", id = "+newChunk.id);
+		System.out.println("Create new chunk : sector="+newSectorId+", id = "+newChunk.getId());
 //		new Exception().printStackTrace();
 		return newChunk;
 	}

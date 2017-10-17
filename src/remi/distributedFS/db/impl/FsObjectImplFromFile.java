@@ -35,9 +35,8 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 //		}
 	}
 
-	//only for root folder
+	//only for root folder (or chunk)
 	protected FsObjectImplFromFile(FsTableLocal master, long sectorId){
-		System.out.println("ROOT created");
 		this.master = master;
 		loaded = false;
 		id = -1;
@@ -244,6 +243,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		}
 	}
 	
+	//TODO: maybe use the sectors field, now?
 	public LongList getSectorsUsed(){
 		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
 		long lastSec = getSector();

@@ -13,6 +13,7 @@ import java.net.Socket;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
@@ -165,7 +166,7 @@ public class PhysicalServer implements ClusterManager {
 						}
 					}
 					if (otherPeer == null) {
-						System.err.println(getId() % 100 + " 'error' accept connection to "
+						System.err.println(getId() % 100 + " 'new' accept connection to "
 								+ peer.getKey().getOtherServerId() % 100);
 						// peers.put(peer.getKey(), peer);
 						if (!peers.contains(peer)) {
@@ -174,11 +175,13 @@ public class PhysicalServer implements ClusterManager {
 							// new peer: propagate!
 							peers.add(peer);
 							for (Peer oldPeer : peers) {
-								System.err.println(
-										getId() % 100 + " 'warn' PROPAGATE to " + oldPeer.getConnectionId() % 100);
-								// MyServerList.get().write(peers, oldPeer);
-								messageManager.sendServerList(oldPeer.getConnectionId(), peers);
-								oldPeer.flush();
+								if(oldPeer.isAlive()){
+									System.err.println(
+											getId() % 100 + " 'warn' PROPAGATE to " + oldPeer.getConnectionId() % 100);
+									// MyServerList.get().write(peers, oldPeer);
+									messageManager.sendServerList(oldPeer.getConnectionId(), peers);
+									oldPeer.flush();
+								}
 							}
 						} else {
 							peers.add(peer);
@@ -454,8 +457,11 @@ public class PhysicalServer implements ClusterManager {
 		synchronized (this.clusterIdMananger.getRegisteredPeers()) {
 			for (Peer peer : this.clusterIdMananger.getRegisteredPeers()) {
 				if(peer != null && peer.isAlive()){
+					System.out.println("write msg "+messageId+" to "+peer.getKey().getOtherServerId()%100);
 					writeMessage(peer, messageId, message);
 					nbEmit ++;
+				}else{
+					System.out.println("peer "+peer.getKey().getOtherServerId()%100+" is not alive, can't send msg");
 				}
 			}
 		}
@@ -582,7 +588,16 @@ public class PhysicalServer implements ClusterManager {
 			} else {
 				// yes
 				// there are a conflict?
-				if (getServerIdDb().id2PublicKey.containsKey(getServerIdDb().myId)/* && !getServerIdDb().id2PublicKey.get(getServerIdDb().myId).equals(getServerIdDb().publicKey)*/) {
+				if (getServerIdDb().id2PublicKey.get(getServerIdDb().myId) != null /* && !getServerIdDb().id2PublicKey.get(getServerIdDb().myId).equals(getServerIdDb().publicKey)*/) {
+					try{
+						System.out.println("id is already there, with my id : "+getServerIdDb().myId);
+						System.out.println(", my pub key : "+getServerIdDb().publicKey);
+						System.out.println(",  their: "+getServerIdDb().id2PublicKey.get(getServerIdDb().myId));
+						System.out.println(", my pub key : "+Arrays.toString(getServerIdDb().publicKey.getEncoded()));
+						System.out.println(",  their: "+Arrays.toString(getServerIdDb().id2PublicKey.get(getServerIdDb().myId).getEncoded()));
+					}catch(Exception e){
+						e.printStackTrace();
+					}
 					// yes
 					// i choose my id recently?
 					if (System.currentTimeMillis() - getServerIdDb().timeChooseId < 10000) {
@@ -600,6 +615,7 @@ public class PhysicalServer implements ClusterManager {
 				} else {
 					// no
 					// nothing todo do ! everything is ok!!
+					System.out.println("ClusterId : everything ok, nothing to do");
 				}
 
 			}

@@ -261,15 +261,33 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 					}
 					System.out.println("check msgs for chunks : CANNOT FIND MY ONE :'(");
 				}
-			}
-			if(retVal == null){
-				if(nbreceived==nbReqEmitted ){
-					System.err.println("Warn : can't find chunk "+idChunk+" in the net");
-					throw new NotFindedException("Warn : can't find chunk "+idChunk+" in the network");
-				}else if(timeToStop>=System.currentTimeMillis()){
-					System.err.println("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout ("+System.currentTimeMillis()+" > "+timeToStop);
-					throw new TimeoutException("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout");
+
+				if(retVal == null){
+					if(nbreceived==nbReqEmitted ){
+						//clean
+						Iterator<Request> it = requests.iterator();
+						while(it.hasNext()){
+							Request req = it.next();
+							if(idChunk == req.chunkId){
+								it.remove();
+							}
+						}
+						System.err.println("Warn : can't find chunk "+idChunk+" in the net ("+nbreceived+"/"+nbReqEmitted+")");
+						throw new NotFindedException("Warn : can't find chunk "+idChunk+" in the network");
+					}else if(timeToStop<System.currentTimeMillis()){
+						//clean
+						Iterator<Request> it = requests.iterator();
+						while(it.hasNext()){
+							Request req = it.next();
+							if(idChunk == req.chunkId){
+								it.remove();
+							}
+						}
+						System.err.println("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout ("+System.currentTimeMillis()+" > "+timeToStop);
+						throw new TimeoutException("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout");
+					}
 				}
+				System.out.println("relance : "+nbreceived+" < "+nbReqEmitted+" && timeok?"+(timeToStop > System.currentTimeMillis()));
 			}
 			System.out.println("check msgs for chunks : return: "+retVal);
 			return retVal;

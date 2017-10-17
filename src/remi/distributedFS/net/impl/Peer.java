@@ -23,7 +23,6 @@ import remi.distributedFS.util.ByteBuff;
  */
 public class Peer implements Runnable {
 
-	private short distComputerId = -1; //unique id for the computer, private-public key protected.
 	public static class PeerKey {
 		private long otherServerId = 0; //use for leader election, connection establishment
 		private final InetAddress address;
@@ -91,6 +90,7 @@ public class Peer implements Runnable {
 
 	// private Socket connexion;
 	// private InetSocketAddress address;
+	private short distComputerId = -1; //unique id for the computer, private-public key protected.
 	private PeerKey myKey;
 	private Socket sock;
 	private InputStream streamIn;
@@ -113,6 +113,7 @@ public class Peer implements Runnable {
 	// myKey.port = inetSocketAddress.getPort();
 	// // address = inetSocketAddress;
 	// }
+	private static final ByteBuff nullmsg = new ByteBuff();
 
 	public Peer(PhysicalServer physicalServer, InetAddress inetAddress, int port) {
 		myServer = physicalServer;
@@ -122,21 +123,24 @@ public class Peer implements Runnable {
 
 	// write only
 	public void ping() {
+		System.out.println("peer "+this.myKey.otherServerId+" compId:"+this.distComputerId+" : is alive? "+this.alive.get());
 		if (!alive.get())
 			return;
 		try {
+			
 			if (myKey.port <= 0) {
-				myServer.writeMessage(this, AbstractMessageManager.GET_LISTEN_PORT, null);
+				myServer.writeMessage(this, AbstractMessageManager.GET_LISTEN_PORT, nullmsg);
 				// GetListenPort.get().write(getOut(), this);
 				// getOut().flush();
 			}
 			if (myKey.otherServerId == 0) {
-				myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_ID, null);
+				myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_ID, nullmsg);
 				// GetServerId.get().write(getOut(), this);
 				// getOut().flush();
 			}
 
 			// get the server list of the other one every 10-15 min.
+			myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_LIST, nullmsg);
 			if (nextTimeSearchMoreServers < System.currentTimeMillis()) {
 				if (nextTimeSearchMoreServers == 0) {
 					nextTimeSearchMoreServers = System.currentTimeMillis() + 1000;
@@ -144,7 +148,7 @@ public class Peer implements Runnable {
 					nextTimeSearchMoreServers = System.currentTimeMillis()
 							+ 1000 * 60 * (10 + new Random().nextInt(10)); // +10-19min
 					// }
-					myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_LIST, null);
+					myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_LIST, nullmsg);
 					// GetServerList.get().write(getOut(), this);
 					// getOut().flush();
 				}
@@ -342,7 +346,7 @@ public class Peer implements Runnable {
 			out.write(messageId);
 			// System.out.println("WRITE 5 5 "+myId.id);
 			ByteBuff buffInt = new ByteBuff();
-			if (message != null) {
+			if (message != null && message.limit()-message.position()>0) {
 				buffInt.putInt(message.limit() - message.position())
 						.putInt(message.limit() - message.position())
 						.flip();
@@ -352,7 +356,7 @@ public class Peer implements Runnable {
 						.flip();
 			}
 			out.write(buffInt.array(), 0, 8);
-			if (message != null) {
+			if (message != null && message.limit()-message.position()>0) {
 				out.write(message.array(),  message.position(), message.limit() - message.position());
 			}
 			out.flush();

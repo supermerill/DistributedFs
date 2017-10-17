@@ -116,7 +116,7 @@ public interface FsFile extends FsObject {
 					chunk.read(buff, 0, chunk.currentSize());
 				}
 				System.out.println("now pos = "+buff.position()+" /"+buff.array().length);
-				System.out.println("sample = "+Arrays.toString(Arrays.copyOfRange(buff.array(), buff.position()-10,  buff.position())));
+				System.out.println("sample = "+Arrays.toString(Arrays.copyOfRange(buff.array(), Math.max(0, buff.position()-10),  buff.position())));
 				chunkIdx++;
 			}
 		}
