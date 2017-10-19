@@ -481,7 +481,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	@Override
 	public void delete(){
 		//delete file if present
-		if(data == null) data = new File(master.getRootRep()+"/"+getId());
+		ensureDataPath();
 		if(data.exists()) data.delete();
 		
 		//delete self

@@ -46,18 +46,19 @@ public abstract class AbstractMessageManager {
 		 */
 		public static final byte  GET_SERVER_PUBLIC_KEY = (byte) 7;
 		/**
-		 * Send his public key (and a message encrypted with the private key)
+		 * Send his public key (and a message encrypted with the private key).<br>
+		 * // also, the public key is a way to get the real server id (for file permission) when it's verified to work (with a rsa exchange)
 		 */
 		public static final byte  SEND_SERVER_PUBLIC_KEY = (byte) 8;
 		/**
-		 * request a SEND_SERVER_RSA_KEY
+		 * request a AES
 		 */
-//		public static final byte  GET_SERVER_RSA_KEY = (byte) 9;
+		public static final byte  GET_SERVER_AES_KEY = (byte) 9;
 		/**
-		 * 'Server A' send an rsa key, encrypted with 'Server A' private key then 'Server B' public key
+		 * emit our AES (encrypted with our private & his public key)
 		 */
-//		public static final byte  SEND_SERVER_RSA_KEY = (byte) 10;
-		// also, the public key is a way to get the real server id (for file permission) when it's verified to work (with a rsa exchange)
+		public static final byte  SEND_SERVER_AES_KEY = (byte) 10;
+		
 
 	
 	public abstract void receiveMessage(long senderId, byte messageId, ByteBuff message);

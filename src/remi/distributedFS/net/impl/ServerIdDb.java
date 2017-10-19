@@ -31,7 +31,9 @@ import java.util.Random;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.util.ByteBuff;
@@ -44,6 +46,7 @@ public class ServerIdDb {
 	List<Peer> receivedServerList;
 	List<Peer> registeredPeers;
 	Map<Short, PublicKey> id2PublicKey;
+	Map<Short, SecretKey> id2AesKey;
 	private PhysicalServer serv;
 	
 	short myId = -1;
@@ -461,6 +464,88 @@ public class ServerIdDb {
 			}
 		}
 		return false;
+	}
+
+	public void sendAesKey(Peer peer) {
+		System.out.println(serv.getId()%100+" (sendAesKey) emit SEND_SERVER_AES_KEY to "+peer.getConnectionId()%100);
+		
+		//check if i'm able to do this
+		if(peer.getComputerId()>=0 && isChoosen(peer.getComputerId())){
+
+
+			try{
+				SecretKey secretKey = null;
+				synchronized (id2AesKey) {
+					secretKey = id2AesKey.get(peer.getComputerId());
+					if(secretKey == null){
+						//create new aes key
+						KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+						keyGen.init(128);
+						secretKey = keyGen.generateKey();
+//						byte[] aesKey = new byte[128 / 8];	// aes-128 (can be 192/256)
+//						SecureRandom prng = new SecureRandom();
+//						prng.nextBytes(aesKey);
+						id2AesKey.put(peer.getComputerId(), secretKey);
+					}
+				}
+				
+				//encrypt the key
+				ByteBuff buffMsg = new ByteBuff();
+				
+				//encode msg with private key
+				Cipher cipherPri = Cipher.getInstance("RSA");
+				cipherPri.init(Cipher.ENCRYPT_MODE, privateKey);
+				ByteBuff buffEncodedPriv = blockCipher(secretKey.getEncoded(), Cipher.ENCRYPT_MODE, cipherPri);
+				System.out.println(serv.getId()%100+" (sendPublicKey) key : "+Arrays.toString(secretKey.getEncoded()));
+				System.out.println(serv.getId()%100+" (sendPublicKey) Encryptmessage : "+Arrays.toString(buffEncodedPriv.array()));
+				
+				//encode again with their public key
+				//encode msg with private key
+				Cipher cipherPub = Cipher.getInstance("RSA");
+				cipherPub.init(Cipher.ENCRYPT_MODE, id2PublicKey.get(peer.getComputerId()));
+				ByteBuff buffEncodedPrivPub = blockCipher(buffEncodedPriv.toArray(), Cipher.ENCRYPT_MODE, cipherPub);
+				buffMsg.putInt(buffEncodedPrivPub.limit()).put(buffEncodedPrivPub);
+				System.out.println(serv.getId()%100+" (sendPublicKey) Encryptmessage2 : "+Arrays.toString(buffEncodedPrivPub.array()));
+				
+				//send packet
+				serv.writeMessage(peer, AbstractMessageManager.SEND_SERVER_PUBLIC_KEY, buffMsg.flip());
+
+			} catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException | NoSuchAlgorithmException | NoSuchPaddingException e1) {
+				e1.printStackTrace();
+			}
+			
+		}else{
+			System.err.println("Error, peer "+peer.getKey().getOtherServerId()%100+" want an aes key but we don't have a rsa one yet!");
+		}
+	}
+
+	public void receiveAesKey(Peer peer, ByteBuff message) {
+		//check if i'm able to do this
+		if(peer.getComputerId()>=0 && isChoosen(peer.getComputerId())){
+			//decrypt the key
+			SecretKey sendedKey = null;
+			//TODO
+		
+			//check if we already have one
+			SecretKey secretKey = null;
+			synchronized (id2AesKey) {
+				secretKey = id2AesKey.get(peer.getComputerId());
+				if(secretKey == null){
+					//store the new one
+				}else if(Arrays.equals(secretKey.getEncoded(), sendedKey.getEncoded())){
+					//do nothing
+				}else{
+					//error, conflict.
+					//use one in random and send it if it's not the new one
+					//TODO
+				}
+			}
+			
+		
+
+		}else{
+			System.err.println("Error, peer "+peer.getKey().getOtherServerId()%100+" want an aes key but we don't have a rsa one yet!");
+		}
 	}
 
 	
