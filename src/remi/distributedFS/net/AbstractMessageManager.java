@@ -40,24 +40,31 @@ public abstract class AbstractMessageManager {
 		 */
 		public static final byte  SEND_LISTEN_PORT = (byte) 6;
 		
-		//TODO, for encrypted connection
 		/**
-		 * request a SEND_SERVER_PUBLIC_KEY (and a message to be encrypted)
+		 * request a SEND_SERVER_PUBLIC_KEY
 		 */
 		public static final byte  GET_SERVER_PUBLIC_KEY = (byte) 7;
 		/**
-		 * Send his public key (and a message encrypted with the private key).<br>
-		 * // also, the public key is a way to get the real server id (for file permission) when it's verified to work (with a rsa exchange)
+		 * Send his public key.<br>
 		 */
 		public static final byte  SEND_SERVER_PUBLIC_KEY = (byte) 8;
+		
+		/** TODO
+		 * send a public-private encrypted message to be encoded.
+		 */
+		public static final byte  GET_VERIFY_IDENTITY = (byte) 9;
+		/** TODO
+		 * Send back the message with a public-private encryption, to tell the other one i am really me.
+		 */
+		public static final byte  SEND_VERIFY_IDENTITY = (byte) 10;
 		/**
 		 * request a AES
 		 */
-		public static final byte  GET_SERVER_AES_KEY = (byte) 9;
+		public static final byte  GET_SERVER_AES_KEY = (byte) 11;
 		/**
 		 * emit our AES (encrypted with our private & his public key)
 		 */
-		public static final byte  SEND_SERVER_AES_KEY = (byte) 10;
+		public static final byte  SEND_SERVER_AES_KEY = (byte) 12;
 		
 
 	

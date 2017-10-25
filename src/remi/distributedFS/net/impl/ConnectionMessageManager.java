@@ -43,7 +43,7 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 			System.out.println(clusterMananger.getId()%100+" receive GET_SERVER_AES_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().sendAesKey(clusterMananger.getPeer(senderId));
 		}
-		if (messageId == AbstractMessageManager.SEND_SERVER_PUBLIC_KEY) {
+		if (messageId == AbstractMessageManager.SEND_SERVER_AES_KEY) {
 			System.out.println(clusterMananger.getId()%100+" receive SEND_SERVER_AES_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().receiveAesKey(clusterMananger.getPeer(senderId), message);
 		}

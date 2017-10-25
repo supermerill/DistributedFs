@@ -56,6 +56,7 @@ public class ByteBuff
 	
 	/**
 	 * Copy the buffIn buffer into this buffer.
+	 * After that, pos is at 0 and limit at buffIn.length.
 	 * 
 	 * @param buffIn
 	 *            buffer for intitialization
@@ -64,6 +65,7 @@ public class ByteBuff
 	{
 		this(buffIn.length);
 		this.put(buffIn);
+		this.rewind();
 	}
 	
 	/**
