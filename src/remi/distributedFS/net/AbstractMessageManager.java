@@ -49,11 +49,11 @@ public abstract class AbstractMessageManager {
 		 */
 		public static final byte  SEND_SERVER_PUBLIC_KEY = (byte) 8;
 		
-		/** TODO
+		/**
 		 * send a public-private encrypted message to be encoded.
 		 */
 		public static final byte  GET_VERIFY_IDENTITY = (byte) 9;
-		/** TODO
+		/**
 		 * Send back the message with a public-private encryption, to tell the other one i am really me.
 		 */
 		public static final byte  SEND_VERIFY_IDENTITY = (byte) 10;
