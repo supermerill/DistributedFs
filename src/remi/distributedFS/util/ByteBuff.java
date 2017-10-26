@@ -560,6 +560,10 @@ public class ByteBuff
 		return retVal;
 	}
 
+	/**
+	 * Clear it. pos and limit are now at 0.
+	 * @return
+	 */
 	public ByteBuff reset() {
 		limit = 0;
 		position = 0;

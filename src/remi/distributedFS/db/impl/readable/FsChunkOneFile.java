@@ -99,12 +99,7 @@ public class FsChunkOneFile extends FsChunkFromFile {
 				buff.limit(toWrite.position()+size);
 //				buff.position(toWrite.position()); //already done in toByteBuffer()
 				dataChannel.write(buff, offset+myOffset);
-				//sometimes it's not correct (if we re-use a file we didn't delete)
-//				currentSize = (int) dataChannel.size();
 				currentSize = Math.max(currentSize, offset+size);
-				if((int) dataChannel.size() != currentSize){
-					System.err.println("Error: the chunk "+idx+" of file "+parentFile.getPath()+" has a file size of "+currentSize+" and the read fileahs a size of "+dataChannel.size());
-				}
 
 				System.out.println("toWrite.position = "+toWrite.position()+"+"+size+"=="+(toWrite.position()+size));
 				toWrite.position(toWrite.position()+size);

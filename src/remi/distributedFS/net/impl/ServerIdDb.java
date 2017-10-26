@@ -247,7 +247,7 @@ public class ServerIdDb {
 	
 	public void requestPublicKey(Peer peer){
 		System.out.println(serv.getId()%100+" (requestPublicKey) emit GET_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100);
-		serv.writeMessage(peer, AbstractMessageManager.GET_SERVER_PUBLIC_KEY, new ByteBuff());
+		serv.writeMessage(peer, AbstractMessageManager.GET_SERVER_PUBLIC_KEY, null);
 	}
 
 	//send our public key to the peer
@@ -512,6 +512,29 @@ public class ServerIdDb {
 		}
 		
 	}
+	
+	public Cipher getSecretCipher(Peer p ,int mode){
+		try {
+			if( (mode == Cipher.ENCRYPT_MODE || mode == Cipher.DECRYPT_MODE)
+					&& p.hasState(PeerConnectionState.CONNECTED_W_AES)){
+				Cipher aesCipher = Cipher.getInstance("AES");
+				aesCipher.init(mode, this.id2AesKey.get(p.getComputerId()));
+				return aesCipher;
+			}
+
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
+			throw new RuntimeException(e);
+		}
+		return null;
+	}
+	
+//	public ByteBuff encodeSecret(ByteBuff message, Cipher cipherToReuse) throws IllegalBlockSizeException, BadPaddingException{
+//		return new ByteBuff(cipherToReuse.doFinal(message.array(), message.position(), message.limit()));
+//	}
+//	
+//	public ByteBuff decodeSecret(ByteBuff message, Cipher cipherToReuse) throws IllegalBlockSizeException, BadPaddingException{
+//		return new ByteBuff(cipherToReuse.doFinal(message.array(), message.position(), message.limit()));
+//	}
 
 	//using skeletton from http://coding.westreicher.org/?p=23 ( Florian Westreicher)
 	private ByteBuff blockCipher(byte[] bytes, int mode, Cipher cipher) throws IllegalBlockSizeException, BadPaddingException{
@@ -544,7 +567,7 @@ public class ServerIdDb {
 					 newlength = bytes.length - i;
 				}
 				// clean the buffer array
-				buffer = new byte[newlength];
+				if(buffer.length != newlength) buffer = new byte[newlength];
 			}
 			// copy byte into our buffer.
 			buffer[i%length] = bytes[i];

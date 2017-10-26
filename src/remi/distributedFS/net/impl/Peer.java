@@ -8,12 +8,14 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.security.PublicKey;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+
 import remi.distributedFS.net.AbstractMessageManager;
-import remi.distributedFS.net.impl.Peer.PeerConnectionState;
 import remi.distributedFS.util.ByteBuff;
 
 /**
@@ -137,6 +139,9 @@ public class Peer implements Runnable {
 	// // address = inetSocketAddress;
 	// }
 	private static final ByteBuff nullmsg = new ByteBuff();
+
+	Cipher encoder = null;
+	Cipher decoder = null;
 
 	public Peer(PhysicalServer physicalServer, InetAddress inetAddress, int port) {
 		myServer = physicalServer;
@@ -386,6 +391,25 @@ public class Peer implements Runnable {
 			System.err.println("Warn : emit null message, id :"+messageId);
 		}
 		try {
+			
+			//encode mesage
+			if(encoder==null) encoder = myServer.getServerIdDb().getSecretCipher(this, Cipher.ENCRYPT_MODE);
+			byte[] encodedMsg = null;
+			if(messageId > AbstractMessageManager.LAST_UNENCODED_MESSAGE){
+				if(hasState(PeerConnectionState.CONNECTED_W_AES)){
+					if(message!=null && message.limit()-message.position()>0){
+						encodedMsg = encoder.doFinal(message.array(), message.position(), message.limit());
+					}
+				}else{
+					System.err.println("Erro, ttry to send a "+messageId+" message when we don't have a aes key!");
+					return;
+				}
+			}else{
+				if(message!=null && message.limit()-message.position()>0){
+					encodedMsg = message.toArray();
+				}
+			}
+			
 			OutputStream out = this.getOut();
 			out.write(5);
 			out.write(5);
@@ -395,9 +419,9 @@ public class Peer implements Runnable {
 			out.write(messageId);
 			// System.out.println("WRITE 5 5 "+myId.id);
 			ByteBuff buffInt = new ByteBuff();
-			if (message != null && message.limit()-message.position()>0) {
-				buffInt.putInt(message.limit() - message.position())
-						.putInt(message.limit() - message.position())
+			if (encodedMsg != null) {
+				buffInt.putInt(encodedMsg.length)
+						.putInt(encodedMsg.length)
 						.flip();
 			} else {
 				buffInt.putInt(0)
@@ -405,15 +429,18 @@ public class Peer implements Runnable {
 						.flip();
 			}
 			out.write(buffInt.array(), 0, 8);
-			if (message != null && message.limit()-message.position()>0) {
-				out.write(message.array(),  message.position(), message.limit() - message.position());
+			if (encodedMsg != null) {
+				out.write(encodedMsg,  0, encodedMsg.length);
 			}
 			out.flush();
-			if(message != null && message.position() != 0){
+			if(encodedMsg != null && message.position() != 0){
 				System.err.println("Warn, you want to send a buffer which is not rewinded : " + message.position());
 			}
 			System.out.println("WRITE MESSAGE : "+messageId+" : "+(message==null?"null":(message.limit() - message.position())));
 		} catch (IOException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
@@ -475,6 +502,22 @@ public class Peer implements Runnable {
 						pos += streamIn.read(buffIn.array(), pos, nbBytes-pos);
 					}
 				}
+				//decode mesage
+				if(decoder==null) decoder = myServer.getServerIdDb().getSecretCipher(this, Cipher.DECRYPT_MODE);
+				byte[] decodedMsg = null;
+				if(newByte > AbstractMessageManager.LAST_UNENCODED_MESSAGE){
+					if(hasState(PeerConnectionState.CONNECTED_W_AES)){
+						if(buffIn!=null && nbBytes> 0 && buffIn.limit()-buffIn.position()>0){
+							decodedMsg = decoder.doFinal(buffIn.array(), buffIn.position(), buffIn.limit());
+							//put decoded message into the read buffer
+							buffIn.reset().put(decodedMsg).rewind();
+						}
+					}else{
+						System.err.println("Error, try to receive a "+newByte+" message when we don't have a aes key!");
+						return;
+					}
+				}//else : nothing to do, it's not encoded
+				//use message
 				if (newByte == AbstractMessageManager.GET_SERVER_ID) {
 					// special case, give the peer object directly.
 					myServer.message().sendServerId(this);
@@ -507,7 +550,7 @@ public class Peer implements Runnable {
 				// standard case, give the peer id. Our physical server should be able to retrieve us.
 				myServer.propagateMessage(getConnectionId(), (byte) newByte, buffIn);
 				
-			} catch (IOException e) {
+			} catch (IOException | IllegalBlockSizeException | BadPaddingException e) {
 				e.printStackTrace();
 				throw new RuntimeException(e);
 			}
