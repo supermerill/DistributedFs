@@ -379,24 +379,6 @@ public class Testjnr {
 		myFuseManager.manager = new FileSystemManager() {
 			
 			@Override
-			public void updateFile(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateDirectory(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateChunk(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
 			public FsDirectory getRoot() {
 				return root;
 			}

@@ -28,7 +28,7 @@ public interface ClusterManager {
 	 * @param messageRet
 	 * @return true if the message should be emitted (no guaranty)
 	 */
-	public boolean writeMessage(long senderId, byte sendDir, ByteBuff messageRet);
+	public boolean writeMessage(long peerId, byte messageType, ByteBuff message);
 	public void registerListener(byte getDir, AbstractMessageManager propagateChange);
 	public void init(int listenPort);
 	

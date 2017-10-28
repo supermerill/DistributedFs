@@ -94,7 +94,8 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 			}
 		}
 		for(int i=0;i<nbFile;i++){
-			files.add(new FsFileFromFile(master, currentBuffer.getLong(), this));
+//			files.add(new FsFileFromFile(master, currentBuffer.getLong(), this));
+			files.add(master.factory.createFile(master,  currentBuffer.getLong(), this));
 			canRead--;
 			if(canRead == 0){
 				canRead = goToNextAndLoad(currentBuffer, sectorNum);
@@ -253,7 +254,8 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	public FsFile createSubFile(String name) {
 		checkLoaded();
 		long newSectorId = master.requestNewSector();
-		FsFileFromFile newone = new FsFileFromFile(master, newSectorId, this);
+//		FsFileFromFile newone = new FsFileFromFile(master, newSectorId, this);
+		FsFileFromFile newone = master.factory.createFile(master, newSectorId, this);
 		newone.loaded = true;
 		newone.setName(name);
 		setObjectContent(newone);

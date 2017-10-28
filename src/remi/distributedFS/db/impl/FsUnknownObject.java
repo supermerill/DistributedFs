@@ -23,7 +23,8 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 		if(type == FsTableLocal.DIRECTORY){
 			me = new FsDirectoryFromFile(master, getSector(), parent);
 		}else if(type == FsTableLocal.FILE){
-			me = new FsFileFromFile(master, getSector(), parent);
+//			me = new FsFileFromFile(master, getSector(), parent);
+			me = master.factory.createFile(master, getSector(), (FsDirectoryFromFile) parent);
 		}else if(type == FsTableLocal.DELETED){
 			me = new FsDeletedObject(master, getSector(), parent);
 		}else{

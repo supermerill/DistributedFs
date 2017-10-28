@@ -9,11 +9,6 @@ import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.net.ClusterManager;
 
 public interface FileSystemManager {
-
-	//not used
-	public void updateDirectory(long dirId, byte[] datas); //TODO
-	public void updateFile(long dirId, byte[] datas); //TODO
-	public void updateChunk(long dirId, byte[] datas); //TODO
 	
 	//used by fs
 	FsDirectory getRoot();

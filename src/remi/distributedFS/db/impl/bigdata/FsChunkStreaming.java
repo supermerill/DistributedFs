@@ -1,4 +1,4 @@
-package remi.distributedFS.db.impl.readable;
+package remi.distributedFS.db.impl.bigdata;
 
 import java.io.File;
 import java.io.IOException;
@@ -6,11 +6,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
+import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.db.UnreachableChunkException;
 import remi.distributedFS.db.impl.FsChunkFromFile;
 import remi.distributedFS.db.impl.FsDirectoryFromFile;
@@ -19,24 +21,30 @@ import remi.distributedFS.db.impl.FsTableLocal;
 import remi.distributedFS.db.impl.ObjectFactory;
 import remi.distributedFS.util.ByteBuff;
 
-public class FsChunkOneFile extends FsChunkFromFile {
+public class FsChunkStreaming extends FsChunkFromFile implements FsChunkStreamable {
 
 	public static class StorageFactory implements ObjectFactory{
 
 		@Override
 		public FsChunkFromFile createChunk(FsTableLocal master, long sectorId, FsFileFromFile parent, long id) {
-			return new FsChunkOneFile(master, sectorId, parent, id);
+			return new FsChunkStreaming(master, sectorId, parent, id);
 		}
 
 		@Override
 		public FsFileFromFile createFile(FsTableLocal master, long sectorId, FsDirectoryFromFile parent) {
-			return new FsFileFromFile(master, sectorId, parent);
+			return new FsFileStreaming(master, sectorId, parent);
 		}
 		
 	}
 
-	public FsChunkOneFile(FsTableLocal master, long sectorId, FsFileFromFile parent, long id) {
+	public FsChunkStreaming(FsTableLocal master, long sectorId, FsFileFromFile parent, long id) {
 		super(master, sectorId, parent, id);
+	}
+
+	public FsChunkStreaming(FsTableLocal master, long newSectorId, FsFileStreaming fsFileStreaming, long goodId,
+			boolean b) {
+		this(master, newSectorId, fsFileStreaming, goodId);
+		loaded = true;
 	}
 
 	@Override
@@ -57,7 +65,7 @@ public class FsChunkOneFile extends FsChunkFromFile {
 			myOffset += ch.currentSize();
 		}
 		
-
+		
 		synchronized (this) {
 
 			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ)){
@@ -82,6 +90,24 @@ public class FsChunkOneFile extends FsChunkFromFile {
 		
 	}
 
+
+	@Override
+	public Iterator<ByteBuff> iterator() {
+		ensureLoaded();
+		ensureDatafield();
+		if(!data.exists()){
+			System.err.println("data '"+data.getPath()+"' doesn't exist!");
+			return null;
+		}
+
+		try {
+			FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ);
+			return new ChannelIterator(dataChannel);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
 	@Override
 	public boolean write(ByteBuff toWrite, int offset, int size) {
 		ensureLoaded();
@@ -90,12 +116,6 @@ public class FsChunkOneFile extends FsChunkFromFile {
 		
 		//get our offset
 		long myOffset = 0;
-		for(FsChunk ch : parentFile.getChunks()){
-			if(ch == this){
-				break;
-			}
-			myOffset += ch.currentSize();
-		}
 		
 		synchronized (this) {
 
@@ -123,6 +143,47 @@ public class FsChunkOneFile extends FsChunkFromFile {
 		}
 
 		toWrite.position(toWrite.position()+size);
+		return false;
+	}
+
+
+	@Override
+	public boolean append(ByteBuff toWrite) {
+		ensureLoaded();
+		ensureDatafield();
+		ensureFileExist();
+		
+		//get our offset
+		long myOffset = 0;
+				
+		synchronized (this) {
+
+			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.WRITE, StandardOpenOption.APPEND)){
+				
+				//create 
+				ByteBuffer buff = ByteBuffer.allocate(toWrite.limit()-toWrite.position());
+				//put size
+				buff.putInt(toWrite.limit()-toWrite.position());
+				//write data
+				buff.put(toWrite.array(), toWrite.position(), toWrite.limit()-toWrite.position());
+				//write into file
+				dataChannel.write(buff);
+				currentSize = Math.max(currentSize, toWrite.limit()-toWrite.position());
+				if((int) dataChannel.size() != currentSize){
+					System.err.println("Error: the chunk "+idx+" of file "+parentFile.getPath()+" has a file size of "+currentSize+" and the read fileahs a size of "+dataChannel.size());
+				}
+
+				System.out.println("toWrite.position = "+toWrite.position()+"+"+(toWrite.limit()-toWrite.position())+"=="+(toWrite.limit()));
+				toWrite.position(toWrite.limit());
+				lastChange = System.currentTimeMillis();
+				lastaccess = System.currentTimeMillis();
+				return true;
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		toWrite.position(toWrite.limit());
 		return false;
 	}
 
@@ -237,6 +298,7 @@ public class FsChunkOneFile extends FsChunkFromFile {
 			}
 		}
 	}
+
 	
 
 }

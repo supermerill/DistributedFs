@@ -20,19 +20,19 @@ import remi.distributedFS.os.JnrfuseImpl;
 
 public class StandardManager implements FileSystemManager {
 	
-	StorageManager storage = null;
+	protected StorageManager storage = null;
 
-	ClusterManager net = null;
+	protected ClusterManager net = null;
 
-	private JnrfuseImpl os;
+	protected JnrfuseImpl os;
 
-	PropagateChange algoPropagate = new PropagateChange(this);
-	ExchangeChunk chunkRequester = new ExchangeChunk(this);
+	protected PropagateChange algoPropagate = new PropagateChange(this);
+	protected ExchangeChunk chunkRequester = new ExchangeChunk(this);
 	
-	char driveletter;
-	String rootFolder = ".";
+	protected char driveletter;
+	protected String rootFolder = ".";
 	
-	Cleaner cleaner;
+	protected Cleaner cleaner;
 	
 	public static void main(String[] args) throws IOException {
 		//TODO: read config file
@@ -172,7 +172,7 @@ public class StandardManager implements FileSystemManager {
 		}
 	}
 
-	private void close() {
+	protected void close() {
 		// TODO Auto-generated method stub
 		
 	}
@@ -185,18 +185,6 @@ public class StandardManager implements FileSystemManager {
 	@Override
 	public StorageManager getDb() {
 		return storage;
-	}
-
-	@Override
-	public void updateDirectory(long dirId, byte[] datas) {
-	}
-
-	@Override
-	public void updateFile(long dirId, byte[] datas) {
-	}
-
-	@Override
-	public void updateChunk(long dirId, byte[] datas) {
 	}
 
 	@Override

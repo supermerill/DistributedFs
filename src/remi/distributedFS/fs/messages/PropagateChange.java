@@ -893,7 +893,6 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		}
 		if(messageId == SEND_FILE_DESCR){
 			System.out.println(this.manager.getComputerId()+"$ RECEIVE SEND FILE from "+senderId);
-			//TODO ajout/fusion
 			//notTODO request chunks? -> i think it's more a db thing, to know if we want one. OR NOT
 			getAFileFrom(senderId, message);
 		}

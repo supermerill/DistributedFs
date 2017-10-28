@@ -222,7 +222,7 @@ public class ByteBuff
 	}
 	
 	/**
-	 * Copy the scr.limit-src.position bytes from src.position to this.position.
+	 * Copy the scr.limit-src.position bytes from src.position to src.limit into this.position.
 	 * @param src soruce array
 	 * @return this.
 	 */
