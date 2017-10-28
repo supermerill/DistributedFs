@@ -1,4 +1,4 @@
-package remi.distributedFS.net.impl;
+package remi.distributedFS.net.impl.test;
 
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;

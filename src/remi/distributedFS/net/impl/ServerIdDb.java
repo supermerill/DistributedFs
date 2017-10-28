@@ -60,6 +60,7 @@ public class ServerIdDb {
 	private Map<Peer, String> emittedMsg = new HashMap<>();
 	private String filepath;
 	public long clusterId = -1; // the id to identify the whole cluster
+	private String passphrase = "no protection";
 	
 	public ServerIdDb(PhysicalServer serv, String filePath){
 		this.serv = serv;
@@ -72,7 +73,7 @@ public class ServerIdDb {
 		// Get an instance of the Cipher for RSA encryption/decryption
 	}
 	
-	public void createNew(){
+	public void createNewPublicKey(){
 		try {
 			KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
 			SecureRandom random = SecureRandom.getInstanceStrong();
@@ -90,6 +91,11 @@ public class ServerIdDb {
 		}
 	}
 
+	public void setPassword(String pass) {
+		passphrase = pass;
+		requestSave();
+	}
+	
 	public void load(){
 		//choose the file.
 		File fic = new File(filepath);
@@ -98,7 +104,7 @@ public class ServerIdDb {
 			if(!fic.exists()){
 				//no previous data, load nothing plz.
 				//but create new data!
-				createNew();
+				createNewPublicKey();
 				requestSave();
 				return;
 			}
@@ -118,6 +124,9 @@ public class ServerIdDb {
 			System.out.println(serv.getId()%100+" myId : "+myId);
 //			System.out.println("myId : "+Integer.toHexString(bufferReac.rewind().getShort()));
 			
+			//read passphrase
+			short nbBytesPwd = bufferReac.reset().read(in, 2).flip().getShort();
+			passphrase = bufferReac.reset().read(in, nbBytesPwd).flip().getUTF8();
 			
 			//read pubKey
 			int nbBytes = bufferReac.reset().read(in,4).flip().getInt();
@@ -196,6 +205,10 @@ public class ServerIdDb {
 			System.out.println(serv.getId()%100+" write id : "+myId);
 			bufferReac.reset().putShort(myId).flip().write(out);
 			
+			//write passphrase
+			bufferReac.reset().putShort((short)0).putUTF8(passphrase);
+			bufferReac.rewind().putShort((short)(bufferReac.limit()-2));
+			bufferReac.rewind().write(out);
 			
 			//write pubKey
 			byte[] encodedPubKey = publicKey.getEncoded();
@@ -334,7 +347,7 @@ public class ServerIdDb {
 			//encode msg
 			Cipher cipher = Cipher.getInstance("RSA");
 			cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-			ByteBuff buffEncoded = blockCipher(new ByteBuff().putShort(myId).putUTF8(messageToEncrypt).flip().toArray(), Cipher.ENCRYPT_MODE, cipher);
+			ByteBuff buffEncoded = blockCipher(new ByteBuff().putShort(myId).putUTF8(messageToEncrypt).putUTF8(passphrase).flip().toArray(), Cipher.ENCRYPT_MODE, cipher);
 			
 			//encrypt more
 			cipher.init(Cipher.ENCRYPT_MODE, theirPubKey);
@@ -387,11 +400,18 @@ public class ServerIdDb {
 			}
 		}
 		ByteBuff buffDecoded = getIdentityDecodedMessage(theirPubKey, buffIn);
-		buffDecoded.getShort(); ///osef short distId = because we can't verify it.
+		short unverifiedCompId = buffDecoded.getShort(); ///osef short distId = because we can't verify it.
 		String msgDecoded = buffDecoded.getUTF8();
-		System.out.println(serv.getId()%100+" (answerIdentity) msgDecoded = "+msgDecoded);
-		
-		sendIdentity(peer, msgDecoded, false);
+		String theirPwd = buffDecoded.getUTF8();
+		if(!theirPwd.equals(passphrase)) {
+			System.err.println("Error: peer "+peer.getConnectionId()%100+" : ?"+unverifiedCompId+"? has not the same pwd as us.");
+			peer.close(); //TODO: verify that Physical server don't revive it.
+			//TODO : remove it from possible server list
+		}else {
+			System.out.println(serv.getId()%100+" (answerIdentity) msgDecoded = "+msgDecoded);
+			//same pwd, continue
+			sendIdentity(peer, msgDecoded, false);
+		}
 	}
 
 
@@ -415,6 +435,7 @@ public class ServerIdDb {
 		//data extracted
 		short distId = buffDecoded.getShort();
 		String msgDecoded = buffDecoded.getUTF8();
+		String theirPwd = buffDecoded.getUTF8();
 		
 
 		if(distId <0 || !emittedMsg.containsKey(peer)){
@@ -424,6 +445,12 @@ public class ServerIdDb {
 			return;
 		}else{
 			System.out.println(serv.getId()%100+" (receiveIdentity) GOOD receive computerid "+distId+" and i "+emittedMsg.containsKey(peer)+" emmitted a message");
+		}
+		if(!theirPwd.equals(passphrase)) {
+			System.err.println("Error: peer "+peer.getConnectionId()%100+" : "+distId+" has not the same pwd as us (2).");
+			peer.close(); //TODO: verify that Physical server don't revive it.
+			//TODO : remove it from possible server list
+			return;
 		}
 
 		System.out.println(serv.getId()%100+" (receiveIdentity) i have sent to "+peer.getConnectionId()%100+" the message "+emittedMsg.get(peer)+" to encode. i have received "+msgDecoded +" !!!");
