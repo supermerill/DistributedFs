@@ -77,9 +77,15 @@ public class PhysicalServer implements ClusterManager {
 	}
 
 	public void update() {
+		boolean quickUpdate = false;
 		while (getServerIdDb().myId < 0) {
 			try {
-				Thread.sleep(5000);
+				if(quickUpdate){
+					Thread.sleep(500);
+				}else{
+					Thread.sleep(5000);
+				}
+				quickUpdate = false;
 				// in case of something went wrong, recheck.
 
 				if (getServerIdDb().clusterId > 0) {
@@ -96,10 +102,11 @@ public class PhysicalServer implements ClusterManager {
 			e.printStackTrace();
 		}
 
+		
 		System.out.println(getId() % 100 + " update " + myFs.getLetter());
 		for (Peer peer : getPeers()) {
 			System.out.println(getId() % 100 + " update peer " + peer.getConnectionId() % 100);
-			peer.ping();
+			quickUpdate = quickUpdate || peer.ping();
 		}
 		// toutes les heures
 		if (lastDirUpdate + 1000 * 60 * 60 < System.currentTimeMillis()) {
@@ -586,7 +593,7 @@ public class PhysicalServer implements ClusterManager {
 						for (Peer peer : peers) {
 							System.out.println(getId() % 100 + " want to send it to peers " + peer.getConnectionId()%100 + "  "+peer.getComputerId());
 							// as we can't emit directly (no message to encode), a request to them should trigger a request from them.
-							getServerIdDb().requestPublicKey(peer, true);
+							getServerIdDb().requestPublicKey(peer);
 						}
 					}
 				}

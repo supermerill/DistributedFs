@@ -8,9 +8,11 @@ import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
+import remi.distributedFS.db.impl.FsChunkFromFile;
 import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
 import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
+import remi.distributedFS.db.impl.ObjectFactory;
 import remi.distributedFS.db.impl.readable.FsChunkOneFile;
 import remi.distributedFS.fs.messages.ExchangeChunk;
 import remi.distributedFS.fs.messages.PropagateChange;
@@ -112,7 +114,11 @@ public class StandardManager implements FileSystemManager {
 			storageFactory.rootRep = dataPath;
 			storageFactory.filename = dataPath+"/"+"localdb.data";
 			storageFactory.manager = this;
-			storageFactory.factory = new FsChunkOneFile.StorageFactory();
+			if(dataPath.contains("R")){
+				storageFactory.factory = new FsChunkOneFile.StorageFactory();
+			}else{
+				storageFactory.factory = new ObjectFactory.StandardFactory(); //ie FSChunkFromFile.StorageFactory();
+			}
 			storage = storageFactory.create();
 //			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this, true);
 			storage.cleanUnusedSectors(true);

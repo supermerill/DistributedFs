@@ -8,9 +8,12 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.security.PublicKey;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.util.ByteBuff;
@@ -22,6 +25,24 @@ import remi.distributedFS.util.ByteBuff;
  *
  */
 public class Peer implements Runnable {
+	
+	public static enum PeerConnectionState{
+		DEAD(0),
+		JUST_BORN(1),
+		HAS_ID(2),
+		HAS_PUBLIC_KEY(3),
+		HAS_VERIFIED_COMPUTER_ID(4),
+		CONNECTED_W_AES(5);
+		
+		private int v ;
+
+		PeerConnectionState(int value){ this.v = value;}
+
+		public boolean lowerThan(PeerConnectionState hasId) {
+			return v < hasId.v;
+		}
+		
+	}
 
 	public static class PeerKey {
 		private long otherServerId = 0; //use for leader election, connection establishment
@@ -100,6 +121,10 @@ public class Peer implements Runnable {
 	private volatile boolean aliveAndSet = false;
 	private int aliveFail = 0;
 	private Socket sockWaitToDelete;
+	
+	//my state, i added this after the dev of this class, so it's spartly used/updated for the dead/born/hasid state, need some debug to be barely reliable.
+	// used mainly to see if HAS_PUBLIC_KEY, HAS_VERIFIED_COMPUTER_ID, CONNECTED_W_AES is done.
+	protected PeerConnectionState myState = PeerConnectionState.DEAD;
 
 	private Thread myCurrentThread = null;
 
@@ -115,6 +140,9 @@ public class Peer implements Runnable {
 	// }
 	private static final ByteBuff nullmsg = new ByteBuff();
 
+	Cipher encoder = null;
+	Cipher decoder = null;
+
 	public Peer(PhysicalServer physicalServer, InetAddress inetAddress, int port) {
 		myServer = physicalServer;
 		myKey = new PeerKey(inetAddress);
@@ -122,10 +150,14 @@ public class Peer implements Runnable {
 	}
 
 	// write only
-	public void ping() {
+	/**
+	 * update connection status.
+	 * @return true if you should call ping quickly afterwards (connection phase)
+	 */
+	public boolean ping() {
 		System.out.println("peer "+this.myKey.otherServerId+" compId:"+this.distComputerId+" : is alive? "+this.alive.get());
 		if (!alive.get())
-			return;
+			return false;
 		try {
 			
 			if (myKey.port <= 0) {
@@ -133,14 +165,15 @@ public class Peer implements Runnable {
 				// GetListenPort.get().write(getOut(), this);
 				// getOut().flush();
 			}
-			if (myKey.otherServerId == 0) {
+			if (myKey.otherServerId == 0 || myState.lowerThan(PeerConnectionState.HAS_ID)) {
 				myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_ID, nullmsg);
 				// GetServerId.get().write(getOut(), this);
 				// getOut().flush();
+				return true;
 			}
 
 			// get the server list of the other one every 10-15 min.
-			myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_LIST, nullmsg);
+//			myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_LIST, nullmsg);
 			if (nextTimeSearchMoreServers < System.currentTimeMillis()) {
 				if (nextTimeSearchMoreServers == 0) {
 					nextTimeSearchMoreServers = System.currentTimeMillis() + 1000;
@@ -154,8 +187,27 @@ public class Peer implements Runnable {
 				}
 
 			}
+
+			if(myState.lowerThan(PeerConnectionState.HAS_PUBLIC_KEY)){
+				myServer.getServerIdDb().requestPublicKey(this);
+				return true;
+			}
+
+			if(myState.lowerThan(PeerConnectionState.HAS_VERIFIED_COMPUTER_ID)){
+				myServer.getServerIdDb().sendIdentity(this, myServer.getServerIdDb().createMessageForIdentityCheck(this, false), true);
+				return true;
+			}
+
+			if(myState.lowerThan(PeerConnectionState.CONNECTED_W_AES)){
+				myServer.getServerIdDb().requestSecretKey(this);
+				return true;
+			}
+			
+
+			return false;
 		} catch (Exception e) {
 			e.printStackTrace();
+			return false;
 		}
 	}
 
@@ -199,6 +251,7 @@ public class Peer implements Runnable {
 			e.printStackTrace();
 		}
 		myCurrentThread = null;
+		changeState(PeerConnectionState.DEAD, false);
 
 		if (alive.get()) {
 			aliveAndSet = false;
@@ -293,10 +346,11 @@ public class Peer implements Runnable {
 			// get the sockId;
 			// MessageId.use[MessageId.SET_SERVER_ID.id].emit(tempStreamOut, );
 			// SetServerId.get().write(myServer.getId(), streamOut);
+			changeState(PeerConnectionState.JUST_BORN, true);
 			myServer.message().sendServerId(this);
 			// MyListenPort.get().write(this);
 			myServer.message().sendListenPort(this);
-			myServer.getServerIdDb().requestPublicKey(this, false);
+			myServer.getServerIdDb().requestPublicKey(this);
 			streamOut.flush();
 
 			// while (myKey.otherServerId == 0) {
@@ -337,6 +391,25 @@ public class Peer implements Runnable {
 			System.err.println("Warn : emit null message, id :"+messageId);
 		}
 		try {
+			
+			//encode mesage
+			if(encoder==null) encoder = myServer.getServerIdDb().getSecretCipher(this, Cipher.ENCRYPT_MODE);
+			byte[] encodedMsg = null;
+			if(messageId > AbstractMessageManager.LAST_UNENCODED_MESSAGE){
+				if(hasState(PeerConnectionState.CONNECTED_W_AES)){
+					if(message!=null && message.limit()-message.position()>0){
+						encodedMsg = encoder.doFinal(message.array(), message.position(), message.limit());
+					}
+				}else{
+					System.err.println("Erro, ttry to send a "+messageId+" message when we don't have a aes key!");
+					return;
+				}
+			}else{
+				if(message!=null && message.limit()-message.position()>0){
+					encodedMsg = message.toArray();
+				}
+			}
+			
 			OutputStream out = this.getOut();
 			out.write(5);
 			out.write(5);
@@ -346,9 +419,9 @@ public class Peer implements Runnable {
 			out.write(messageId);
 			// System.out.println("WRITE 5 5 "+myId.id);
 			ByteBuff buffInt = new ByteBuff();
-			if (message != null && message.limit()-message.position()>0) {
-				buffInt.putInt(message.limit() - message.position())
-						.putInt(message.limit() - message.position())
+			if (encodedMsg != null) {
+				buffInt.putInt(encodedMsg.length)
+						.putInt(encodedMsg.length)
 						.flip();
 			} else {
 				buffInt.putInt(0)
@@ -356,15 +429,18 @@ public class Peer implements Runnable {
 						.flip();
 			}
 			out.write(buffInt.array(), 0, 8);
-			if (message != null && message.limit()-message.position()>0) {
-				out.write(message.array(),  message.position(), message.limit() - message.position());
+			if (encodedMsg != null) {
+				out.write(encodedMsg,  0, encodedMsg.length);
 			}
 			out.flush();
-			if(message != null && message.position() != 0){
+			if(encodedMsg != null && message.position() != 0){
 				System.err.println("Warn, you want to send a buffer which is not rewinded : " + message.position());
 			}
 			System.out.println("WRITE MESSAGE : "+messageId+" : "+(message==null?"null":(message.limit() - message.position())));
 		} catch (IOException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
@@ -426,6 +502,22 @@ public class Peer implements Runnable {
 						pos += streamIn.read(buffIn.array(), pos, nbBytes-pos);
 					}
 				}
+				//decode mesage
+				if(decoder==null) decoder = myServer.getServerIdDb().getSecretCipher(this, Cipher.DECRYPT_MODE);
+				byte[] decodedMsg = null;
+				if(newByte > AbstractMessageManager.LAST_UNENCODED_MESSAGE){
+					if(hasState(PeerConnectionState.CONNECTED_W_AES)){
+						if(buffIn!=null && nbBytes> 0 && buffIn.limit()-buffIn.position()>0){
+							decodedMsg = decoder.doFinal(buffIn.array(), buffIn.position(), buffIn.limit());
+							//put decoded message into the read buffer
+							buffIn.reset().put(decodedMsg).rewind();
+						}
+					}else{
+						System.err.println("Error, try to receive a "+newByte+" message when we don't have a aes key!");
+						return;
+					}
+				}//else : nothing to do, it's not encoded
+				//use message
 				if (newByte == AbstractMessageManager.GET_SERVER_ID) {
 					// special case, give the peer object directly.
 					myServer.message().sendServerId(this);
@@ -438,6 +530,7 @@ public class Peer implements Runnable {
 					if(clusterId >0 && myServer.getServerIdDb().clusterId < 0){
 						//set our cluster id
 						myServer.getServerIdDb().clusterId = clusterId;
+						changeState(PeerConnectionState.HAS_ID, true);
 					}else if(clusterId >0 && myServer.getServerIdDb().clusterId != clusterId){
 						//error, not my cluster!
 						System.err.println("Error, trying to connect with "+getConnectionId()%100+" but his cluster is "+clusterId+" and mine is "
@@ -457,7 +550,7 @@ public class Peer implements Runnable {
 				// standard case, give the peer id. Our physical server should be able to retrieve us.
 				myServer.propagateMessage(getConnectionId(), (byte) newByte, buffIn);
 				
-			} catch (IOException e) {
+			} catch (IOException | IllegalBlockSizeException | BadPaddingException e) {
 				e.printStackTrace();
 				throw new RuntimeException(e);
 			}
@@ -545,6 +638,7 @@ public class Peer implements Runnable {
 
 	public void close() {
 		alive.set(false);
+		changeState(PeerConnectionState.DEAD, false);
 		try {
 			if (sockWaitToDelete != null)
 				sockWaitToDelete.close();
@@ -565,6 +659,18 @@ public class Peer implements Runnable {
 
 	public void flush() throws IOException {
 		getOut().flush();
+	}
+
+	public void changeState(PeerConnectionState newState, boolean changeOnlyIfHigher) {
+		synchronized (myState) {
+			if(!changeOnlyIfHigher || myState.lowerThan(newState))
+				myState = newState;
+		}
+		
+	}
+
+	public boolean hasState(PeerConnectionState stateToVerify) {
+		return !myState.lowerThan(stateToVerify);
 	}
 
 }
