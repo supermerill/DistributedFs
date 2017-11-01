@@ -37,6 +37,12 @@ public interface ClusterManager {
 	public short getComputerId();
 	public void launchUpdater();
 	public void initializeNewCluster();
+	
+	/**
+	 * Get the computerId of a peerId.
+	 * @param senderId the peerId (what we receive from the net message)
+	 * @return  the computerid or -1 if it's not connected (yet).
+	 */
 	public short getComputerId(long senderId); //get a computerId from a peerId (senderId)
 	public long getSenderId(short compId); //get a peerId (senderId) from a computerId
 
