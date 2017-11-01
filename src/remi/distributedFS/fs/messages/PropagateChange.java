@@ -379,7 +379,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			int nbChunks = message.getTrailInt();
 			System.out.println(this.manager.getComputerId()%100+" FILECG "+fic.getPath()+" has "+nbChunks+" chunks");
 			List<FsChunk> chunksToSet = new ArrayList<>();
-			final long peerServerId = manager.getNet().getComputerId(senderId);
+			final short peerServerId = manager.getNet().getComputerId(senderId);
 			for(int i=0;i<nbChunks;i++){
 				long chunkId = message.getLong();
 				long chunkDate = message.getLong();
@@ -493,6 +493,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		message.putTrailInt(arrayDir.size());
 		System.out.println("WRITE DIR : "+arrayDir.size());
 		for(FsDirectory dchild : arrayDir){
+			System.out.println(" -D-> : "+dchild.getName());
 			message.putUTF8(dchild.getName());
 			message.putLong(dchild.getId());
 			message.putLong(dchild.getModifyDate());
@@ -502,6 +503,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		message.putTrailInt(arrayFile.size());
 		System.out.println("WRITE FIC : "+arrayFile.size());
 		for(FsFile fchild : arrayFile){
+			System.out.println(" -F-> : "+fchild.getName());
 			message.putUTF8(fchild.getName());
 			message.putLong(fchild.getId());
 			message.putLong(fchild.getModifyDate());
@@ -510,7 +512,8 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		System.out.println("WRITE DEL : "+arrayDel.size());
 		message.putTrailInt(arrayDel.size());
 		for(FsObject ochild : arrayDel){
-			System.out.println("WRITE DEL NAME : "+ochild.getName().length()+" "+ochild.getName());
+//			System.out.println("WRITE DEL NAME : "+ochild.getName().length()+" "+ochild.getName());
+			System.out.println(" -R-> : "+ochild.getName());
 			message.putUTF8(ochild.getName());
 			message.putLong(ochild.getId());
 			message.putLong(ochild.getDeleteDate());
@@ -867,8 +870,9 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 			System.out.println(this.manager.getComputerId()%100+" READ SEND DIR : NO dir "+mypath+" from "+senderId);
 			System.err.println("I Requested an not existant folder : "+mypath);
 			// request his par<ent dir, to see if it's not deleted.
-			FsDirectory dirParent = getPathParentDir( manager.getRoot(), mypath);
-			if(dirParent != null) requestDirPath(senderId, dirParent.getPath(), dirParent.getId());
+			//can be dead lock if "request missing dir" -> getparent -> "request missing dir"
+//			FsDirectory dirParent = getPathParentDir( manager.getRoot(), mypath);
+//			if(dirParent != null) requestDirPath(senderId, dirParent.getPath(), dirParent.getId());
 		}
 	}
 	
@@ -893,7 +897,6 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		}
 		if(messageId == SEND_FILE_DESCR){
 			System.out.println(this.manager.getComputerId()+"$ RECEIVE SEND FILE from "+senderId);
-			//TODO ajout/fusion
 			//notTODO request chunks? -> i think it's more a db thing, to know if we want one. OR NOT
 			getAFileFrom(senderId, message);
 		}

@@ -5,45 +5,45 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.shorts.ShortArrayList;
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.db.UnreachableChunkException;
 import remi.distributedFS.util.ByteBuff;
 import remi.distributedFS.util.Ref;
 
-public class FsChunkFromFile implements FsChunk {
-	protected FsTableLocal master;
-	protected FsFileFromFile parent;
-	protected long id;
-	protected long sector;
-	protected int idx;
+public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
+//	protected FsTableLocal master;
+	protected FsFileFromFile parentFile;
+//	protected long id;
+//	protected long sector;
+	protected int idx; //not used
 	protected int currentSize;
 	protected int maxSize;
 	protected boolean isValid; // false if data isn't available locally
 	protected long lastChange = 0;
 	protected long lastaccess = 0;
-	protected LongList serverIdPresent = new LongArrayList(2);
+	protected ShortList serverIdPresent = new ShortArrayList(2);
 
-	protected boolean loaded = false;
+//	protected boolean loaded = false;
 	protected File data; //don't load data on memory, just on-demand. => maybe that's the problem with wmp : too much latency?
 
-	public FsChunkFromFile(FsTableLocal master, long sectorId, FsFileFromFile parent, int idx) {
-		this.sector = sectorId;
-		this.parent = parent;
-		this.master = master;
-		this.idx = idx;
+	public FsChunkFromFile(FsTableLocal master, long sectorId, FsFileFromFile parent, long id) {
+		super(master, sectorId, parent.getParent());
+//		this.sector = sectorId;
+		this.parentFile = parent;
+		this.idx = -1;
 		this.lastChange = 0;
 		this.maxSize = 0; //maybe we should use factories (with interface for them)
 		this.currentSize = 0;
 		this.isValid = false;
-		this.loaded = false;
-		this.id = master.getComputerId()<<48 | ( sectorId&0xFFFFFFFFFFFFL);
+//		this.loaded = false;
+		this.id = id;//master.getComputerId()<<48 | ( sectorId&0xFFFFFFFFFFFFL);
 	}
 
 	@Override
@@ -60,15 +60,13 @@ public class FsChunkFromFile implements FsChunk {
 
 		synchronized (this) {
 
-			try {
-				FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ);
+			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ)){
 				
 				System.out.println("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
 				ByteBuffer buff = toAppend.toByteBuffer();
 				buff.limit(buff.position()+size);
 //				buff.position(buff.position()); //already done in toByteBuffer()
 				dataChannel.read(buff, offset);
-				dataChannel.close();
 
 				toAppend.position(toAppend.position()+size);
 				System.out.println("pos after = "+toAppend.position());
@@ -88,10 +86,10 @@ public class FsChunkFromFile implements FsChunk {
 	public boolean write(ByteBuff toWrite, int offset, int size) {
 		ensureLoaded();
 		ensureDatafield();
+		ensureFileExist();
 		synchronized (this) {
 
-			try {
-				FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
+			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.WRITE)){
 				
 				ByteBuffer buff = toWrite.toByteBuffer();
 				buff.limit(toWrite.position()+size);
@@ -101,7 +99,7 @@ public class FsChunkFromFile implements FsChunk {
 //				currentSize = (int) dataChannel.size();
 				currentSize = Math.max(currentSize, offset+size);
 				if((int) dataChannel.size() != currentSize){
-					System.err.println("Error: the chunk "+idx+" of file "+parent.getPath()+" has a file size of "+currentSize+" and the read fileahs a size of "+dataChannel.size());
+					System.err.println("Error: the chunk "+idx+" of file "+parentFile.getPath()+" has a file size of "+currentSize+" and the read fileahs a size of "+dataChannel.size());
 				}
 				dataChannel.close();
 
@@ -126,28 +124,36 @@ public class FsChunkFromFile implements FsChunk {
 			load(buff);
 		}
 	}
+
+	
+	protected void ensureDataPath(){
+		if(data==null){
+			data=new File(master.getRootRep()+"/"+getId());
+		}
+	}
 	
 	protected void ensureDatafield(){
 		if(data==null){
-			//it never change & is unique (because the option to "defragment"/move the descriptors isn't implemented yet)
-			data=new File(master.getRootRep()+"/"+getId());
+			//it never change & is unique (TODO: multiple dirs to not e with 1million files in the same dir)
 			//create folder path
-			if(!data.exists()){
-				try {
-					//we now store all on our root folder, no need to check if the dir exist
-					//TODO: create more rep to not make too much files in the same rep.
-					//		for example, a rep for each 1000 sectorid.
-					//create file
-					data.createNewFile();
-//					System.out.println("data '"+data.getPath()+"' is now created");
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-			if(!isValid){
+//			if(!data.exists()){
+//				try {
+//					//we now store all on our root folder, no need to check if the dir exist
+//					//TODO: create more rep to not make too much files in the same rep.
+//					//		for example, a rep for each 1000 sectorid.
+//					//create file
+//					data.createNewFile();
+////					System.out.println("data '"+data.getPath()+"' is now created");
+//				} catch (IOException e) {
+//					e.printStackTrace();
+//				}
+//			}
+			if(isValid){
+				ensureDataPath();
+			}else{
 				//request it (via network)
 				System.out.println("REQUEST DATA FOR CHUNK "+getId());
-				FsChunk meWithData = master.getManager().requestChunk(this.parent, this, serverIdPresent());
+				FsChunk meWithData = master.getManager().requestChunk(this.parentFile, this, serverIdPresent());
 				if(meWithData == null){
 					//can't find it!
 					throw new UnreachableChunkException("Error: can't find the chunk "+this.getId()+" in the cluster. Maybe you should reconnect with more peers.");
@@ -182,6 +188,7 @@ public class FsChunkFromFile implements FsChunk {
 					//simplier version
 					ByteBuff buff = new ByteBuff(currentSize);
 					meWithData.read(buff, 0, buff.limit());
+					ensureDataPath();
 					this.write(buff, 0, buff.limit());
 					
 				}
@@ -205,7 +212,7 @@ public class FsChunkFromFile implements FsChunk {
 		//master.loadSector(buff, getId()); //useless, we want to write, not read!
 		save(buff); //this one should auto-call master.write
 
-		if(parent==null){
+		if(parentFile==null){
 			//delete this one
 //			this.delete();
 			master.removeSector(this.getSector());
@@ -217,7 +224,7 @@ public class FsChunkFromFile implements FsChunk {
 	
 
 	public void load(ByteBuffer buffer){
-		int buffInitPos = buffer.position();
+		int buffInitPos = buffer.position(); //0
 		//check if it's a chunk
 		byte type = buffer.get(); //1
 		if(type != FsTableLocal.CHUNK){
@@ -243,34 +250,36 @@ public class FsChunkFromFile implements FsChunk {
 		
 		//get filename  (useless... for now)
 		int nbServerId = buffer.getInt(); //42
-		int nbBytesFilename = buffer.getInt(); //46
-		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytesFilename);
+//		int nbBytesFilename = buffer.getInt(); //46
+//		ByteBuffer nameBuffer = ByteBuffer.allocate(nbBytesFilename);
 		
 		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
+		int canRead =  FsTableLocal.FS_SECTOR_SIZE - (buffer.position() + 8);
 		
-		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
+//		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
 		ByteBuffer currentBuffer = buffer;
-		
+
+		Ref<Integer> sectorNum = new Ref<>(0);
 		//read serverlist
 		for(int i=0;i<nbServerId;i++){
-			serverIdPresent.add(currentBuffer.getLong());
-			canRead-=8;
+			serverIdPresent.add(currentBuffer.getShort());
+			canRead-=2;
 			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
+				canRead = goToNextAndLoad(currentBuffer, sectorNum)*8;
 			}
 		}
 		
 		//read filename
 //		long currentSector = this.getId();
 		//read folder
-		for(int i=0;i<nbBytesFilename;i++){
-			nameBuffer.put(currentBuffer.get());
-			canRead--;
-			if(canRead == 0){
-				canRead = goToNext(currentBuffer);
-			}
-		}
-		nameBuffer.flip();
+//		for(int i=0;i<nbBytesFilename;i++){
+//			nameBuffer.put(currentBuffer.get());
+//			canRead--;
+//			if(canRead == 0){
+//				canRead = goToNextAndLoad(currentBuffer)*8;
+//			}
+//		}
+//		nameBuffer.flip();
 		//lol it's not used as we use the id!!!
 //		data = new File(FsObjectImplFromFile.CHARSET.decode(nameBuffer).toString());
 //		ensureDatafield();
@@ -287,7 +296,7 @@ public class FsChunkFromFile implements FsChunk {
 		int buffInitPos = buffer.position();
 		
 		//set "erased" or d"directory"
-		buffer.put(parent==null?0:FsTableLocal.CHUNK);
+		buffer.put(parentFile==null?0:FsTableLocal.CHUNK);
 
 		buffer.putLong(getId());
 		
@@ -300,102 +309,46 @@ public class FsChunkFromFile implements FsChunk {
 		buffer.put((byte)(isValid?1:0)); 
 
 		//get name buffer
-//		ensureDatafield(); //don't do that, it create a dead loop
-		ByteBuffer buffName = null;
-		if(data!=null){
-			buffName = FsObjectImplFromFile.CHARSET.encode(data.getPath());
-		}else{
-			buffName = FsObjectImplFromFile.CHARSET.encode("");
-		}
+//		ensureDataPath(); //it's not useful to save the path name, as it's constructed from id. TODO: remove saving name
+//		ByteBuffer buffName = null;
+//		if(data!=null){
+//			buffName = FsObjectImplFromFile.CHARSET.encode(data.getPath());
+//		}else{
+//			buffName = FsObjectImplFromFile.CHARSET.encode("");
+//		}
 		
 		//buffName.flip(); already done in encode()
 		buffer.putInt(serverIdPresent.size());
-		buffer.putInt(buffName.limit());
+//		buffer.putInt(buffName.limit());
 
 		buffer.position(buffInitPos + 64); // 64 to have enough space to store all small datas before
-		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
+		int canRead =  FsTableLocal.FS_SECTOR_SIZE - (buffer.position() + 8);
+//		int canRead = FsTableLocal.FS_SECTOR_SIZE-64-8;
 		
 		ByteBuffer currentBuffer = buffer;
-		Ref<Long> currentSector = new Ref<>(this.getSector());
+//		Ref<Long> currentSector = new Ref<>(this.getSector());
+		Ref<Integer> sectorNum = new Ref<>(0);
 		//save serverlist
 		for(int i=0;i<serverIdPresent.size();i++){
-			currentBuffer.putLong(serverIdPresent.getLong(i));
-			canRead-=8;
+			currentBuffer.putShort(serverIdPresent.getShort(i));
+			canRead-=2;
 			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector);
+				canRead = goToNextOrCreate(currentBuffer, sectorNum)*8;
 			}
 		}
-		//save folder
-		for(int i=0;i<buffName.limit();i++){
-			currentBuffer.put(buffName.get(i));
-			canRead--;
-			if(canRead == 0){
-				canRead = goToNextOrCreate(currentBuffer, currentSector);
-			}
-		}
+		//save name
+//		for(int i=0;i<buffName.limit();i++){
+//			currentBuffer.put(buffName.get(i));
+//			canRead--;
+//			if(canRead == 0){
+//				canRead = goToNextOrCreate(currentBuffer, currentSector)*8;
+//			}
+//		}
 
-		//fill last sector with zeros
-		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
 		//write last sector
-		currentBuffer.rewind();
-		master.saveSector(currentBuffer, currentSector.get());
-	}
-	
-
-	public int goToNextOrCreate(ByteBuffer buff, Ref<Long> currentSector){
-		int pos = buff.position();
-		long nextsector = buff.getLong();
-		buff.position(pos);
-		if(nextsector<=0){
-			long newSectorId = master.requestNewSector();
-			buff.putLong(newSectorId);
-			buff.rewind();
-			master.saveSector(buff, currentSector.get());
-			currentSector.set(newSectorId);
-			//master.loadSector(buff, newSectorId); //useless, it's not created yet!
-			buff.rewind();
-			buff.put(FsTableLocal.EXTENSION);
-			buff.putLong(this.getSector());
-			buff.position(FsTableLocal.FS_SECTOR_SIZE-8);
-			buff.putLong(-1);
-			buff.position(9);
-			return (FsTableLocal.FS_SECTOR_SIZE) - (8+8+1);
-		}else{
-			return goToNext(buff);
-		}
-	}
-	
-
-	/**
-	 * return the number of long that can be read.
-	 * @param buff
-	 * @return nb long to read (max)
-	 */
-	public int goToNext(ByteBuffer buff){
-		long nextsector = buff.getLong();
-		if(nextsector<=0){
-				System.err.println("Error, no more sector to parse for chunk "+this.getSector());
-				throw new RuntimeException("Error, no more sector to parse for chunk "+this.getSector());
-			
-		}
-		buff.rewind();
-		master.loadSector(buff, nextsector);
-		if(buff.get()==FsTableLocal.EXTENSION){
-			//ok
-			//verify it's mine
-			long storedSec = buff.getLong();
-			if(storedSec != this.getSector()){
-				System.err.println("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
-				throw new RuntimeException("Error, my next sector is not picked for me !!! : "+storedSec+" != "+sector);
-			}
-			//now i should be at pos 9
-			//go to ok pos
-			buff.position(9);
-			return (FsTableLocal.FS_SECTOR_SIZE) - (8+8+1); 
-		}else{
-			System.err.println("Error, my next sector is not picked for me !!!");
-			throw new RuntimeException("Error, my next sector is not picked for me !!!");
-		}
+		flushLastSector(currentBuffer, sectorNum);
+//		currentBuffer.rewind();
+//		master.saveSector(currentBuffer, currentSector.get());
 	}
 
 	@Override
@@ -433,7 +386,7 @@ public class FsChunkFromFile implements FsChunk {
 	}
 
 	@Override
-	public LongList serverIdPresent() {
+	public ShortList serverIdPresent() {
 		ensureLoaded();
 		return serverIdPresent;
 	}
@@ -452,7 +405,7 @@ public class FsChunkFromFile implements FsChunk {
 
 	public void unallocate() {
 		ensureLoaded();
-		ensureDatafield();
+		ensureDataPath();
 		data.delete();
 		ByteBuffer buff = ByteBuffer.allocate(FsTableLocal.FS_SECTOR_SIZE);
 		buff.put((byte)0);
@@ -465,6 +418,7 @@ public class FsChunkFromFile implements FsChunk {
 		ensureLoaded();
 		if(isValid){
 			ensureDatafield();
+			ensureFileExist();
 	
 			synchronized (this) {
 	
@@ -487,13 +441,31 @@ public class FsChunkFromFile implements FsChunk {
 		}
 	}
 
+	protected void ensureFileExist() {
+		if(!data.exists()){
+			try {
+//				//we now store all on our root folder, no need to check if the dir exist
+//				//TODO: create more rep to not make too much files in the same rep.
+//				//		for example, a rep for each 1000 sectorid.
+//				//create file
+				data.createNewFile();
+//				System.out.println("data '"+data.getPath()+"' is now created");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
 	@Override
 	public void setPresent(boolean isPresentLocally) {
 		ensureLoaded();
+		System.out.println("Chunk : setPresent "+isValid+" -> "+isPresentLocally);
 		isValid = isPresentLocally;
 		//if invalidate, remove local datafile
 		if(!isValid){
-			if(data!=null && data.exists()){
+			ensureDataPath();
+			if(data.exists()){
+				System.out.println("Chunk : delete data on disk");
 				data.delete();
 			}
 			data = null;
@@ -509,7 +481,7 @@ public class FsChunkFromFile implements FsChunk {
 	@Override
 	public void delete(){
 		//delete file if present
-		if(data == null) data = new File(master.getRootRep()+"/"+getId());
+		ensureDataPath();
 		if(data.exists()) data.delete();
 		
 		//delete self

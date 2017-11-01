@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.shorts.ShortArrayList;
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
@@ -50,7 +50,7 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		public long chunkDateUID;
 		public int nbBytes; // = chunkSize
 		public int chunkMaxSize;
-		public LongList serverIds;
+		public ShortList serverIds;
 	}
 	
 	List<Semaphore> waiters = new java.util.concurrent.CopyOnWriteArrayList<>();
@@ -146,9 +146,9 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 			req.chunkMaxSize = message.getInt();
 			//serverId list
 			int nbServers = message.getTrailInt();
-			req.serverIds = new LongArrayList(nbServers);
+			req.serverIds = new ShortArrayList(nbServers);
 			for(int i=0;i<nbServers;i++){
-				long sid = message.getLong();
+				short sid = message.getShort();
 				if(sid >= 0 && sid != this.manager.getNet().getComputerId()){
 					req.serverIds.add(sid);
 				}
@@ -196,10 +196,10 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		buff.putLong(chunkOk.getModifyUID());
 		buff.putInt(chunkOk.getMaxSize());
 		//serverId list
-		LongList serverIdList = chunkOk.serverIdPresent();
+		ShortList serverIdList = chunkOk.serverIdPresent();
 		buff.putTrailInt(serverIdList.size());
 		for(int i=0;i<serverIdList.size();i++){
-			buff.putLong(serverIdList.getLong(i));
+			buff.putShort(serverIdList.getShort(i));
 		}
 		//send chunk data
 		buff.putTrailInt(chunkOk.currentSize());
@@ -209,7 +209,7 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		manager.getNet().writeMessage(senderId, SEND_FILE_CHUNK, buff);
 	}
 
-	public int requestchunk(FsFile fic, FsChunk chunk) {
+	public int requestchunk(ShortList serverIdPresent, FsFile fic, FsChunk chunk) {
 		System.out.println(this.manager.getComputerId()%100+" WRITE GET CHUNK "+fic.getPath()+" : "+chunk.getId());
 		ByteBuff buff = new ByteBuff();
 		buff.putLong(fic.getId());
@@ -218,7 +218,17 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		buff.putLong(chunk.getId());
 		buff.putLong(chunk.getModifyDate());
 		buff.flip();
-		return manager.getNet().writeBroadcastMessage(GET_FILE_CHUNK, buff);
+		int nbMessageEmitted = 0;
+		for(short compId : serverIdPresent){
+			long peerId = manager.getNet().getSenderId(compId);
+			if(peerId>=0){
+				//ok, i may be here
+				 if(manager.getNet().writeMessage(peerId, GET_FILE_CHUNK, buff)){
+					 nbMessageEmitted++;
+				 }
+			}
+		}
+		return nbMessageEmitted;
 	}
 	
 	public FsChunk waitReceiveChunk(final long idChunk, final long idFile, final long modifyDateFile, final int nbReqEmitted) {
@@ -261,15 +271,33 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 					}
 					System.out.println("check msgs for chunks : CANNOT FIND MY ONE :'(");
 				}
-			}
-			if(retVal == null){
-				if(nbreceived==nbReqEmitted ){
-					System.err.println("Warn : can't find chunk "+idChunk+" in the net");
-					throw new NotFindedException("Warn : can't find chunk "+idChunk+" in the network");
-				}else if(timeToStop>=System.currentTimeMillis()){
-					System.err.println("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout ("+System.currentTimeMillis()+" > "+timeToStop);
-					throw new TimeoutException("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout");
+
+				if(retVal == null){
+					if(nbreceived==nbReqEmitted ){
+						//clean
+						Iterator<Request> it = requests.iterator();
+						while(it.hasNext()){
+							Request req = it.next();
+							if(idChunk == req.chunkId){
+								it.remove();
+							}
+						}
+						System.err.println("Warn : can't find chunk "+idChunk+" in the net ("+nbreceived+"/"+nbReqEmitted+")");
+						throw new NotFindedException("Warn : can't find chunk "+idChunk+" in the network");
+					}else if(timeToStop<System.currentTimeMillis()){
+						//clean
+						Iterator<Request> it = requests.iterator();
+						while(it.hasNext()){
+							Request req = it.next();
+							if(idChunk == req.chunkId){
+								it.remove();
+							}
+						}
+						System.err.println("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout ("+System.currentTimeMillis()+" > "+timeToStop);
+						throw new TimeoutException("Warn : can't find chunk "+idChunk+" in the net in less than the max timeout");
+					}
 				}
+				System.out.println("relance : "+nbreceived+" < "+nbReqEmitted+" && timeok?"+(timeToStop > System.currentTimeMillis()));
 			}
 			System.out.println("check msgs for chunks : return: "+retVal);
 			return retVal;

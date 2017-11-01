@@ -56,6 +56,7 @@ public class ByteBuff
 	
 	/**
 	 * Copy the buffIn buffer into this buffer.
+	 * After that, pos is at 0 and limit at buffIn.length.
 	 * 
 	 * @param buffIn
 	 *            buffer for intitialization
@@ -64,6 +65,7 @@ public class ByteBuff
 	{
 		this(buffIn.length);
 		this.put(buffIn);
+		this.rewind();
 	}
 	
 	/**
@@ -222,7 +224,7 @@ public class ByteBuff
 	}
 	
 	/**
-	 * Copy the scr.limit-src.position bytes from src.position to this.position.
+	 * Copy the scr.limit-src.position bytes from src.position to src.limit into this.position.
 	 * @param src soruce array
 	 * @return this.
 	 */
@@ -558,6 +560,10 @@ public class ByteBuff
 		return retVal;
 	}
 
+	/**
+	 * Clear it. pos and limit are now at 0.
+	 * @return
+	 */
 	public ByteBuff reset() {
 		limit = 0;
 		position = 0;

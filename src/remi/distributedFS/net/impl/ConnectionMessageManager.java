@@ -20,10 +20,14 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 //		clusterMananger.registerListener(GET_LISTEN_PORT, this); passed directly by peer
 		clusterMananger.registerListener(GET_SERVER_LIST, this);
 		clusterMananger.registerListener(GET_SERVER_PUBLIC_KEY, this);
+		clusterMananger.registerListener(GET_VERIFY_IDENTITY, this);
+		clusterMananger.registerListener(GET_SERVER_AES_KEY, this);
 //		clusterMananger.registerListener(SEND_LISTEN_PORT, this); used directly by peer
 //		clusterMananger.registerListener(SEND_SERVER_ID, this); used directly by peer
 		clusterMananger.registerListener(SEND_SERVER_LIST, this);
 		clusterMananger.registerListener(SEND_SERVER_PUBLIC_KEY, this);
+		clusterMananger.registerListener(SEND_VERIFY_IDENTITY, this);
+		clusterMananger.registerListener(SEND_SERVER_AES_KEY, this);
 	}
 
 	@Override
@@ -31,20 +35,42 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 		System.out.println(clusterMananger.getId()%100+" receive message from "+senderId%100);
 		if (messageId == AbstractMessageManager.GET_SERVER_PUBLIC_KEY) {
 			System.out.println(clusterMananger.getId()%100+" receive GET_SERVER_PUBLIC_KEY from "+senderId%100);
-			clusterMananger.getServerIdDb().sendPublicKey(clusterMananger.getPeer(senderId), message.getUTF8());
+			clusterMananger.getServerIdDb().sendPublicKey(clusterMananger.getPeer(senderId));
 		}
 		if (messageId == AbstractMessageManager.SEND_SERVER_PUBLIC_KEY) {
 			System.out.println(clusterMananger.getId()%100+" receive SEND_SERVER_PUBLIC_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().receivePublicKey(clusterMananger.getPeer(senderId), message);
 		}
+		if (messageId == AbstractMessageManager.GET_VERIFY_IDENTITY) {
+			System.out.println(clusterMananger.getId()%100+" receive GET_VERIFY_IDENTITY from "+senderId%100);
+//			sendIdentity(p, createMessageForIdentityCheck(p, true), true);
+			clusterMananger.getServerIdDb().answerIdentity(clusterMananger.getPeer(senderId), message);
+		}
+		if (messageId == AbstractMessageManager.SEND_VERIFY_IDENTITY) {
+			System.out.println(clusterMananger.getId()%100+" receive SEND_VERIFY_IDENTITY from "+senderId%100);
+			clusterMananger.getServerIdDb().receiveIdentity(clusterMananger.getPeer(senderId), message);
+		}
+		if (messageId == AbstractMessageManager.GET_SERVER_AES_KEY) {
+			System.out.println(clusterMananger.getId()%100+" receive GET_SERVER_AES_KEY from "+senderId%100);
+			clusterMananger.getServerIdDb().sendAesKey(clusterMananger.getPeer(senderId), ServerIdDb.AES_PROPOSAL);
+		}
+		if (messageId == AbstractMessageManager.SEND_SERVER_AES_KEY) {
+			System.out.println(clusterMananger.getId()%100+" receive SEND_SERVER_AES_KEY from "+senderId%100);
+			clusterMananger.getServerIdDb().receiveAesKey(clusterMananger.getPeer(senderId), message);
+		}
 		if(messageId == GET_SERVER_LIST){
-			sendServerList(senderId, this.clusterMananger.getServerIdDb().getRegisteredPeers());
+			System.out.println(clusterMananger.getId()%100+"he ( "+senderId%100+" ) want my server list");
+			synchronized (this.clusterMananger.getServerIdDb().getRegisteredPeers()) {
+				sendServerList(senderId, this.clusterMananger.getServerIdDb().getRegisteredPeers());
+			}
 		}
 		if(messageId == SEND_LISTEN_PORT){
+			System.out.println(clusterMananger.getId()%100+" received SEND_LISTEN_PORT from "+senderId%100);
 			Peer p = clusterMananger.getPeer(senderId);
 			p.setPort(message.getInt());
 		}
 		if(messageId == SEND_SERVER_LIST){
+			System.out.println(clusterMananger.getId()%100+" received SEND_SERVER_LIST from "+senderId%100);
 
 //			System.out.println(p.getMyServer().getId()%100+" read "+myId+" for "+p.getKey().getOtherServerId()%100);
 			short peerId = message.getShort();

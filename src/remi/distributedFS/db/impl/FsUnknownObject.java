@@ -23,7 +23,8 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 		if(type == FsTableLocal.DIRECTORY){
 			me = new FsDirectoryFromFile(master, getSector(), parent);
 		}else if(type == FsTableLocal.FILE){
-			me = new FsFileFromFile(master, getSector(), parent);
+//			me = new FsFileFromFile(master, getSector(), parent);
+			me = master.factory.createFile(master, getSector(), (FsDirectoryFromFile) parent);
 		}else if(type == FsTableLocal.DELETED){
 			me = new FsDeletedObject(master, getSector(), parent);
 		}else{
@@ -74,15 +75,15 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 	}
 
 	@Override
-	public int goToNextOrCreate(ByteBuffer buff, Ref<Long> currentSector) {
+	public int goToNextOrCreate(ByteBuffer buff, Ref<Integer> sectorIdx) {
 		checkLoaded();
-		return me.goToNextOrCreate(buff, currentSector);
+		return me.goToNextOrCreate(buff, sectorIdx);
 	}
 
 	@Override
-	public int goToNext(ByteBuffer buff) {
+	public int goToNextAndLoad(ByteBuffer buff, Ref<Integer> sectorIdx) {
 		checkLoaded();
-		return me.goToNext(buff);
+		return me.goToNextAndLoad(buff, sectorIdx);
 	}
 
 	@Override

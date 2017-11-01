@@ -7,10 +7,13 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import remi.distributedFS.datastruct.FsChunk;
@@ -36,7 +39,7 @@ public class FsTableLocal implements StorageManager{
 	
 	FsDirectory root;
 
-	static final int FS_SECTOR_SIZE = 512; // bytes, at least 384 to have enough place to allocate other sector in a linked chain way
+	public static final int FS_SECTOR_SIZE = 512; // bytes, at least 384 to have enough place to allocate other sector in a linked chain way
 	ByteBuffer buffer;
 	
 	FileChannel fsFile;
@@ -45,6 +48,8 @@ public class FsTableLocal implements StorageManager{
 	
 	long fileSize = 0;
 	private String rootRep;
+
+	public ObjectFactory factory;
 	
 	//TODO: create a separate thread for flushing/updating
 
@@ -53,34 +58,52 @@ public class FsTableLocal implements StorageManager{
 	Long2ObjectMap<FsChunk> chunkId2LoadedObj = new Long2ObjectOpenHashMap<>();
 	
 	
-	public FsTableLocal(String rootRep, String filename, FileSystemManager manager, boolean cleanIt) throws IOException{
-		this.manager = manager;
-		this.rootRep = rootRep;
-		//check root rep 
-		File rootF = new File(rootRep);
-		if(!rootF.exists()){
-			rootF.mkdirs();
+	public static class FsTableLocalFactory{
+		public String rootRep = ".";
+		public String filename = "./fstab.data";
+		public FileSystemManager manager;
+		public ObjectFactory factory = new ObjectFactory.StandardFactory();
+		
+		public FsTableLocal create(){
+			try{
+				FsTableLocal obj = new FsTableLocal();
+				obj.manager = manager;
+				obj.rootRep = rootRep;
+				obj.factory = factory;
+				
+				//check root rep 
+				File rootF = new File(rootRep);
+				if(!rootF.exists()){
+					rootF.mkdirs();
+				}
+				
+				
+				obj.buffer = ByteBuffer.allocate(FS_SECTOR_SIZE);
+				
+				File fic = new File(filename);
+				if(!fic.exists()) fic.createNewFile();
+				obj.fsFile = FileChannel.open(fic.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
+				//read root
+				obj.root = obj.readOrCreateRoot(0);
+				//get each unused position inside
+				obj.fileSize = obj.fsFile.size();
+				
+				
+				//load all content from fs
+				//it's a stub, this content should be stored in a 'small' separate file.
+				//			getRoot().accept(new Visu());
+				obj.getRoot().accept(obj.new Loader());
+				return obj;
+			}catch(IOException e){
+				throw new RuntimeException(e);
+			}
 		}
 		
+	}
+	
+	
+	protected FsTableLocal(){
 		
-		 buffer = ByteBuffer.allocate(FS_SECTOR_SIZE);
-		
-		 File fic = new File(filename);
-		 if(!fic.exists()) fic.createNewFile();
-		fsFile = FileChannel.open(fic.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
-		//read root
-		root = readOrCreateRoot(0);
-		//get each unused position inside
-		fileSize = fsFile.size();
-		
-
-		//load all content from fs
-		//it's a stub, this content should be stored in a 'small' separate file.
-//		getRoot().accept(new Visu());
-		getRoot().accept(new Loader());
-		if(cleanIt){
-			cleanUnusedSectors(true);
-		}
 	}
 	class Visu implements FsObjectVisitor{
 		
@@ -123,29 +146,41 @@ public class FsTableLocal implements StorageManager{
 
 	class Loader implements FsObjectVisitor{
 
+		String pref = "";
+		
 		@Override
 		public void visit(FsDirectory dirParent) {
 			objectId2LoadedObj.put(dirParent.getId(), dirParent);
-			System.out.println(" dir "+dirParent.getPath());
+//			System.out.print(" dir "+((FsObjectImplFromFile)dirParent).getSectorsUsed()); System.out.println(" : "+dirParent.getPath());
 			for(FsDirectory dir : new ArrayList<>(dirParent.getDirs())){
 				try{
-					System.out.println("contains "+dir.getName());
+					System.out.print(pref+"(D) "+((FsObjectImplFromFile)dir).getSectorsUsed()); System.out.println(" :"+dir.getName()+" ("+dir.getPath()+")");
+					pref = pref + "    ";
 					visit(dir);
+					pref = pref.substring(4);
 				}catch(WrongSectorTypeException ex){
 					ex.printStackTrace();
 					//recover : del this
 					dirParent.getDirs().remove(dir);
 					((FsDirectoryFromFile)dirParent).setDirty(true);
-//					dirParent.flush();
+					dirParent.flush();
 				}
-				System.out.println(dir.getPath() + " "+dir.getId());
 			}
 			for(FsFile fic : dirParent.getFiles()){
-				visit(fic);
+				try{
+					System.out.print(pref+"(F) "+((FsObjectImplFromFile)fic).getSectorsUsed()); System.out.print(" :"+fic.getName());
+					visit(fic);
+				}catch(WrongSectorTypeException ex){
+					ex.printStackTrace();
+					//recover : del this
+					dirParent.getFiles().remove(fic);
+					((FsDirectoryFromFile)dirParent).setDirty(true);
+					dirParent.flush();
+				}
 			}
 			for(FsObject obj : dirParent.getDelete()){
 				if(obj == dirParent) System.err.println("error, dir is inside deletes");
-				System.out.println(obj.getPath()+" (D) " + obj.getId());
+				System.out.print(pref+"(R) "+((FsObjectImplFromFile)obj).getSectorsUsed()); System.out.println(obj.getPath()+" : " + obj.getId());
 				obj.accept(this);
 //				objectId2LocalCluster.put(obj.getId(), obj);
 			}
@@ -154,12 +189,16 @@ public class FsTableLocal implements StorageManager{
 		@Override
 		public void visit(FsFile fic) {
 			try{
+				LongList sectUsed = new LongArrayList();
 				fic.getName(); // important, to trigger a load
-				System.out.println(fic.getPath()+" (F) " + fic.getId());
+//				System.out.println(fic.getPath()+" (F) " + fic.getId());
 				objectId2LoadedObj.put(fic.getId(), fic);
 				for(FsChunk ch : fic.getAllChunks()){
 					visit(ch);
+					sectUsed.addAll(((FsChunkFromFile)ch).getSectorsUsed());
 				}
+				Collections.sort(sectUsed);
+				System.out.println(" (chunks : "+sectUsed+" )");
 			}catch(WrongSectorTypeException ex){
 				ex.printStackTrace();
 				//recover : del this

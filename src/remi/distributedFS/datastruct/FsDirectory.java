@@ -24,6 +24,7 @@ public interface FsDirectory extends FsObject {
 
 	public void removeFile(FsFile obj);
 	public void removeDir(FsDirectory obj);
+	public void removeCompletely(FsObject obj); // remove knowledge that is was deleted Completely
 
 	public void moveFile(FsFile obj, FsDirectory newDir);
 	public void moveDir(FsDirectory obj, FsDirectory newDir);
@@ -279,5 +280,6 @@ public interface FsDirectory extends FsObject {
 //		}
 	
 	}
+
 	
 }

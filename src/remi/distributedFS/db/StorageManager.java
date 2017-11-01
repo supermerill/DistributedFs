@@ -30,5 +30,7 @@ public interface StorageManager {
 	 */
 	public void removeOldDelItem(long since);
 
+	void cleanUnusedSectors(boolean hard);
+
 
 }

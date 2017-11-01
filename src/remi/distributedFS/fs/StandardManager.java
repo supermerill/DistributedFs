@@ -2,17 +2,18 @@ package remi.distributedFS.fs;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
-import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
+import remi.distributedFS.db.impl.FsChunkFromFile;
 import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
+import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
+import remi.distributedFS.db.impl.ObjectFactory;
+import remi.distributedFS.db.impl.readable.FsChunkOneFile;
 import remi.distributedFS.fs.messages.ExchangeChunk;
 import remi.distributedFS.fs.messages.PropagateChange;
 import remi.distributedFS.net.ClusterManager;
@@ -21,19 +22,19 @@ import remi.distributedFS.os.JnrfuseImpl;
 
 public class StandardManager implements FileSystemManager {
 	
-	StorageManager storage = null;
+	protected StorageManager storage = null;
 
-	ClusterManager net = null;
+	protected ClusterManager net = null;
 
-	private JnrfuseImpl os;
+	protected JnrfuseImpl os;
 
-	PropagateChange algoPropagate = new PropagateChange(this);
-	ExchangeChunk chunkRequester = new ExchangeChunk(this);
+	protected PropagateChange algoPropagate = new PropagateChange(this);
+	protected ExchangeChunk chunkRequester = new ExchangeChunk(this);
 	
-	char driveletter;
-	String rootFolder = ".";
+	protected char driveletter;
+	protected String rootFolder = ".";
 	
-	Cleaner cleaner;
+	protected Cleaner cleaner;
 	
 	public static void main(String[] args) throws IOException {
 		//TODO: read config file
@@ -83,10 +84,6 @@ public class StandardManager implements FileSystemManager {
 	
 	public StandardManager() {
 		super();
-		//TODO: serialize & gui
-//		cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
-		cleaner = new Cleaner(this, 1024*10, 1024*1024*1024, 1000*60);
-		cleaner.start();
 	}
 
 
@@ -113,7 +110,18 @@ public class StandardManager implements FileSystemManager {
 			}
 			
 			System.out.println("begin");
-			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this, true);
+			FsTableLocalFactory storageFactory = new FsTableLocal.FsTableLocalFactory();
+			storageFactory.rootRep = dataPath;
+			storageFactory.filename = dataPath+"/"+"localdb.data";
+			storageFactory.manager = this;
+			if(dataPath.contains("R")){
+				storageFactory.factory = new FsChunkOneFile.StorageFactory();
+			}else{
+				storageFactory.factory = new ObjectFactory.StandardFactory(); //ie FSChunkFromFile.StorageFactory();
+			}
+			storage = storageFactory.create();
+//			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this, true);
+			storage.cleanUnusedSectors(true);
 	
 			if(port>0){
 				net = new PhysicalServer(this, false, dataPath);
@@ -121,6 +129,13 @@ public class StandardManager implements FileSystemManager {
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
 			}
+			
+
+			//TODO: serialize & gui
+//			cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
+			cleaner = new Cleaner(this);
+			cleaner.start();
+			
 		}catch (Exception e) {
 			e.printStackTrace();
 			close();
@@ -163,7 +178,7 @@ public class StandardManager implements FileSystemManager {
 		}
 	}
 
-	private void close() {
+	protected void close() {
 		// TODO Auto-generated method stub
 		
 	}
@@ -176,18 +191,6 @@ public class StandardManager implements FileSystemManager {
 	@Override
 	public StorageManager getDb() {
 		return storage;
-	}
-
-	@Override
-	public void updateDirectory(long dirId, byte[] datas) {
-	}
-
-	@Override
-	public void updateFile(long dirId, byte[] datas) {
-	}
-
-	@Override
-	public void updateChunk(long dirId, byte[] datas) {
 	}
 
 	@Override
@@ -230,10 +233,10 @@ public class StandardManager implements FileSystemManager {
 	}
 
 	@Override
-	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
+	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
 		System.out.println("REQUEST CHUNK "+chunk.getId());
 		//request chunk to all servers
-		int nbReq = chunkRequester.requestchunk(file, chunk);
+		int nbReq = chunkRequester.requestchunk(serverIdPresent, file, chunk);
 		//register to the chunk requester
 		boolean ok = false;
 		FsChunk chunkReceived = null;

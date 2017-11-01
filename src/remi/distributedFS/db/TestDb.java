@@ -1,19 +1,19 @@
 package remi.distributedFS.db;
 
+import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getDir;
+import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getFile;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.List;
 
+import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
-
-import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.*;
-
 import remi.distributedFS.db.impl.FsFileFromFile;
-import remi.distributedFS.db.impl.FsObjectImplFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
+import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.util.ByteBuff;
@@ -24,24 +24,6 @@ public class TestDb {
 	public static void main(String[] args) throws IOException {
 		TestDb testeur = new TestDb();
 		FileSystemManager manager = new FileSystemManager() {
-			
-			@Override
-			public void updateFile(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateDirectory(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateChunk(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
 			
 			@Override
 			public void propagateChange(FsObject fic) {
@@ -104,12 +86,16 @@ public class TestDb {
 			}
 
 			@Override
-			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, List<Long> serverIdPresent) {
+			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
 				// TODO Auto-generated method stub
 				return null;
 			}
 		};
-		testeur.db = new FsTableLocal(".", "fs.data", manager, true);
+		FsTableLocalFactory storageFactory = new FsTableLocal.FsTableLocalFactory();
+		storageFactory.rootRep = ".";
+		storageFactory.filename = "fs.data";
+		storageFactory.manager = manager;
+		testeur.db = storageFactory.create();
 		testeur.test();
 		
 	}
