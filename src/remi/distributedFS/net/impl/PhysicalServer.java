@@ -21,6 +21,7 @@ import java.util.concurrent.Semaphore;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.net.ClusterManager;
+import remi.distributedFS.net.impl.Peer.PeerConnectionState;
 import remi.distributedFS.util.ByteBuff;
 
 public class PhysicalServer implements ClusterManager {
@@ -650,7 +651,7 @@ public class PhysicalServer implements ClusterManager {
 	@Override
 	public short getComputerId(long senderId) {
 		Peer p = getPeer(senderId);
-		if(p != null){
+		if(p != null && p.hasState(PeerConnectionState.CONNECTED_W_AES)){
 			return p.getComputerId();
 		}
 		return -1;
