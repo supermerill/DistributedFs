@@ -1,8 +1,20 @@
 package remi.distributedFS.gui.install;
 
-import javax.swing.JPanel;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 
-public abstract class InstallPanel extends JPanel {
+public abstract class InstallPanel extends Scene {
+
+//	Group root;
+	
+//	public InstallPanel() {
+//		super(new Group());
+//		root = (Group) rootProperty().get();
+//	}
+
+	public InstallPanel(Parent gridPane) {
+		super(gridPane);
+	}
 
 	protected MainInstall manager;
 

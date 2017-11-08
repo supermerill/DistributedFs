@@ -6,45 +6,54 @@ import java.util.Map;
 
 import javax.swing.JFrame;
 
-public class MainInstall extends JFrame {
+import javafx.application.Application;
+import javafx.stage.Stage;
+
+public class MainInstall extends Application {
 	private static final long serialVersionUID = 1L;
 
 	InstallPanel currentPanel;
 	Map<String, Object> savedData = new HashMap<>();
-	
-	public MainInstall() {
-		this.setDefaultCloseOperation(EXIT_ON_CLOSE);
-		this.setLayout(new BorderLayout());
+
+	Stage myFrame;
+
+	@Override
+	public void start(Stage frame) throws Exception {
+		myFrame = frame;
+		frame.setOnCloseRequest(e->System.exit(0));
 		// create the first panel
 		goToPanel(new PanelChoiceNewConnect());
+		frame.setTitle("Install & configure a distributed hard drive instance");
+		frame.setWidth(900);
+		frame.setHeight(900);
+		frame.centerOnScreen();
+		frame.show();
 	}
 	
 	
 	public void goToPanel(InstallPanel nextPanel) {
 		if(currentPanel != null) {
-			System.out.println("destroy "+currentPanel);
+//			System.out.println("destroy "+currentPanel);
 			currentPanel.destroy();
-			this.remove(currentPanel);
+//			this.remove(currentPanel);
 		}
-		currentPanel = nextPanel;
-		System.out.println("add nextPanel "+nextPanel);
-		currentPanel.init(this);
-		this.add(currentPanel, BorderLayout.CENTER);
-		currentPanel.construct();
-		currentPanel.invalidate();
-		this.invalidate();
-		this.revalidate();
-		this.repaint();
+//		currentPanel = nextPanel;
+//		System.out.println("add nextPanel "+nextPanel);
+//		currentPanel.init(this);
+//		this.add(currentPanel, BorderLayout.CENTER);
+//		currentPanel.construct();
+//		currentPanel.invalidate();
+//		this.invalidate();
+//		this.revalidate();
+//		this.repaint();
+		nextPanel.init(this);
+		myFrame.setScene(nextPanel);
 	}
 	
 	public static void main(String[] args) {
-		MainInstall fen = new MainInstall();
-		fen.setSize(900, 900);
-		fen.setVisible(true);
-//		System.out.println("127.0.0.1:3033".matches("^[0-9:\\.]+:[0-9][0-9][0-9]?[0-9]?[0-9]?$"));
-//		System.out.println("K".matches("[A-Z]"));
-//		System.out.println("ooKoo".matches("[A-Z]"));
+		Application.launch(args);
 	}
+	
 
 
 	public void finish() {
@@ -59,7 +68,8 @@ public class MainInstall extends JFrame {
 		//launch first instance
 		
 		System.out.println("end it!");
-		this.dispose();
+		myFrame.close();
 	}
+
 	
 }

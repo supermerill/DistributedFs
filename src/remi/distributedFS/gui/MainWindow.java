@@ -8,55 +8,46 @@ import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JTabbedPane;
 
+import javafx.application.Application;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.stage.Stage;
+
+import it.unimi.dsi.fastutil.shorts.ShortList;
+import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
+import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.ClusterManager;
 
-public class MainWindow extends JFrame {
+public class MainWindow extends Application {
 
 	//tabs;
 	PanelPeers peers;
 	PanelRequest req;
-	JTabbedPane tabs;
+	TabPane tabs;
 	
-	public MainWindow(FileSystemManager manager) {
+	FileSystemManager manager;
+
+	@Override
+	public void start(Stage primaryStage) throws Exception {
 		
-		tabs = new JTabbedPane();
+		tabs = new TabPane();
 		
 //		peers = new PanelPeers(manager);
 //		tabs.addTab("network", peers);
 		
 		req = new PanelRequest();
-		tabs.addTab("req", req);
-		
-		setLayout(new BorderLayout());
-		add(tabs, BorderLayout.CENTER);
+//		tabs.getTabs().add(new Tab("req", req);
 		
 	}
 	
-	public static void main(String[] args) {
-		
-		MainWindow test = new MainWindow(new FileSystemManager() {
+	private void createFake(){
+
+		manager = new FileSystemManager() {
 			
-			@Override
-			public void updateFile(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateDirectory(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateChunk(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
 			
 			@Override
 			public void requestDirUpdate() {
@@ -101,13 +92,33 @@ public class MainWindow extends JFrame {
 			}
 			
 			@Override
-			public long getComputerId() {
+			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public char getLetter() {
 				// TODO Auto-generated method stub
 				return 0;
 			}
-		});
-		test.setSize(1000,700);
-		test.setVisible(true);
+
+			@Override
+			public String getRootFolder() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public short getComputerId() {
+				// TODO Auto-generated method stub
+				return 0;
+			}
+		};
+	}
+	
+	public static void main(String[] args) {
+		Application.launch(args);
 	}
 	
 	

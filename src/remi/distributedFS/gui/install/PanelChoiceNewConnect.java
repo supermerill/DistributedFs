@@ -1,28 +1,31 @@
 package remi.distributedFS.gui.install;
 
-import java.awt.FlowLayout;
-
-import javax.swing.JButton;
+import javafx.geometry.Insets;
+import javafx.scene.control.Button;
+import javafx.scene.layout.VBox;
 
 public class PanelChoiceNewConnect extends InstallPanel {
 
 
-	JButton btNew;
-	JButton btConnect;
+	Button btNew;
+	Button btConnect;
 	
 	public PanelChoiceNewConnect(){
-		setLayout(new FlowLayout());
-		btNew = new JButton("Create new cluster");
-		btNew.addActionListener((actionEvent)->{
+		super(new VBox());
+	    VBox vbox = (VBox) rootProperty().get();
+	    vbox.setPadding(new Insets(10));
+	    vbox.setSpacing(8);
+		btNew = new Button("Create new cluster");
+		btNew.setOnAction((ActionEvent)->{
 			System.out.println("new cluster");
 			manager.goToPanel(new PanelCreateNewCluster());
 		});
-		add(btNew);
-		btConnect = new JButton("Connect to a cluster");
-		btConnect.addActionListener((actionEvent)->{
+		vbox.getChildren().add(btNew);
+		btConnect = new Button("Connect to a cluster");
+		btConnect.setOnAction((ActionEvent)->{
 			manager.goToPanel(new PanelConnectToCluster());
 		});
-		add(btConnect);
+		vbox.getChildren().add(btConnect);
 	}
 
 	@Override
