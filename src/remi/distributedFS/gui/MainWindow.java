@@ -1,20 +1,21 @@
 package remi.distributedFS.gui;
 
 import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.GridBagLayout;
 
-import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JTabbedPane;
 
+import it.unimi.dsi.fastutil.shorts.ShortList;
+import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
+import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.ClusterManager;
 
 public class MainWindow extends JFrame {
+	private static final long serialVersionUID = 1L;
 
 	//tabs;
 	PanelPeers peers;
@@ -39,24 +40,6 @@ public class MainWindow extends JFrame {
 	public static void main(String[] args) {
 		
 		MainWindow test = new MainWindow(new FileSystemManager() {
-			
-			@Override
-			public void updateFile(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateDirectory(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
-			
-			@Override
-			public void updateChunk(long dirId, byte[] datas) {
-				// TODO Auto-generated method stub
-				
-			}
 			
 			@Override
 			public void requestDirUpdate() {
@@ -99,11 +82,29 @@ public class MainWindow extends JFrame {
 				// TODO Auto-generated method stub
 				return null;
 			}
-			
+
 			@Override
-			public long getComputerId() {
+			public short getComputerId() {
 				// TODO Auto-generated method stub
 				return 0;
+			}
+
+			@Override
+			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public String getDrivePath() {
+				// TODO Auto-generated method stub
+				return "";
+			}
+
+			@Override
+			public String getRootFolder() {
+				// TODO Auto-generated method stub
+				return null;
 			}
 		});
 		test.setSize(1000,700);

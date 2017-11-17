@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Semaphore;
 
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.AbstractMessageManager;
@@ -103,7 +102,7 @@ public class PhysicalServer implements ClusterManager {
 		}
 
 		
-		System.out.println(getId() % 100 + " update " + myFs.getLetter());
+		System.out.println(getId() % 100 + " update " + myFs.getDrivePath());
 		for (Peer peer : getPeers()) {
 			System.out.println(getId() % 100 + " update peer " + peer.getConnectionId() % 100);
 			quickUpdate = quickUpdate || peer.ping();
@@ -664,6 +663,13 @@ public class PhysicalServer implements ClusterManager {
 			}
 		}
 		return -1;
+	}
+
+	@Override
+	public void connect() {
+		for(Peer falsePeer : getServerIdDb().loadedPeers) {
+			this.connect(falsePeer.getIP(), falsePeer.getPort());
+		}
 	}
 
 }

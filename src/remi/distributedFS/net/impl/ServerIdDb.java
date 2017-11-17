@@ -12,13 +12,11 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +33,6 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import javax.management.RuntimeErrorException;
 
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.net.impl.Peer.PeerConnectionState;
@@ -48,6 +45,7 @@ public class ServerIdDb {
 
 	List<Peer> receivedServerList;
 	List<Peer> registeredPeers;
+	List<Peer> loadedPeers;
 	Map<Long, PublicKey> tempPubKey; // unidentified pub key
 	Map<Short, PublicKey> id2PublicKey; // identified pub key
 	Map<Short, SecretKey> id2AesKey;
@@ -144,11 +142,13 @@ public class ServerIdDb {
 			privateKey = createPrivKey(encodedPrivKey);
 			
 			//read peers
+			loadedPeers.clear();
 			int nbPeers = bufferReac.reset().read(in,4).flip().getInt();
 			System.out.println(serv.getId()%100+" i have "+nbPeers+" peers");
 			for(int i=0;i<nbPeers;i++){
-				nbBytes = bufferReac.reset().read(in, 4).flip().getInt();
-				String distIp = bufferReac.reset().read(in, nbBytes).flip().getUTF8();
+				nbBytes = bufferReac.reset().read(in, 2).flip().getShort();
+				String distIp = bufferReac.read(in, nbBytes).flip().getShortUTF8();
+				System.out.println("read peer ip from file : "+distIp);
 				int distPort = bufferReac.reset().read(in, 4).flip().getInt();
 				short distId =  bufferReac.reset().read(in, 2).flip().getShort();
 				nbBytes = bufferReac.reset().read(in,4).flip().getInt();
@@ -163,6 +163,7 @@ public class ServerIdDb {
 					//save
 					Peer p = new Peer(serv, new InetSocketAddress(distIp, distPort).getAddress(), distPort);
 					p.setComputerId(distId);
+					loadedPeers.add(p);
 					id2PublicKey.put(distId, distPublicKey);
 				}else{
 					System.err.println(serv.getId()%100+" error, i have a peer but he has no public key.");
@@ -240,8 +241,7 @@ public class ServerIdDb {
 				for(int i=0;i<nbPeers;i++){
 					Peer p = registeredPeers.get(i);
 					//save ip
-					bufferReac.reset().putInt(0).putUTF8(p.getIP()).flip();
-					bufferReac.putInt(bufferReac.limit()-4).rewind().write(out);	
+					bufferReac.reset().putShortUTF8(p.getIP()).flip().write(out);
 					//save port
 					bufferReac.reset().putInt(p.getPort()).flip().write(out);
 					//save id

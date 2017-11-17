@@ -21,6 +21,8 @@ import javax.swing.JTextField;
  */
 public class PanelCreateNewCluster extends InstallPanel {
 
+	private static final long serialVersionUID = 8779324129474868505L;
+
 	JLabel lblClusterId = new JLabel();
 	JLabel lblClusterPwd = new JLabel();
 	JTextField txtClusterId = new JTextField();

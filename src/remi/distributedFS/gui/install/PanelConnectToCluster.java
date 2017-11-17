@@ -24,6 +24,8 @@ import javax.swing.JTextField;
  */
 public class PanelConnectToCluster extends InstallPanel {
 
+	private static final long serialVersionUID = -8412251672293919001L;
+
 	JLabel lblClusterIpPort = new JLabel();
 	JLabel lblClusterId = new JLabel();
 	JLabel lblClusterPwd = new JLabel();

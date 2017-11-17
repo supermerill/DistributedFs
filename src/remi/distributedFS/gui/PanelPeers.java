@@ -15,7 +15,6 @@ import javax.swing.JPanel;
 import javax.swing.ListModel;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.Border;
-import javax.swing.border.TitledBorder;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
 

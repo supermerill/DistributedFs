@@ -5,7 +5,7 @@ import java.awt.FlowLayout;
 import javax.swing.JButton;
 
 public class PanelChoiceNewConnect extends InstallPanel {
-
+	private static final long serialVersionUID = -4861532843787270076L;
 
 	JButton btNew;
 	JButton btConnect;

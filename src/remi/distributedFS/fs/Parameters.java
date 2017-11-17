@@ -86,6 +86,17 @@ public class Parameters {
 		return Long.parseLong(data.get(key));
 	}
 	
+	public String getStringOrDef(String key, String def){
+		def = def.replace("\n", " ");
+		String obj = data.get(key);
+		if(obj == null){
+			data.put(key, def);
+			save();
+			return def;
+		}
+		return obj;
+	}
+	
 	public long getLongOrDef(String key, long def){
 		String obj = data.get(key);
 		if(obj == null){

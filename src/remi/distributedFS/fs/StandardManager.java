@@ -8,7 +8,6 @@ import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
-import remi.distributedFS.db.impl.FsChunkFromFile;
 import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
 import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
@@ -27,11 +26,13 @@ public class StandardManager implements FileSystemManager {
 	protected ClusterManager net = null;
 
 	protected JnrfuseImpl os;
+	
+	protected Parameters myParameters;
 
 	protected PropagateChange algoPropagate = new PropagateChange(this);
 	protected ExchangeChunk chunkRequester = new ExchangeChunk(this);
 	
-	protected char driveletter;
+	protected String driveletter;
 	protected String rootFolder = ".";
 	
 	protected Cleaner cleaner;
@@ -58,7 +59,17 @@ public class StandardManager implements FileSystemManager {
 						manager.net.connect("localhost",Integer.parseInt(args[2]));
 				}
 				
-				manager.initOs("./data"+args[0], args[0].charAt(0));
+				manager.initOs("./data"+args[0], args[0]);
+
+			}).start();
+		}else if(args.length == 1) {
+			//mode parameter file.
+			new Thread(()->{
+				StandardManager manager = new StandardManager();
+				manager.myParameters = new Parameters(args[0]);
+				
+				manager.initBdNet(manager.myParameters.get("MainDir"), manager.myParameters.getInt("ListenPort"));	
+				manager.initOs(manager.myParameters.get("MainDir"), manager.myParameters.get("DriveLetter"));
 
 			}).start();
 		}
@@ -143,7 +154,7 @@ public class StandardManager implements FileSystemManager {
 	}
 
 
-	public void initOs(String dataPath, char letter) {
+	public void initOs(String dataPath, String letter) {
 		try{
 	
 			//wait initialization before giving hand to men
@@ -157,11 +168,11 @@ public class StandardManager implements FileSystemManager {
 				e.printStackTrace();
 			}
 			
-			if(letter >0){
+			if(letter != null){
 				os = new JnrfuseImpl(this);
 				os.init(letter);
 				driveletter = letter;
-			}else driveletter = ' ';
+			}else driveletter = " ";
 			
 			System.out.println("end of init");
 			
@@ -217,7 +228,7 @@ public class StandardManager implements FileSystemManager {
 		return os.getContext().uid.longValue();
 	}
 
-	public char getLetter() {
+	public String getDrivePath() {
 		return driveletter;
 	}
 
