@@ -48,7 +48,7 @@ public class PanelParameterPeer extends InstallPanel {
 	Label lblElagage = new Label("ReduceSize aggressively");
 	Label lblTimeDelFic = new Label("Time before deletion (files)");
 	Label lblTimeDelFS = new Label("Time before deletion (metadata)");
-	JLabel lblStoreOnlyPlainFiles = new JLabel("Store only plain files");
+	Label lblStoreOnlyPlainFiles = new Label("Store only plain files");
 
 	TextField txtInstallPath = new TextField();
 	Button btInstallPath = new Button();
@@ -56,10 +56,10 @@ public class PanelParameterPeer extends InstallPanel {
 	TextField txtListenPort = new TextField();
 	TextField txtSizeIdeal = new TextField();
 	TextField txtSizeMax = new TextField();
-	CheckBox txtElagage = new CheckBox();
+	CheckBox chkElagage = new CheckBox();
 	TextField txtTimeDelFic = new TextField();
 	TextField txtTimeDelFS = new TextField();
-	JCheckBox chkStoreOnlyPlainFiles = new JCheckBox();
+	CheckBox chkStoreOnlyPlainFiles = new CheckBox();
 
 	Button btNext = new Button();
 
@@ -71,16 +71,18 @@ public class PanelParameterPeer extends InstallPanel {
 		txtListenPort.setTooltip(new Tooltip("Tcp port where we listen the connection from other peers."));
 		txtSizeIdeal.setTooltip(new Tooltip("Ideal maximum size that this drive can take in your local hard drive."));
 		txtSizeMax.setTooltip(new Tooltip("Absolute maximum size this drive can take in your hard drive (should be at least 1gio)."));
+		chkElagage.setTooltip(new Tooltip("Check it to allow the fs to erase file locally even if it's not sure that "
+				+ "it was copied to a 'trusted' host (ie permanent storage or at least one with enough free space)"));
 		txtTimeDelFic.setTooltip(new Tooltip("Number of seconds before a file can be really deleted on this disk."));
 		txtTimeDelFS.setTooltip(new Tooltip("Number of seconds before the knowledge of the deletion is deleted. "
 				+ "Must be greater than the value behind, should be at least the maximum time you can be disconnected from the cluster."));
-		chkStoreOnlyPlainFiles.setToolTipText("Set it to false to be able to store only some parts of the files, to be more space-efficient.\nSet it to true if you want to be able to read stored files even if the program isn't launched.");
+		chkStoreOnlyPlainFiles.setTooltip(new Tooltip("Set it to false to be able to store only some parts of the files, to be more space-efficient.\nSet it to true if you want to be able to read stored files even if the program isn't launched."));
 		btNext.setText("Next");
 		btNext.setTooltip(new Tooltip("Create your instance and connect it."));
 		String localPath = new File(".").getAbsolutePath();
 //		txtInstallPath.setText(localPath.substring(0, localPath.length()-1)+"myNewDrive");
-		txtInstallPath.setMultiSelectionEnabled(false);
-		txtInstallPath.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+//		txtInstallPath.setMultiSelectionEnabled(false);
+//		txtInstallPath.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 		btInstallPath.setText("...");
 		txtDrivePath.setText("K");
 		txtListenPort.setText("30400");
@@ -107,8 +109,8 @@ public class PanelParameterPeer extends InstallPanel {
 				alert.showAndWait();
 				return;
 			}
-			if(!txtInstallPath.getSelectedFile().exists()) {
-				txtInstallPath.getSelectedFile().mkdirs();
+			if(!new File(txtInstallPath.getText()).exists()) {
+				new File(txtInstallPath.getText()).mkdirs();
 			}
 			if(!new File(txtInstallPath.getText()).exists()) {
 				Alert alert = new Alert(Alert.AlertType.WARNING);alert.setTitle("Error");alert.setHeaderText("Error:");
@@ -172,7 +174,7 @@ public class PanelParameterPeer extends InstallPanel {
 		grid.add(txtSizeMax, 1, y, 1, 1);
 		y++;
 		grid.add(lblElagage, 0, y, 1, 1);
-		grid.add(txtElagage, 1, y, 1, 1);
+		grid.add(chkElagage, 1, y, 1, 1);
 		y++;
 		grid.add(lblTimeDelFS, 0, y, 1, 1);
 		grid.add(txtTimeDelFS, 1, y, 1, 1);
@@ -191,10 +193,11 @@ public class PanelParameterPeer extends InstallPanel {
 	@Override
 	public void destroy() {
 		
-		manager.savedData.put("InstallDir", txtInstallPath.getSelectedFile());
+		manager.savedData.put("InstallPath", txtInstallPath.getText());
 		manager.savedData.put("DrivePath", txtDrivePath.getText());
 		manager.savedData.put("ListenPort", txtListenPort.getText());
 		manager.savedData.put("SizeIdeal", txtSizeIdeal.getText());
+		manager.savedData.put("SizeMax", txtSizeMax.getText());
 		manager.savedData.put("SizeMax", txtSizeMax.getText());
 		manager.savedData.put("TimeDelFic", txtTimeDelFic.getText());
 		manager.savedData.put("TimeDelFS", txtTimeDelFS.getText());

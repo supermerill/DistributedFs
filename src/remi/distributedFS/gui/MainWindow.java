@@ -98,12 +98,6 @@ public class MainWindow extends Application {
 			}
 
 			@Override
-			public char getLetter() {
-				// TODO Auto-generated method stub
-				return 0;
-			}
-
-			@Override
 			public String getRootFolder() {
 				// TODO Auto-generated method stub
 				return null;
@@ -113,6 +107,12 @@ public class MainWindow extends Application {
 			public short getComputerId() {
 				// TODO Auto-generated method stub
 				return 0;
+			}
+
+			@Override
+			public String getDrivePath() {
+				// TODO Auto-generated method stub
+				return null;
 			}
 		};
 	}

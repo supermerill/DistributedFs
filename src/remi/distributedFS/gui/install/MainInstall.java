@@ -1,17 +1,14 @@
 package remi.distributedFS.gui.install;
 
-import java.awt.BorderLayout;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.swing.JFrame;
-
 import javafx.application.Application;
 import javafx.stage.Stage;
 
+
 public class MainInstall extends Application {
-	private static final long serialVersionUID = 1L;
 
 	InstallPanel currentPanel;
 	Map<String, Object> savedData = new HashMap<>();
@@ -68,7 +65,7 @@ public class MainInstall extends Application {
 		//create parameter files
 		
 		//standardManager.properties
-		Parameters paramsMana = new Parameters(mainDir.getAbsolutePath()+"/standardManager.properties");
+		remi.distributedFS.fs.Parameters paramsMana = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/standardManager.properties");
 		paramsMana.getStringOrDef("DriveLetter", savedData.get("DrivePath").toString());
 		paramsMana.getIntOrDef("ListenPort", Integer.parseInt(savedData.get("ListenPort").toString()));
 		paramsMana.getStringOrDef("StorageType", ((Boolean)savedData.get("PlainFileOnly"))?
@@ -77,7 +74,7 @@ public class MainInstall extends Application {
 		paramsMana.getStringOrDef("MainDir", mainDir.getAbsolutePath());
 		
 		//cleaner.properties
-		Parameters paramsClean = new Parameters(mainDir.getAbsolutePath()+"/cleaner.properties");
+		remi.distributedFS.fs.Parameters paramsClean = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/cleaner.properties");
 		paramsClean.getIntOrDef("minKnownDuplicate", 2);
 		paramsClean.getBoolOrDef("canDelete", true);
 		paramsClean.getIntOrDef("maxSize", Integer.parseInt(savedData.get("SizeMax").toString()));
