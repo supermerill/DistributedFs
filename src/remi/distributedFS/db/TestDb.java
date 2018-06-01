@@ -74,9 +74,9 @@ public class TestDb {
 			}
 
 			@Override
-			public char getLetter() {
+			public String getDrivePath() {
 				// TODO Auto-generated method stub
-				return 0;
+				return "";
 			}
 
 			@Override

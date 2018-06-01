@@ -28,7 +28,7 @@ public interface FileSystemManager {
 	
 	
 	
-	public char getLetter();
+	public String getDrivePath();
 	public String getRootFolder();
 
 }

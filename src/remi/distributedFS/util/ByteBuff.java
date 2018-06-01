@@ -501,7 +501,7 @@ public class ByteBuff
 	{
 		return putLong(Double.doubleToLongBits(value));
 	}
-	
+
 	public ByteBuff putUTF8(final String str)
 	{
 		final ByteBuffer buffUTF8 = UTF8.encode(str);
@@ -513,6 +513,21 @@ public class ByteBuff
 	public String getUTF8()
 	{
 		final int size = getTrailInt();
+		final CharBuffer buffUTF8 = UTF8.decode(ByteBuffer.wrap(get(size)));
+		return buffUTF8.toString();
+	}
+
+	public ByteBuff putShortUTF8(final String str)
+	{
+		final ByteBuffer buffUTF8 = UTF8.encode(str);
+		putShort((short) buffUTF8.remaining());
+		put(buffUTF8.array(), 0, buffUTF8.remaining());
+		return this;
+	}
+
+	public String getShortUTF8()
+	{
+		final int size = getShort();
 		final CharBuffer buffUTF8 = UTF8.decode(ByteBuffer.wrap(get(size)));
 		return buffUTF8.toString();
 	}

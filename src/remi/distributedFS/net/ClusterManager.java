@@ -33,7 +33,8 @@ public interface ClusterManager {
 	public void init(int listenPort);
 	
 	
-	public void connect(String string, int port);
+	public void connect(String string, int port); //try to connect to new peer
+	public void connect(); //try to connect to old stored peers
 	public short getComputerId();
 	public void launchUpdater();
 	public void initializeNewCluster();

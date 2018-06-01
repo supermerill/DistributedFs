@@ -15,9 +15,6 @@ import remi.distributedFS.fs.StandardManager;
 import remi.distributedFS.fs.messages.PropagateChange;
 import remi.distributedFS.net.impl.PhysicalServer;
 import remi.distributedFS.util.ByteBuff;
-import securitytools.sandbox.PermissionsSecurityManager;
-import securitytools.sandbox.Sandbox;
-import securitytools.sandbox.UntrustedAction;
 
 public class DistributedBigDataClientMananger extends StandardManager {
 	
@@ -47,6 +44,7 @@ public class DistributedBigDataClientMananger extends StandardManager {
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
 				bigdataExchange.register(this.net); // <======= a change is here
+				net.connect();
 			}
 			
 
