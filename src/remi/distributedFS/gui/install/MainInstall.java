@@ -1,11 +1,16 @@
 package remi.distributedFS.gui.install;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Map;
 
 import javafx.application.Application;
+import javafx.scene.control.Tooltip;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 
 public class MainInstall extends Application {
@@ -15,6 +20,24 @@ public class MainInstall extends Application {
 
 	Stage myFrame;
 
+	static {
+		//change behavior of tooltip : show for 30s instead of 5s
+		try {
+			
+			Class<?> TooltipBehaviorClass = Class.forName("javafx.scene.control.Tooltip$TooltipBehavior");
+			Constructor<?> cons_TB = TooltipBehaviorClass.getDeclaredConstructor(Duration.class, Duration.class, Duration.class, Boolean.TYPE);
+			cons_TB.setAccessible(true);
+			Object tb = cons_TB.newInstance(new Duration(1000), new Duration(30000), new Duration(200), false);
+			
+			Field f_BEHAVIOR = Tooltip.class.getDeclaredField("BEHAVIOR");
+			f_BEHAVIOR.setAccessible(true);
+			f_BEHAVIOR.set(null, tb);
+			
+		} catch (SecurityException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | ClassNotFoundException | InstantiationException | InvocationTargetException | NoSuchMethodException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	@Override
 	public void start(Stage frame) throws Exception {
 		myFrame = frame;

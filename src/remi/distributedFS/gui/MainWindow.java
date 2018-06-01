@@ -24,73 +24,72 @@ import remi.distributedFS.net.ClusterManager;
 
 public class MainWindow extends Application {
 
-	//tabs;
+	// tabs;
 	PanelPeers peers;
 	PanelRequest req;
 	TabPane tabs;
-	
+
 	FileSystemManager manager;
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {
-		
+
 		tabs = new TabPane();
-		
-//		peers = new PanelPeers(manager);
-//		tabs.addTab("network", peers);
-		
+
+		// peers = new PanelPeers(manager);
+		// tabs.addTab("network", peers);
+
 		req = new PanelRequest();
-//		tabs.getTabs().add(new Tab("req", req);
-		
+		// tabs.getTabs().add(new Tab("req", req);
+
 	}
-	
-	private void createFake(){
+
+	private void createFake() {
 
 		manager = new FileSystemManager() {
-			
-			
+
 			@Override
 			public void requestDirUpdate() {
 				// TODO Auto-generated method stub
-				
+
 			}
-			
+
 			@Override
 			public void propagateChange(FsObject fic) {
 				// TODO Auto-generated method stub
-				
+
 			}
-			
+
 			@Override
 			public long getUserId() {
 				// TODO Auto-generated method stub
 				return 0;
 			}
-			
+
 			@Override
 			public FsDirectory getRoot() {
 				// TODO Auto-generated method stub
 				return null;
 			}
-			
+
 			@Override
 			public ClusterManager getNet() {
 				// TODO Auto-generated method stub
 				return null;
 			}
-			
+
 			@Override
 			public long getGroupId() {
 				// TODO Auto-generated method stub
 				return 0;
 			}
-			
+
 			@Override
 			public StorageManager getDb() {
 				// TODO Auto-generated method stub
 				return null;
 			}
-			
+
 			@Override
 			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
 				// TODO Auto-generated method stub
@@ -116,10 +115,9 @@ public class MainWindow extends Application {
 			}
 		};
 	}
-	
+
 	public static void main(String[] args) {
 		Application.launch(args);
 	}
-	
-	
+
 }
