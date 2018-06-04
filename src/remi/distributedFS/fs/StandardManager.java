@@ -204,9 +204,9 @@ public class StandardManager implements FileSystemManager {
 		}
 	}
 
-	protected void close() {
-		// TODO Auto-generated method stub
-		
+	public void close() {
+		getNet().close();
+		os.close();
 	}
 
 	@Override

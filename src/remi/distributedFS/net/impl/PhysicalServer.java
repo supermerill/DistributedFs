@@ -1,5 +1,6 @@
 package remi.distributedFS.net.impl;
 
+import java.awt.TrayIcon.MessageType;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,10 +43,10 @@ import remi.distributedFS.util.ByteBuff;
  * To verify, we send a short message back but public-encrytped.<br>
  * Then, we can speak in RSA.<br>
  * We exchange our computerId.<br>
- * We verify if the publickey/computerID pair is ok, if we already seen the computer.
- * if everything is ok
+ * We verify if the publickey/computerID pair is ok, if we already seen the computer.<br>
  * 
  * 
+ * TODO: add cluster priv/pub key to be sure if somone has created an other cluster with the same id/password, he can't connect to our.
  * 
  * 
  * @author centai
@@ -773,6 +774,25 @@ public class PhysicalServer implements ClusterManager {
 
 	public ServerConnectionState getState() {
 		return myInformalState;
+	}
+
+	@Override
+	public void close() {
+		synchronized(peers) {
+			for(Peer peer : peers) {
+				try {
+					peer.close();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+			try {
+				if(mySocket != null)
+					mySocket.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 }

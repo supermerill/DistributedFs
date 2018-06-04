@@ -1,11 +1,15 @@
 package remi.distributedFS.gui;
 
 import java.io.File;
+import java.util.Optional;
 
 import it.unimi.dsi.fastutil.shorts.ShortList;
 import javafx.application.Application;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -71,6 +75,7 @@ public class MainWindow extends Application {
 		File mainDir = new File(".");
 		//standardMananger properties
 		remi.distributedFS.fs.Parameters paramsMana = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/standardManager.properties");
+		remi.distributedFS.fs.Parameters paramsNet = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/network.properties");
 		//cleaner.properties
 //		remi.distributedFS.fs.Parameters paramsClean = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/cleaner.properties");
 		//current net instance repo
@@ -97,9 +102,36 @@ public class MainWindow extends Application {
 					nbConnection = manager.getNet().getNbPeers();
 					System.out.println("nb connected peers = "+nbConnection);
 					if(nbConnection == 0) {
-						System.out.println("can't connect, create my new server");
+						System.out.println("can't connect, create my new server ? " + !paramsNet.getBoolOrDef("FirstConnection", false));
 						//start a new net cluster
-						manager.getNet().initializeNewCluster();
+						//TODO: if "connect to existing cluter" is checked, please do not create a new cluster without user permission
+						if(paramsNet.getBoolOrDef("FirstConnection", false)) {
+							Alert alert = new Alert(AlertType.CONFIRMATION);
+							alert.setTitle("Can't connect to cluster");
+							alert.setHeaderText("The cluster seems unreacheable.");
+							alert.setContentText("Do we abandon to connect to the cluster and create our own (click cancel if you want to try again alter) ?");
+							Optional<ButtonType> ret = alert.showAndWait();
+							if(ret.get().getButtonData().isDefaultButton()) {
+								manager.getNet().initializeNewCluster();
+								paramsNet.setBool("FirstConnection", false);
+							}else {
+								paramsNet.setBool("FirstConnection", true);
+								//close open threads & pipes
+								manager.close();
+								//remove nealy create files
+								for(File f : new File(mainDir.getAbsolutePath()).listFiles()) {
+									try {
+										if(!f.getName().endsWith(".properties")){
+											f.delete();
+										}
+									}catch(Exception e) {}
+								}
+								//exit
+								System.exit(0);
+							}
+						}else {
+							manager.getNet().initializeNewCluster();
+						}
 					}
 				}else{
 					System.out.println("MANY connection");
@@ -118,77 +150,6 @@ public class MainWindow extends Application {
 
 	}
 
-	private void createFake() {
-
-		manager = new FileSystemManager() {
-
-			@Override
-			public void requestDirUpdate() {
-				// TODO Auto-generated method stub
-
-			}
-
-			@Override
-			public void propagateChange(FsObject fic) {
-				// TODO Auto-generated method stub
-
-			}
-
-			@Override
-			public long getUserId() {
-				// TODO Auto-generated method stub
-				return 0;
-			}
-
-			@Override
-			public FsDirectory getRoot() {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
-			public ClusterManager getNet() {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
-			public long getGroupId() {
-				// TODO Auto-generated method stub
-				return 0;
-			}
-
-			@Override
-			public StorageManager getDb() {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
-			public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
-			public String getRootFolder() {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
-			public short getComputerId() {
-				// TODO Auto-generated method stub
-				return 0;
-			}
-
-			@Override
-			public String getDrivePath() {
-				// TODO Auto-generated method stub
-				return null;
-			}
-		};
-	}
 
 	public static void main(String[] args) {
 		Application.launch(args);

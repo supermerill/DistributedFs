@@ -114,6 +114,7 @@ public class MainInstall extends Application {
 		if(savedData.containsKey("ClusterIpPort")) {
 			paramsNet.getStringOrDef("PeerIp", savedData.get("ClusterIpPort").toString().split(":")[0]);
 			paramsNet.getLongOrDef("PeerPort", Long.parseLong(savedData.get("ClusterIpPort").toString().split(":")[1]));
+			paramsNet.setBool("FirstConnection", true);
 		}
 		paramsNet.getLongOrDef("ClusterId", Math.abs(savedData.get("ClusterId").hashCode()));
 		paramsNet.getStringOrDef("ClusterPassphrase", savedData.get("ClusterPwd").toString());

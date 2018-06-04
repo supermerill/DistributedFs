@@ -54,6 +54,11 @@ public interface ClusterManager {
 	 * @return number of connected peer (approximation).
 	 */
 	public int connect();
+
+	/**
+	 * shutdown
+	 */
+	public void close();
 	
 	public short getComputerId();
 	public void launchUpdater();

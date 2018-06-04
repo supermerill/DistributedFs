@@ -183,6 +183,9 @@ public class PanelParameterPeer extends InstallPanel {
 		grid.add(lblTimeDelFic, 0, y, 1, 1);
 		grid.add(txtTimeDelFic, 1, y, 1, 1);
 		y++;
+		grid.add(lblStoreOnlyPlainFiles, 0, y, 1, 1);
+		grid.add(chkStoreOnlyPlainFiles, 1, y, 1, 1);
+		y++;
 		grid.add(btNext, 3, y, 1, 1);
 	}
 	

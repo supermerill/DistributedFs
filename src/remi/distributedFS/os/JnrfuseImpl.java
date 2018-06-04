@@ -868,4 +868,8 @@ public class JnrfuseImpl extends FuseStubFS {
     public int fallocate(String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {
         return -ErrorCodes.ENOSYS();
     }
+    
+	public void close() {
+		this.umount();
+	}
 }
