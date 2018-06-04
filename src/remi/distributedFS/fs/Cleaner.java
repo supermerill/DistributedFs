@@ -24,7 +24,7 @@ public class Cleaner extends Thread{
 	int minKnownDuplicate;
 	long idealSize;
 	long maxSize;
-	long mstimeBeforeDelete;
+	long stimeBeforeDelete;
 	
 	
 	int msSleepPerOp = 10;
@@ -42,7 +42,7 @@ public class Cleaner extends Thread{
 		this.minKnownDuplicate = params.getIntOrDef("minKnownDuplicate", 1);
 		this.idealSize = params.getLongOrDef("idealSize", 1024*1024*10);
 		this.maxSize = params.getLongOrDef("maxSize", 1024*1024*1024);
-		this.mstimeBeforeDelete = params.getLongOrDef("mstimeBeforeDelete", 1000*60);
+		this.stimeBeforeDelete = params.getLongOrDef("stimeBeforeDelete", 1000*60);
 		
 		//scheduled next remove op in 100sec from creation, to elt time for the fs to load and rest
 		nextCleaningOp = System.currentTimeMillis() + 100000 *0;
@@ -54,7 +54,7 @@ public class Cleaner extends Thread{
 		this.manager = manager;
 		this.idealSize = idealSize;
 		this.maxSize = maxSize;
-		this.mstimeBeforeDelete = mstimeBeforeDelete;
+		this.stimeBeforeDelete = mstimeBeforeDelete /1000;
 		
 		//scheduled next remove op in 100sec from creation, to elt time for the fs to load and rest
 		nextCleaningOp = System.currentTimeMillis() + 100000 *0;
@@ -75,7 +75,7 @@ public class Cleaner extends Thread{
 		}
 		System.out.println(System.currentTimeMillis()+" > "+nextCleaningOp+" == "+(System.currentTimeMillis() > nextCleaningOp));
 		if(System.currentTimeMillis() > nextCleaningOp){
-			manager.getDb().removeOldDelItem(System.currentTimeMillis() - mstimeBeforeDelete);
+			manager.getDb().removeOldDelItem(System.currentTimeMillis() - 1000L*stimeBeforeDelete);
 //			nextCleaningOp = System.currentTimeMillis() + 1000 * 60 * 60 * 2; //every 2 hour
 			nextCleaningOp = System.currentTimeMillis() + 1000 * 20; //testing : every 20 seconds
 		}
@@ -83,18 +83,29 @@ public class Cleaner extends Thread{
 	}
 	
 	public static class ScoreDeletion implements Comparable<ScoreDeletion>{
+		long id;
 		long lastaccess;
 		int size;
 		int nbCopy;
 		
 		
-		public ScoreDeletion(long lastaccess, int size, int nbCopy) {
+		public ScoreDeletion(long id, long lastaccess, int size, int nbCopy) {
 			super();
+			this.id = id;
 			this.lastaccess = lastaccess;
 			this.size = size;
 			this.nbCopy = nbCopy;
 		}
 
+		@Override
+		public int hashCode() {
+			return Long.hashCode(id);
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			return (obj instanceof ScoreDeletion && ((ScoreDeletion)obj).id == this.id);
+		}
 
 		@Override
 		public int compareTo(ScoreDeletion o) {
@@ -182,13 +193,15 @@ public class Cleaner extends Thread{
 					// if i'm not the only one to have it, put it in the map (last access -> filename)
 					long timeWithFlavor = chunk.getLastAccessDate()*10+aleat.nextInt(1000);
 					int stop = 0;
-					while(lastAccess2id.containsKey(timeWithFlavor) && stop<1000){
+					ScoreDeletion scoreDeletion = new ScoreDeletion(chunkId, chunk.getLastAccessDate(), chunk.currentSize(), chunk.serverIdPresent().size());
+//					while(lastAccess2id.containsKey(timeWithFlavor) && stop<1000){
+					while(lastAccess2id.containsKey(scoreDeletion) && stop<1000){
 						//add some flavour
 						timeWithFlavor = chunk.getLastAccessDate()*10+aleat.nextInt(1000);
 						stop++;
 						System.out.println("chunk "+chunkId+" is not alone (with flavour"+timeWithFlavor+")");
 					}
-					lastAccess2id.put(new ScoreDeletion(chunk.getLastAccessDate(), chunk.currentSize(), chunk.serverIdPresent().size()), chunkId);
+					lastAccess2id.put(scoreDeletion, chunkId);
 					System.out.println("chunk "+chunkId+" is not alone");
 				}
 			}

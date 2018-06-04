@@ -5,7 +5,7 @@ import javafx.scene.control.Button;
 import javafx.scene.layout.VBox;
 
 public class PanelChoiceNewConnect extends InstallPanel {
-
+	private static final long serialVersionUID = -4861532843787270076L;
 
 	Button btNew;
 	Button btConnect;

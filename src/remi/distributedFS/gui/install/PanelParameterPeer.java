@@ -33,14 +33,15 @@ import javafx.stage.DirectoryChooser;
  */
 public class PanelParameterPeer extends InstallPanel {
 
-	Label lblInstallPath = new Label("Install path");
+	Label lblInstallPath = new Label("Install directory");
 	Label lblDrivePath = new Label("Drive path");
-	Label lblListenPort = new Label("Install path");
+	Label lblListenPort = new Label("Instance port");
 	Label lblSizeIdeal = new Label("Ideal size (in mio)");
 	Label lblSizeMax = new Label("Maximum size (in mio)");
 	Label lblElagage = new Label("ReduceSize aggressively");
 	Label lblTimeDelFic = new Label("Time before deletion (files)");
 	Label lblTimeDelFS = new Label("Time before deletion (metadata)");
+	Label lblStoreOnlyPlainFiles = new Label("Store only plain files");
 
 	TextField txtInstallPath = new TextField();
 	Button btInstallPath = new Button();
@@ -53,6 +54,7 @@ public class PanelParameterPeer extends InstallPanel {
 	TextField txtTimeDelFic = new TextField();
 	CheckBox chkCanDelFic = new CheckBox();
 	TextField txtTimeDelFS = new TextField();
+	CheckBox chkStoreOnlyPlainFiles = new CheckBox();
 
 	Button btNext = new Button();
 
@@ -67,15 +69,21 @@ public class PanelParameterPeer extends InstallPanel {
 		chkCanReduce.setTooltip(new Tooltip("Allow this instance to delete local content to make space for new one."));
 		txtSizeMax.setTooltip(
 				new Tooltip("Absolute maximum size this drive can take in your hard drive (should be at least 1gio)."));
+		chkElagage.setTooltip(new Tooltip("Check it to allow the fs to erase file locally even if it's not sure that "
+				+ "it was copied to a 'trusted' host (ie permanent storage or at least one with enough free space)"));
 		txtTimeDelFic.setTooltip(new Tooltip("Number of seconds before a file can be really deleted on this disk."));
 		chkCanDelFic.setTooltip(new Tooltip(
 				"Allow this instance to delete files stored locally when they are deleted in the distributed filesystem."));
 		txtTimeDelFS.setTooltip(new Tooltip("Number of seconds before the knowledge of the deletion is deleted. "
 				+ "Must be greater than the value behind, should be at least the maximum time you can be disconnected from the cluster."));
-		btNext.setText("Next");
+		chkStoreOnlyPlainFiles.setTooltip(new Tooltip("Set it to false to be able to store only some parts of the files, to be more space-efficient.\nSet it to true if you want to be able to read stored files even if the program isn't launched."));
+		btNext.setText("Finish");
 		btNext.setTooltip(new Tooltip("Create your instance and connect it."));
 		String localPath = new File(".").getAbsolutePath();
-		txtInstallPath.setText(localPath.substring(0, localPath.length() - 1) + "myNewDrive");
+//		txtInstallPath.setText(localPath.substring(0, localPath.length()-1)+"myNewDrive");
+//		txtInstallPath.setMultiSelectionEnabled(false);
+//		txtInstallPath.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		txtInstallPath.setText(new File(".").getAbsolutePath());
 		btInstallPath.setText("...");
 		txtDrivePath.setText("K");
 		txtListenPort.setText("30400");
@@ -196,6 +204,9 @@ public class PanelParameterPeer extends InstallPanel {
 		grid.add(txtTimeDelFic, 1, y, 1, 1);
 		grid.add(chkCanDelFic, 2, y, 1, 1);
 		y++;
+		grid.add(lblStoreOnlyPlainFiles, 0, y, 1, 1);
+		grid.add(chkStoreOnlyPlainFiles, 1, y, 1, 1);
+		y++;
 		grid.add(btNext, 3, y, 1, 1);
 	}
 
@@ -220,6 +231,7 @@ public class PanelParameterPeer extends InstallPanel {
 			manager.savedData.put("SizeIdeal", -1);
 		}
 		manager.savedData.put("SizeMax", txtSizeMax.getText());
+		manager.savedData.put("SizeMax", txtSizeMax.getText());
 		if (chkCanDelFic.isSelected()) {
 			manager.savedData.put("NoDelete", false);
 			manager.savedData.put("TimeDelFic", txtTimeDelFic.getText());
@@ -228,6 +240,6 @@ public class PanelParameterPeer extends InstallPanel {
 			manager.savedData.put("TimeDelFic", -1);
 		}
 		manager.savedData.put("TimeDelFS", txtTimeDelFS.getText());
-
+		manager.savedData.put("PlainFileOnly", chkStoreOnlyPlainFiles.isSelected());
 	}
 }

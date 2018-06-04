@@ -12,13 +12,11 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +33,6 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import javax.management.RuntimeErrorException;
 
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.net.impl.Peer.PeerConnectionState;
@@ -48,19 +45,22 @@ public class ServerIdDb {
 
 	List<Peer> receivedServerList;
 	List<Peer> registeredPeers;
+	List<Peer> loadedPeers;
 	Map<Long, PublicKey> tempPubKey; // unidentified pub key
 	Map<Short, PublicKey> id2PublicKey; // identified pub key
 	Map<Short, SecretKey> id2AesKey;
-	private PhysicalServer serv;
+	protected PhysicalServer serv;
 	
-	short myId = -1;
+	short myComputerId = -1;
 	long timeChooseId = 0;
 	
 	
-	private Map<Peer, String> emittedMsg = new HashMap<>();
-	private String filepath;
-	public long clusterId = -1; // the id to identify the whole cluster
-	private String passphrase = "no protection";
+	protected Map<Peer, String> emittedMsg = new HashMap<>();
+	protected String filepath;
+	protected long clusterId = -1; // the id to identify the whole cluster
+	protected String passphrase = "no protection"; //the passphrase of the cluster
+	
+	protected ServerIdDb() {}
 	
 	public ServerIdDb(PhysicalServer serv, String filePath){
 		this.serv = serv;
@@ -70,6 +70,7 @@ public class ServerIdDb {
 		id2AesKey =  new HashMap<>();
 		registeredPeers = new ArrayList<>();
 		receivedServerList = new ArrayList<>();
+		loadedPeers = new ArrayList<>();
 		// Get an instance of the Cipher for RSA encryption/decryption
 	}
 	
@@ -79,13 +80,13 @@ public class ServerIdDb {
 			SecureRandom random = SecureRandom.getInstanceStrong();
 			random.setSeed(System.currentTimeMillis());
 			generator.initialize(1024, random);
-			System.out.println(serv.getId()%100+" generate rsa");
+			System.out.println(serv.getPeerId()%100+" generate rsa");
 			KeyPair pair = generator.generateKeyPair();
-			System.out.println(serv.getId()%100+" generate rsa: ended");
+			System.out.println(serv.getPeerId()%100+" generate rsa: ended");
 			privateKey = pair.getPrivate();
 			publicKey = pair.getPublic();
 			
-			System.out.println(serv.getId()%100+" Priv key algo : "+createPrivKey(privateKey.getEncoded()).getAlgorithm());
+			System.out.println(serv.getPeerId()%100+" Priv key algo : "+createPrivKey(privateKey.getEncoded()).getAlgorithm());
 		} catch (NoSuchAlgorithmException e) {
 			throw new RuntimeException(e);
 		}
@@ -102,10 +103,48 @@ public class ServerIdDb {
 		if(!fic.exists()){
 			fic = new File(filepath+"_1");
 			if(!fic.exists()){
-				//no previous data, load nothing plz.
+				
+				//try to get data from the install file
+				remi.distributedFS.fs.Parameters paramsNet = new remi.distributedFS.fs.Parameters(fic.getParentFile().getAbsolutePath()+"/network.properties");
+				if(paramsNet.get("ClusterId")==null) {
+					//no previous data, load nothing plz.
+					System.err.println("No install data, please construct them!!!");
+					createNewPublicKey();
+				}else {
+
+					if(paramsNet.get("ClusterId") != null) {
+						System.out.println("set ClusterId to "+paramsNet.get("ClusterId"));
+						clusterId = paramsNet.getLong("ClusterId");
+					}
+					if(paramsNet.get("ClusterPassphrase") != null) {
+						System.out.println("set passphrase to "+paramsNet.get("ClusterPassphrase"));
+						passphrase = paramsNet.get("ClusterPassphrase");
+					}
+					if(paramsNet.get("PeerIp") != null && paramsNet.get("PeerPort") != null) {
+						final InetSocketAddress addr = new InetSocketAddress(paramsNet.get("PeerIp"), paramsNet.getInt("PeerPort"));
+						Peer p = new Peer(serv, addr.getAddress() , addr.getPort());
+						p.setComputerId((short) -1); // set it to <0 to let us know it's invalid
+						loadedPeers.add(p);
+					}
+					if(paramsNet.get("PubKey") == null || paramsNet.get("PrivKey") == null) {
+						System.out.println("no priv/pub key defeined, creating some random ones");
+						createNewPublicKey();
+					}else {
+						//TODO : get key from unicode string
+						publicKey = null;
+						throw new UnsupportedOperationException("pub/priv load key is not implemented yet");
+					}
+				}
+
 				//but create new data!
-				createNewPublicKey();
 				requestSave();
+				
+				//remove ClusterPwd in the conf file (to encrypt it, it doesn't protect it but just obfuscate a little)
+				if(paramsNet.get("ClusterPwd") != null) {
+					// it's not very useful, so for the beta phase, let it commented
+					//TODO uncomment this for release
+//					paramsNet.set("ClusterPwd","deleted");
+				}
 				return;
 			}
 		}
@@ -115,13 +154,13 @@ public class ServerIdDb {
 			
 			//read
 			clusterId = bufferReac.reset().read(in,8).flip().getLong();
-			System.out.println(serv.getId()%100+" clusterId : "+clusterId);
+			System.out.println(serv.getPeerId()%100+" clusterId : "+clusterId);
 //			System.out.println("clusterId : "+Long.toHexString(clusterId));
 			
 			//read id
-			myId = bufferReac.reset().read(in,2).flip().getShort();
-			System.out.println(serv.getId() % 100 + " LOAD MY COMPUTER ID as =" + myId);
-			System.out.println(serv.getId()%100+" myId : "+myId);
+			myComputerId = bufferReac.reset().read(in,2).flip().getShort();
+			System.out.println(serv.getPeerId() % 100 + " LOAD MY COMPUTER ID as =" + myComputerId);
+//			System.out.println(serv.getPeerId()%100+" myComputerId : "+myComputerId);
 //			System.out.println("myId : "+Integer.toHexString(bufferReac.rewind().getShort()));
 			
 			//read passphrase
@@ -135,7 +174,7 @@ public class ServerIdDb {
 			X509EncodedKeySpec bobPubKeySpec = new X509EncodedKeySpec(encodedPubKey);
 			KeyFactory keyFactory = KeyFactory.getInstance("RSA");
 			publicKey = keyFactory.generatePublic(bobPubKeySpec);
-			System.out.println( serv.getId()%100+" publicKey => "+Arrays.toString(encodedPubKey));
+			System.out.println( serv.getPeerId()%100+" publicKey => "+Arrays.toString(encodedPubKey));
 
 			//read privKey
 			nbBytes = bufferReac.reset().read(in,4).flip().getInt();
@@ -144,33 +183,37 @@ public class ServerIdDb {
 			privateKey = createPrivKey(encodedPrivKey);
 			
 			//read peers
+			loadedPeers.clear();
 			int nbPeers = bufferReac.reset().read(in,4).flip().getInt();
-			System.out.println(serv.getId()%100+" i have "+nbPeers+" peers");
+			System.out.println(serv.getPeerId()%100+" i have "+nbPeers+" peers");
 			for(int i=0;i<nbPeers;i++){
-				nbBytes = bufferReac.reset().read(in, 4).flip().getInt();
-				String distIp = bufferReac.reset().read(in, nbBytes).flip().getUTF8();
+				nbBytes = bufferReac.reset().read(in, 2).flip().getShort();
+				String distIp = bufferReac.read(in, nbBytes).flip().getShortUTF8();
+				System.out.println("read peer ip from file : "+distIp);
 				int distPort = bufferReac.reset().read(in, 4).flip().getInt();
 				short distId =  bufferReac.reset().read(in, 2).flip().getShort();
 				nbBytes = bufferReac.reset().read(in,4).flip().getInt();
 				encodedPubKey = new byte[nbBytes];
 				PublicKey distPublicKey = null;
 				if(nbBytes>0){
-					System.out.println(serv.getId()%100+" (ext)publicKey size : "+nbBytes);
+					System.out.println(serv.getPeerId()%100+" (ext)publicKey size : "+nbBytes);
 					bufferReac.reset().read(in,nbBytes).flip().get(encodedPubKey, 0, nbBytes);
-					System.out.println( serv.getId()%100+"  => "+Arrays.toString(encodedPubKey));
+					System.out.println( serv.getPeerId()%100+"  => "+Arrays.toString(encodedPubKey));
 					bobPubKeySpec = new X509EncodedKeySpec(encodedPubKey);
 					distPublicKey = keyFactory.generatePublic(bobPubKeySpec);
 					//save
 					Peer p = new Peer(serv, new InetSocketAddress(distIp, distPort).getAddress(), distPort);
 					p.setComputerId(distId);
+					loadedPeers.add(p);
 					id2PublicKey.put(distId, distPublicKey);
 				}else{
-					System.err.println(serv.getId()%100+" error, i have a peer but he has no public key.");
+					System.err.println(serv.getPeerId()%100+" error, i have a peer but he has no public key.");
 				}
 			}
 			
 			
 		} catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e1) {
+			e1.printStackTrace();
 			throw new RuntimeException(e1);
 		}
 	}
@@ -198,12 +241,12 @@ public class ServerIdDb {
 			ByteBuff bufferReac = new ByteBuff(1024);
 			
 			//write
-			System.out.println(serv.getId()%100+" write Cid : "+clusterId);
+			System.out.println(serv.getPeerId()%100+" write Cid : "+clusterId);
 			bufferReac.reset().putLong(clusterId).flip().write(out);
 			
 			//write id
-			System.out.println(serv.getId()%100+" write id : "+myId);
-			bufferReac.reset().putShort(myId).flip().write(out);
+			System.out.println(serv.getPeerId()%100+" write id : "+myComputerId);
+			bufferReac.reset().putShort(myComputerId).flip().write(out);
 			
 			//write passphrase
 			bufferReac.reset().putShort((short)0).putUTF8(passphrase);
@@ -240,8 +283,7 @@ public class ServerIdDb {
 				for(int i=0;i<nbPeers;i++){
 					Peer p = registeredPeers.get(i);
 					//save ip
-					bufferReac.reset().putInt(0).putUTF8(p.getIP()).flip();
-					bufferReac.putInt(bufferReac.limit()-4).rewind().write(out);	
+					bufferReac.reset().putShortUTF8(p.getIP()).flip().write(out);
 					//save port
 					bufferReac.reset().putInt(p.getPort()).flip().write(out);
 					//save id
@@ -252,20 +294,20 @@ public class ServerIdDb {
 				}
 			}
 			
-			
+			out.flush();
 		} catch (IOException e1) {
 			throw new RuntimeException(e1);
 		}
 	}
 	
 	public void requestPublicKey(Peer peer){
-		System.out.println(serv.getId()%100+" (requestPublicKey) emit GET_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100);
+		System.out.println(serv.getPeerId()%100+" (requestPublicKey) emit GET_SERVER_PUBLIC_KEY to "+peer.getPeerId()%100);
 		serv.writeMessage(peer, AbstractMessageManager.GET_SERVER_PUBLIC_KEY, null);
 	}
 
 	//send our public key to the peer
 	public void sendPublicKey(Peer peer) {
-		System.out.println(serv.getId()%100+" (sendPublicKey) emit SEND_SERVER_PUBLIC_KEY to "+peer.getConnectionId()%100);
+		System.out.println(serv.getPeerId()%100+" (sendPublicKey) emit SEND_SERVER_PUBLIC_KEY to "+peer.getPeerId()%100);
 		
 		ByteBuff buff = new ByteBuff();
 		//my pub key
@@ -279,7 +321,7 @@ public class ServerIdDb {
 	
 
 	public void receivePublicKey(Peer p, ByteBuff buffIn) {
-		System.out.println(serv.getId()%100+" (receivePublicKey) receive SEND_SERVER_PUBLIC_KEY to "+p.getConnectionId()%100);
+		System.out.println(serv.getPeerId()%100+" (receivePublicKey) receive SEND_SERVER_PUBLIC_KEY to "+p.getPeerId()%100);
 		try{
 			//get pub Key
 			int nbBytes = buffIn.getInt();
@@ -289,7 +331,7 @@ public class ServerIdDb {
 			KeyFactory keyFactory = KeyFactory.getInstance("RSA");
 			PublicKey distPublicKey = keyFactory.generatePublic(bobPubKeySpec);
 			synchronized (tempPubKey) {
-				tempPubKey.put(p.getConnectionId(), distPublicKey);
+				tempPubKey.put(p.getPeerId(), distPublicKey);
 //				System.out.println(serv.getId()%100+" (receivePublicKey) peer "+p.getConnectionId()%100+" has now a pub key of "+tempPubKey.get(p.getConnectionId()));
 			}
 
@@ -308,34 +350,34 @@ public class ServerIdDb {
 			emittedMsg.put(peer, msg);
 			//todo: encrypt it with our public key.
 		}else{
-			System.out.println(" (createMessageForIdentityCheck) We already emit a request for indentity to "+peer.getConnectionId()%100+" with message "+emittedMsg.get(peer));
+			System.out.println(" (createMessageForIdentityCheck) We already emit a request for indentity to "+peer.getPeerId()%100+" with message "+emittedMsg.get(peer));
 		}
 		return msg;
 	}
 
 	//send our public key to the peer, with the message encoded
 	public void sendIdentity(Peer peer, String messageToEncrypt, boolean isRequest) {
-		System.out.println(serv.getId()%100+" (sendIdentity"+isRequest+") emit "+(isRequest?"GET_IDENTITY":"SEND_IDENTITY")+" to "+peer.getConnectionId()%100+", with message 2encrypt : "+messageToEncrypt);
+		System.out.println(serv.getPeerId()%100+" (sendIdentity"+isRequest+") emit "+(isRequest?"GET_IDENTITY":"SEND_IDENTITY")+" to "+peer.getPeerId()%100+", with message 2encrypt : "+messageToEncrypt);
 		//check if we have the public key of this peer
 		PublicKey theirPubKey = null;
 		synchronized (tempPubKey) {
-			theirPubKey = tempPubKey.get(peer.getConnectionId());
+			theirPubKey = tempPubKey.get(peer.getPeerId());
 			if(theirPubKey == null){
 				//request his key
-				System.out.println(serv.getId()%100+" (sendIdentity "+isRequest+")i don't have public key! why are you doing that? Request his one!");
+				System.out.println(serv.getPeerId()%100+" (sendIdentity "+isRequest+")i don't have public key! why are you doing that? Request his one!");
 				requestPublicKey(peer);
 				return;
 			}
 		}
 		
 		//don't emit myId if it's -1
-		if(myId<0){
-			System.out.println(serv.getId()%100+" (sendIdentity "+isRequest+") but i have null id!! ");
+		if(myComputerId<0){
+			System.out.println(serv.getPeerId()%100+" (sendIdentity "+isRequest+") but i have null id!! ");
 			ByteBuff buff = new ByteBuff();
 			buff.putShort((short) -1);
 			//send packet
 			if(!isRequest){
-				System.out.println(serv.getId()%100+" (sendIdentity "+isRequest+") so i return '-1' ");
+				System.out.println(serv.getPeerId()%100+" (sendIdentity "+isRequest+") so i return '-1' ");
 				serv.writeMessage(peer, AbstractMessageManager.SEND_VERIFY_IDENTITY, buff.flip());
 			}
 			return;
@@ -347,15 +389,15 @@ public class ServerIdDb {
 			//encode msg
 			Cipher cipher = Cipher.getInstance("RSA");
 			cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-			ByteBuff buffEncoded = blockCipher(new ByteBuff().putShort(myId).putUTF8(messageToEncrypt).putUTF8(passphrase).flip().toArray(), Cipher.ENCRYPT_MODE, cipher);
+			ByteBuff buffEncoded = blockCipher(new ByteBuff().putShort(myComputerId).putUTF8(messageToEncrypt).putUTF8(passphrase).flip().toArray(), Cipher.ENCRYPT_MODE, cipher);
 			
 			//encrypt more
 			cipher.init(Cipher.ENCRYPT_MODE, theirPubKey);
 			buffEncoded = blockCipher(buffEncoded.array(), Cipher.ENCRYPT_MODE, cipher);
 			
 			buff.putInt(buffEncoded.limit()).put(buffEncoded);
-			System.out.println(serv.getId()%100+" (sendIdentity"+isRequest+") message : "+messageToEncrypt);
-			System.out.println(serv.getId()%100+" (sendIdentity"+isRequest+") Encryptmessage : "+Arrays.toString(buffEncoded.rewind().array()));
+			System.out.println(serv.getPeerId()%100+" (sendIdentity"+isRequest+") message : "+messageToEncrypt);
+			System.out.println(serv.getPeerId()%100+" (sendIdentity"+isRequest+") Encryptmessage : "+Arrays.toString(buffEncoded.rewind().array()));
 			
 			//send packet
 			serv.writeMessage(peer, isRequest?AbstractMessageManager.GET_VERIFY_IDENTITY:AbstractMessageManager.SEND_VERIFY_IDENTITY, buff.flip());
@@ -386,15 +428,15 @@ public class ServerIdDb {
 	}
 	
 	public void answerIdentity(Peer peer, ByteBuff buffIn) {
-		System.out.println(serv.getId()%100+" (answerIdentity) receive GET_IDENTITY to "+peer.getConnectionId()%100);
+		System.out.println(serv.getPeerId()%100+" (answerIdentity) receive GET_IDENTITY to "+peer.getPeerId()%100);
 
 
 		PublicKey theirPubKey = null;
 		synchronized (tempPubKey) {
-			theirPubKey = tempPubKey.get(peer.getConnectionId());
+			theirPubKey = tempPubKey.get(peer.getPeerId());
 			if(theirPubKey == null){
 				//request his key
-				System.out.println(serv.getId()%100+" (answerIdentity)i don't have public key! why are you doing that? Request his one!");
+				System.out.println(serv.getPeerId()%100+" (answerIdentity)i don't have public key! why are you doing that? Request his one!");
 				requestPublicKey(peer);
 				return;
 			}
@@ -404,11 +446,11 @@ public class ServerIdDb {
 		String msgDecoded = buffDecoded.getUTF8();
 		String theirPwd = buffDecoded.getUTF8();
 		if(!theirPwd.equals(passphrase)) {
-			System.err.println("Error: peer "+peer.getConnectionId()%100+" : ?"+unverifiedCompId+"? has not the same pwd as us.");
+			System.err.println("Error: peer "+peer.getPeerId()%100+" : ?"+unverifiedCompId+"? has not the same pwd as us.");
 			peer.close(); //TODO: verify that Physical server don't revive it.
 			//TODO : remove it from possible server list
 		}else {
-			System.out.println(serv.getId()%100+" (answerIdentity) msgDecoded = "+msgDecoded);
+			System.out.println(serv.getPeerId()%100+" (answerIdentity) msgDecoded = "+msgDecoded);
 			//same pwd, continue
 			sendIdentity(peer, msgDecoded, false);
 		}
@@ -416,15 +458,15 @@ public class ServerIdDb {
 
 
 	public void receiveIdentity(Peer peer, ByteBuff buffIn) {
-		System.out.println(serv.getId()%100+" (receiveIdentity) receive SEND_IDENTITY to "+peer.getConnectionId()%100);
+		System.out.println(serv.getPeerId()%100+" (receiveIdentity) receive SEND_IDENTITY to "+peer.getPeerId()%100);
 
 
 		PublicKey theirPubKey = null;
 		synchronized (tempPubKey) {
-			theirPubKey = tempPubKey.get(peer.getConnectionId());
+			theirPubKey = tempPubKey.get(peer.getPeerId());
 			if(theirPubKey == null){
 				//request his key
-				System.out.println(serv.getId()%100+" (receiveIdentity)i don't have public key! why are you doing that? Request his one!");
+				System.out.println(serv.getPeerId()%100+" (receiveIdentity)i don't have public key! why are you doing that? Request his one!");
 				requestPublicKey(peer);
 				return;
 			}
@@ -439,21 +481,21 @@ public class ServerIdDb {
 		
 
 		if(distId <0 || !emittedMsg.containsKey(peer)){
-			System.out.println(serv.getId()%100+" (receiveIdentity) BAD receive computerid "+distId+" and i "+emittedMsg.containsKey(peer)+" emmitted a message");
+			System.out.println(serv.getPeerId()%100+" (receiveIdentity) BAD receive computerid "+distId+" and i "+emittedMsg.containsKey(peer)+" emmitted a message");
 			//the other peer doesn't have an computerid (yet)
 			emittedMsg.remove(peer);
 			return;
 		}else{
-			System.out.println(serv.getId()%100+" (receiveIdentity) GOOD receive computerid "+distId+" and i "+emittedMsg.containsKey(peer)+" emmitted a message");
+			System.out.println(serv.getPeerId()%100+" (receiveIdentity) GOOD receive computerid "+distId+" and i "+emittedMsg.containsKey(peer)+" emmitted a message");
 		}
 		if(!theirPwd.equals(passphrase)) {
-			System.err.println("Error: peer "+peer.getConnectionId()%100+" : "+distId+" has not the same pwd as us (2).");
+			System.err.println("Error: peer "+peer.getPeerId()%100+" : "+distId+" has not the same pwd as us (2).");
 			peer.close(); //TODO: verify that Physical server don't revive it.
 			//TODO : remove it from possible server list
 			return;
 		}
 
-		System.out.println(serv.getId()%100+" (receiveIdentity) i have sent to "+peer.getConnectionId()%100+" the message "+emittedMsg.get(peer)+" to encode. i have received "+msgDecoded +" !!!");
+		System.out.println(serv.getPeerId()%100+" (receiveIdentity) i have sent to "+peer.getPeerId()%100+" the message "+emittedMsg.get(peer)+" to encode. i have received "+msgDecoded +" !!!");
 		
 		//check if this message is inside our peer
 		if(emittedMsg.get(peer).equals(msgDecoded)){
@@ -469,7 +511,7 @@ public class ServerIdDb {
 							storedP.close();
 							System.out.println("Seems like computer "+distId+" has reconnected!");
 						}else{
-							System.err.println("error, cluster id "+distId+" already taken for "+peer.getConnectionId()%100+" ");
+							System.err.println("error, cluster id "+distId+" already taken for "+peer.getPeerId()%100+" ");
 							alreadyTaken = true;
 							//TODO: emit something to let it know we don't like his clusterId
 							break;
@@ -481,7 +523,7 @@ public class ServerIdDb {
 				synchronized (id2PublicKey) {
 					//check if the public key is the same
 					if(!this.id2PublicKey.containsKey(distId) || this.id2PublicKey.get(distId) == null){
-						System.out.println(serv.getId()%100+" (receiveIdentity) assign new publickey  for computerid "+distId+" , connId="+peer.getConnectionId()%100);
+						System.out.println(serv.getPeerId()%100+" (receiveIdentity) assign new publickey  for computerid "+distId+" , connId="+peer.getPeerId()%100);
 						//validate this peer
 						this.id2PublicKey.put(distId, theirPubKey);
 						this.registeredPeers.add(peer);
@@ -494,11 +536,11 @@ public class ServerIdDb {
 						
 					}else{
 						if(!Arrays.equals(this.id2PublicKey.get(distId).getEncoded(), theirPubKey.getEncoded())){
-							System.err.println(serv.getId()%100+" (receiveIdentity) error, cluster id "+distId+"has a wrong public key (not the one i registered) "+peer.getConnectionId()%100+" ");
-							System.err.println(serv.getId()%100+" (receiveIdentity) what i have : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
-							System.err.println(serv.getId()%100+" (receiveIdentity) what i received : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
+							System.err.println(serv.getPeerId()%100+" (receiveIdentity) error, cluster id "+distId+"has a wrong public key (not the one i registered) "+peer.getPeerId()%100+" ");
+							System.err.println(serv.getPeerId()%100+" (receiveIdentity) what i have : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
+							System.err.println(serv.getPeerId()%100+" (receiveIdentity) what i received : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
 						}else{
-							System.out.println(serv.getId()%100+" (receiveIdentity) publickey ok for computerid "+distId);
+							System.out.println(serv.getPeerId()%100+" (receiveIdentity) publickey ok for computerid "+distId);
 							peer.setComputerId(distId);
 							if(!registeredPeers.contains(peer)) this.registeredPeers.add(peer);
 							//request a aes key
@@ -510,7 +552,7 @@ public class ServerIdDb {
 				
 				if(peer.hasState(PeerConnectionState.HAS_VERIFIED_COMPUTER_ID)){
 					// easy optional leader election (add 'true||' if you want to test the proposal-conflict-resolver-algorithm).
-					if(this.serv.getId() > peer.getConnectionId()){
+					if(this.serv.getPeerId() > peer.getPeerId()){
 						sendAesKey(peer, AES_PROPOSAL);
 					}else{
 						requestSecretKey(peer);
@@ -519,14 +561,14 @@ public class ServerIdDb {
 				
 			}
 		}else{
-			System.err.println("Errror: (receivePublicKey) message '"+emittedMsg.get(peer)+"' emmited to "+peer.getConnectionId()%100+" is different than "+msgDecoded+" received!");
+			System.err.println("Errror: (receivePublicKey) message '"+emittedMsg.get(peer)+"' emmited to "+peer.getPeerId()%100+" is different than "+msgDecoded+" received!");
 		}
 	}
 
 	
 	public void requestSave() {
 		// save the current state into the file.
-		if(clusterId<0 || myId<0) return; //don't save if we are not registered on the server yet.
+		if(clusterId<0 || myComputerId<0) return; //don't save if we are not registered on the server yet.
 		// get synch
 		synchronized (this) {
 			// create an other file
@@ -624,7 +666,7 @@ public class ServerIdDb {
 	}
 	
 	public void requestSecretKey(Peer peer){
-			System.out.println(serv.getId()%100+" (requestSecretKey) emit GET_SERVER_AES_KEY to "+peer.getConnectionId()%100);
+			System.out.println(serv.getPeerId()%100+" (requestSecretKey) emit GET_SERVER_AES_KEY to "+peer.getPeerId()%100);
 			serv.writeMessage(peer, AbstractMessageManager.GET_SERVER_AES_KEY, new ByteBuff());
 			//todo: encrypt it with our public key.
 	}
@@ -639,7 +681,7 @@ public class ServerIdDb {
 	//note: the proposal/confirm thing work because i set my aes key before i emit my proposal.
 	
 	public void sendAesKey(Peer peer, byte aesState) {
-		System.out.println(serv.getId()%100+" (sendAesKey) emit SEND_SERVER_AES_KEY state:"+((aesState&AES_FLAG_CONFIRM)==0?"PROPOSAL":"CONFIRM")+" to "+peer.getConnectionId()%100);
+		System.out.println(serv.getPeerId()%100+" (sendAesKey) emit SEND_SERVER_AES_KEY state:"+((aesState&AES_FLAG_CONFIRM)==0?"PROPOSAL":"CONFIRM")+" to "+peer.getPeerId()%100);
 		
 		//check if i'm able to do this
 		if(peer.getComputerId()>=0 && isChoosen(peer.getComputerId())){
@@ -669,8 +711,8 @@ public class ServerIdDb {
 				Cipher cipherPri = Cipher.getInstance("RSA");
 				cipherPri.init(Cipher.ENCRYPT_MODE, privateKey);
 				ByteBuff buffEncodedPriv = blockCipher(secretKey.getEncoded(), Cipher.ENCRYPT_MODE, cipherPri);
-				System.out.println(serv.getId()%100+" (sendAesKey) key : "+Arrays.toString(secretKey.getEncoded()));
-				System.out.println(serv.getId()%100+" (sendAesKey) EncryptKey : "+Arrays.toString(buffEncodedPriv.array()));
+				System.out.println(serv.getPeerId()%100+" (sendAesKey) key : "+Arrays.toString(secretKey.getEncoded()));
+				System.out.println(serv.getPeerId()%100+" (sendAesKey) EncryptKey : "+Arrays.toString(buffEncodedPriv.array()));
 				
 				//encode again with their public key
 				//encode msg with private key
@@ -678,7 +720,7 @@ public class ServerIdDb {
 				cipherPub.init(Cipher.ENCRYPT_MODE, id2PublicKey.get(peer.getComputerId()));
 				ByteBuff buffEncodedPrivPub = blockCipher(buffEncodedPriv.toArray(), Cipher.ENCRYPT_MODE, cipherPub);
 				buffMsg.putInt(buffEncodedPrivPub.limit()).put(buffEncodedPrivPub);
-				System.out.println(serv.getId()%100+" (sendAesKey) EncryptKey2 : "+Arrays.toString(buffEncodedPrivPub.array()));
+				System.out.println(serv.getPeerId()%100+" (sendAesKey) EncryptKey2 : "+Arrays.toString(buffEncodedPrivPub.array()));
 				
 				//send packet
 				serv.writeMessage(peer, AbstractMessageManager.SEND_SERVER_AES_KEY, buffMsg.flip());
@@ -688,32 +730,32 @@ public class ServerIdDb {
 			}
 			
 		}else{
-			System.err.println("Error, peer "+peer.getConnectionId()%100+" want an aes key but we don't have a rsa one yet!");
+			System.err.println("Error, peer "+peer.getPeerId()%100+" want an aes key but we don't have a rsa one yet!");
 		}
 	}
 
 	public void receiveAesKey(Peer peer, ByteBuff message) {
-		System.out.println(serv.getId()%100+" (receiveAesKey) receive SEND_SERVER_AES_KEY"+" from "+peer.getConnectionId()%100);
+		System.out.println(serv.getPeerId()%100+" (receiveAesKey) receive SEND_SERVER_AES_KEY"+" from "+peer.getPeerId()%100);
 		//check if i'm able to do this
 		if(peer.getComputerId()>=0 && isChoosen(peer.getComputerId())){
 			try{
 				//decrypt the key
 				//0° : get the message
 				byte aesStateMsg = message.get();
-				System.out.println(serv.getId()%100+" (receiveAesKey) receive SEND_SERVER_AES_KEY state:"+((aesStateMsg&AES_FLAG_CONFIRM)==0?"PROPOSAL":"CONFIRM"));
+				System.out.println(serv.getPeerId()%100+" (receiveAesKey) receive SEND_SERVER_AES_KEY state:"+((aesStateMsg&AES_FLAG_CONFIRM)==0?"PROPOSAL":"CONFIRM"));
 				int nbBytesMsg = message.getInt();
 				byte[] aesKeyEncrypt = message.get(nbBytesMsg);
-				System.out.println(serv.getId()%100+" (receiveAesKey) EncryptKey2 : "+Arrays.toString(aesKeyEncrypt));
+				System.out.println(serv.getPeerId()%100+" (receiveAesKey) EncryptKey2 : "+Arrays.toString(aesKeyEncrypt));
 				//1°: decrypt with our private key
 				Cipher cipher = Cipher.getInstance("RSA");
 				cipher.init(Cipher.DECRYPT_MODE, this.privateKey);
 				ByteBuff aesKeySemiDecrypt = blockCipher(aesKeyEncrypt, Cipher.DECRYPT_MODE, cipher);
-				System.out.println(serv.getId()%100+" (receiveAesKey) EncryptKey : "+Arrays.toString(aesKeySemiDecrypt.array()));
+				System.out.println(serv.getPeerId()%100+" (receiveAesKey) EncryptKey : "+Arrays.toString(aesKeySemiDecrypt.array()));
 				//2° deccrypt with his public key
 				Cipher cipher2 = Cipher.getInstance("RSA");
 				cipher2.init(Cipher.DECRYPT_MODE, id2PublicKey.get(peer.getComputerId()));
 				ByteBuff aesKeyDecrypt = blockCipher(aesKeySemiDecrypt.array(), Cipher.DECRYPT_MODE, cipher2);
-				System.out.println(serv.getId()%100+" (receiveAesKey) DecryptKey : "+Arrays.toString(aesKeyDecrypt.array()));
+				System.out.println(serv.getPeerId()%100+" (receiveAesKey) DecryptKey : "+Arrays.toString(aesKeyDecrypt.array()));
 				SecretKey secretKeyReceived = new SecretKeySpec(aesKeyDecrypt.array(), aesKeyDecrypt.position(), aesKeyDecrypt.limit(), "AES"); 
 			
 				//check if we already have one
@@ -724,14 +766,14 @@ public class ServerIdDb {
 					if(secretKey == null){
 						//store the new one
 						id2AesKey.put(peer.getComputerId(), secretKeyReceived);
-						System.out.println(serv.getId()%100+" (receiveAesKey) use new one");
+						System.out.println(serv.getPeerId()%100+" (receiveAesKey) use new one");
 						peer.changeState(PeerConnectionState.CONNECTED_W_AES, true);
 						if(aesStateMsg != AES_CONFIRM){
 							shouldEmit = AES_CONFIRM;
 						}
 					}else if(Arrays.equals(secretKey.getEncoded(), secretKeyReceived.getEncoded())){
 						//same, no problem
-						System.out.println(serv.getId()%100+" (receiveAesKey) same as i have");
+						System.out.println(serv.getPeerId()%100+" (receiveAesKey) same as i have");
 						peer.changeState(PeerConnectionState.CONNECTED_W_AES, true);
 						if(aesStateMsg != AES_CONFIRM){
 							shouldEmit = AES_CONFIRM;
@@ -739,7 +781,7 @@ public class ServerIdDb {
 					}else{
 						//error, conflict?
 						if(peer.hasState(PeerConnectionState.CONNECTED_W_AES)){
-							System.err.println(serv.getId()%100+" (receiveAesKey) warn, receive a 'late' 'proposal?"+(aesStateMsg==0)+"'");
+							System.err.println(serv.getPeerId()%100+" (receiveAesKey) warn, receive a 'late' 'proposal?"+(aesStateMsg==0)+"'");
 							//already confirmed, use current one
 							//emit confirm if we need it
 							if(aesStateMsg != AES_CONFIRM){
@@ -747,19 +789,19 @@ public class ServerIdDb {
 							}
 						}else if(aesStateMsg == AES_CONFIRM){
 							// he blocked this one, choose it
-							System.err.println(serv.getId()%100+" (receiveAesKey) warn, receive a contradict confirm");
+							System.err.println(serv.getPeerId()%100+" (receiveAesKey) warn, receive a contradict confirm");
 							id2AesKey.put(peer.getComputerId(), secretKeyReceived);
 							peer.changeState(PeerConnectionState.CONNECTED_W_AES, true);
 						}else{
-							System.err.println(serv.getId()%100+" (receiveAesKey) warn, conflict");
+							System.err.println(serv.getPeerId()%100+" (receiveAesKey) warn, conflict");
 							//use one in random and send it, it should converge.
 							if(System.currentTimeMillis()%2==0){
 								//use new one
 								id2AesKey.put(peer.getComputerId(), secretKeyReceived);
-								System.out.println(serv.getId()%100+" (receiveAesKey) conflict: use new");
+								System.out.println(serv.getPeerId()%100+" (receiveAesKey) conflict: use new");
 							}else{
 								//nothing, we keep the current one
-								System.out.println(serv.getId()%100+" (receiveAesKey) conflict: use old");
+								System.out.println(serv.getPeerId()%100+" (receiveAesKey) conflict: use old");
 							}
 							//notify (outside of sync group)
 							shouldEmit = AES_PROPOSAL;
@@ -776,9 +818,23 @@ public class ServerIdDb {
 			}
 			
 		}else{
-			System.err.println("Error, peer "+peer.getConnectionId()%100+" want an aes key but we don't have a rsa one yet!");
+			System.err.println("Error, peer "+peer.getPeerId()%100+" want an aes key but we don't have a rsa one yet!");
 		}
 	}
+
+	public long getClusterId() {
+		return clusterId;
+	}
+
+	public void newClusterId() {
+		clusterId = Math.abs(new Random().nextLong());
+	}
+
+	//when receiving it from network?
+//	public void setClusterId(long clusterId2) {
+//		// TODO Auto-generated method stub
+//		
+//	}
 
 	
 	

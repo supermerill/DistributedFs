@@ -349,7 +349,7 @@ public class FsTableLocal implements StorageManager{
 			}
 		}
 	
-		System.out.println("idRet="+idRet);
+		System.out.println("idRetNS="+idRet);
 		//create new
 		if(idRet<0){
 			idRet = fileSize/FS_SECTOR_SIZE;

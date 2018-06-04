@@ -32,53 +32,55 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 
 	@Override
 	public void receiveMessage(long senderId, byte messageId, ByteBuff message) {
-		System.out.println(clusterMananger.getId()%100+" receive message from "+senderId%100);
+		System.out.println(clusterMananger.getPeerId()%100+" receive message from "+senderId%100);
 		if (messageId == AbstractMessageManager.GET_SERVER_PUBLIC_KEY) {
-			System.out.println(clusterMananger.getId()%100+" receive GET_SERVER_PUBLIC_KEY from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" receive GET_SERVER_PUBLIC_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().sendPublicKey(clusterMananger.getPeer(senderId));
 		}
 		if (messageId == AbstractMessageManager.SEND_SERVER_PUBLIC_KEY) {
-			System.out.println(clusterMananger.getId()%100+" receive SEND_SERVER_PUBLIC_KEY from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" receive SEND_SERVER_PUBLIC_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().receivePublicKey(clusterMananger.getPeer(senderId), message);
 		}
 		if (messageId == AbstractMessageManager.GET_VERIFY_IDENTITY) {
-			System.out.println(clusterMananger.getId()%100+" receive GET_VERIFY_IDENTITY from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" receive GET_VERIFY_IDENTITY from "+senderId%100);
 //			sendIdentity(p, createMessageForIdentityCheck(p, true), true);
 			clusterMananger.getServerIdDb().answerIdentity(clusterMananger.getPeer(senderId), message);
 		}
 		if (messageId == AbstractMessageManager.SEND_VERIFY_IDENTITY) {
-			System.out.println(clusterMananger.getId()%100+" receive SEND_VERIFY_IDENTITY from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" receive SEND_VERIFY_IDENTITY from "+senderId%100);
 			clusterMananger.getServerIdDb().receiveIdentity(clusterMananger.getPeer(senderId), message);
 		}
 		if (messageId == AbstractMessageManager.GET_SERVER_AES_KEY) {
-			System.out.println(clusterMananger.getId()%100+" receive GET_SERVER_AES_KEY from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" receive GET_SERVER_AES_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().sendAesKey(clusterMananger.getPeer(senderId), ServerIdDb.AES_PROPOSAL);
 		}
 		if (messageId == AbstractMessageManager.SEND_SERVER_AES_KEY) {
-			System.out.println(clusterMananger.getId()%100+" receive SEND_SERVER_AES_KEY from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" receive SEND_SERVER_AES_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().receiveAesKey(clusterMananger.getPeer(senderId), message);
 		}
 		if(messageId == GET_SERVER_LIST){
-			System.out.println(clusterMananger.getId()%100+"he ( "+senderId%100+" ) want my server list");
+			System.out.println(clusterMananger.getPeerId()%100+"he ( "+senderId%100+" ) want my server list");
 			synchronized (this.clusterMananger.getServerIdDb().getRegisteredPeers()) {
 				sendServerList(senderId, this.clusterMananger.getServerIdDb().getRegisteredPeers());
 			}
 		}
 		if(messageId == SEND_LISTEN_PORT){
-			System.out.println(clusterMananger.getId()%100+" received SEND_LISTEN_PORT from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" received SEND_LISTEN_PORT from "+senderId%100);
 			Peer p = clusterMananger.getPeer(senderId);
 			p.setPort(message.getInt());
 		}
 		if(messageId == SEND_SERVER_LIST){
-			System.out.println(clusterMananger.getId()%100+" received SEND_SERVER_LIST from "+senderId%100);
+			System.out.println(clusterMananger.getPeerId()%100+" received SEND_SERVER_LIST from "+senderId%100);
 
 //			System.out.println(p.getMyServer().getId()%100+" read "+myId+" for "+p.getKey().getOtherServerId()%100);
 			short peerId = message.getShort();
 			//add this id in our list, to be sure we didn't use it and we can transmit it.
 			synchronized (this.clusterMananger.getServerIdDb()) {
-				System.out.println(clusterMananger.getId()%100+" receive peer computerId:  "+peerId+" from "+senderId%100);
-				if(!this.clusterMananger.getServerIdDb().id2PublicKey.containsKey(peerId)){
-					this.clusterMananger.getServerIdDb().id2PublicKey.put(peerId, null);
+				System.out.println(clusterMananger.getPeerId()%100+" receive peer computerId:  "+peerId+" from "+senderId%100);
+				if(peerId>0) {
+					if(!this.clusterMananger.getServerIdDb().id2PublicKey.containsKey(peerId)){
+						this.clusterMananger.getServerIdDb().id2PublicKey.put(peerId, null);
+					}
 				}
 			}
 			int nb = message.getTrailInt();
@@ -90,8 +92,8 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 				
 				//add this id in our list, to be sure we didn't use it and we can transmit it.
 				synchronized (this.clusterMananger.getServerIdDb()) {
-					System.out.println(clusterMananger.getId()%100+" receive a distant computerId:  "+computerId+" of "+id%100+" from "+senderId%100);
-					if(!this.clusterMananger.getServerIdDb().id2PublicKey.containsKey(computerId) && id != clusterMananger.getId()){
+					System.out.println(clusterMananger.getPeerId()%100+" receive a distant computerId:  "+computerId+" of "+id%100+" from "+senderId%100);
+					if(!this.clusterMananger.getServerIdDb().id2PublicKey.containsKey(computerId) && id != clusterMananger.getPeerId()){
 						this.clusterMananger.getServerIdDb().id2PublicKey.put(computerId, null);
 					}
 				}
@@ -102,7 +104,7 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 				clusterMananger.connectTo(ip, port);
 			}
 			clusterMananger.getServerIdDb().receivedServerList.add(this.clusterMananger.getPeer(senderId));
-			clusterMananger.chooseClusterId();
+			clusterMananger.chooseComputerId();
 		}
 
 	}
@@ -111,11 +113,11 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 	public void sendServerList(long sendTo, List<Peer> list) {
 		ByteBuff buff = new ByteBuff();
 		//put our id
-		buff.putShort(clusterMananger.getServerIdDb().myId);
+		buff.putShort(clusterMananger.getServerIdDb().myComputerId);
 		//put data
 		buff.putTrailInt(list.size());
 		for(Peer peer : list){
-			buff.putLong(peer.getConnectionId());
+			buff.putLong(peer.getPeerId());
 			buff.putUTF8(peer.getIP());
 			buff.putTrailInt(peer.getPort());
 			buff.putShort(peer.getComputerId());
@@ -128,8 +130,8 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 
 	public void sendServerId(Peer peer) {
 		ByteBuff buff = new ByteBuff();
-		buff.putLong(clusterMananger.getId());
-		buff.putLong(clusterMananger.getServerIdDb().clusterId);
+		buff.putLong(clusterMananger.getPeerId());
+		buff.putLong(clusterMananger.getServerIdDb().getClusterId());
 		clusterMananger.writeMessage(peer, SEND_SERVER_ID, buff.flip());
 	}
 

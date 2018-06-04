@@ -8,7 +8,6 @@ import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.db.StorageManager;
-import remi.distributedFS.db.impl.FsChunkFromFile;
 import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
 import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
@@ -27,11 +26,13 @@ public class StandardManager implements FileSystemManager {
 	protected ClusterManager net = null;
 
 	protected JnrfuseImpl os;
+	
+	protected Parameters myParameters;
 
 	protected PropagateChange algoPropagate = new PropagateChange(this);
 	protected ExchangeChunk chunkRequester = new ExchangeChunk(this);
 	
-	protected char driveletter;
+	protected String driveletter;
 	protected String rootFolder = ".";
 	
 	protected Cleaner cleaner;
@@ -58,7 +59,17 @@ public class StandardManager implements FileSystemManager {
 						manager.net.connect("localhost",Integer.parseInt(args[2]));
 				}
 				
-				manager.initOs("./data"+args[0], args[0].charAt(0));
+				manager.initOs("./data"+args[0], args[0]);
+
+			}).start();
+		}else if(args.length == 1) {
+			//mode parameter file.
+			new Thread(()->{
+				StandardManager manager = new StandardManager();
+				manager.myParameters = new Parameters(args[0]);
+				
+				manager.initBdNet(manager.myParameters.get("MainDir"), manager.myParameters.getInt("ListenPort"));	
+				manager.initOs(manager.myParameters.get("MainDir"), manager.myParameters.get("DriveLetter"));
 
 			}).start();
 		}
@@ -89,6 +100,11 @@ public class StandardManager implements FileSystemManager {
 
 
 
+	/**
+	 * Initialize a new network cluster.
+	 * Do it if you want to start a cluster, when you can't join any other live instances.
+	 */
+	@Deprecated
 	public void initializeNewCluster() {
 		//check if we havn't any id
 		if(getComputerId() < 0){
@@ -100,6 +116,13 @@ public class StandardManager implements FileSystemManager {
 		
 	}
 
+	/**
+	 * Launch the manager,<br>
+	 * It load the filesystem<br>
+	 * The it listen to port for incoming connections.
+	 * @param dataPath path of the filesystem on the local drive
+	 * @param port port to listen to.
+	 */
 	public void initBdNet(String dataPath, int port) {
 		try{
 			rootFolder = dataPath;
@@ -108,13 +131,13 @@ public class StandardManager implements FileSystemManager {
 			if(!new File(rootFolder).exists()){
 				new File(rootFolder).mkdirs();
 			}
-			
-			System.out.println("begin");
+
+			System.out.println("== begin init bd");
 			FsTableLocalFactory storageFactory = new FsTableLocal.FsTableLocalFactory();
-			storageFactory.rootRep = dataPath;
+			storageFactory.rootRep = dataPath+"/data";
 			storageFactory.filename = dataPath+"/"+"localdb.data";
 			storageFactory.manager = this;
-			if(dataPath.contains("R")){
+			if(dataPath.endsWith("Backup")){
 				storageFactory.factory = new FsChunkOneFile.StorageFactory();
 			}else{
 				storageFactory.factory = new ObjectFactory.StandardFactory(); //ie FSChunkFromFile.StorageFactory();
@@ -124,7 +147,9 @@ public class StandardManager implements FileSystemManager {
 			storage.cleanUnusedSectors(true);
 	
 			if(port>0){
+				System.out.println("== create net");
 				net = new PhysicalServer(this, false, dataPath);
+				System.out.println("== init net");
 				net.init(port);
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
@@ -133,6 +158,7 @@ public class StandardManager implements FileSystemManager {
 
 			//TODO: serialize & gui
 //			cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
+			System.out.println("== create cleaner");
 			cleaner = new Cleaner(this);
 			cleaner.start();
 			
@@ -143,7 +169,7 @@ public class StandardManager implements FileSystemManager {
 	}
 
 
-	public void initOs(String dataPath, char letter) {
+	public void initOs(String dataPath, String letter) {
 		try{
 	
 			//wait initialization before giving hand to men
@@ -157,11 +183,11 @@ public class StandardManager implements FileSystemManager {
 				e.printStackTrace();
 			}
 			
-			if(letter >0){
+			if(letter != null){
 				os = new JnrfuseImpl(this);
 				os.init(letter);
 				driveletter = letter;
-			}else driveletter = ' ';
+			}else driveletter = " ";
 			
 			System.out.println("end of init");
 			
@@ -178,9 +204,9 @@ public class StandardManager implements FileSystemManager {
 		}
 	}
 
-	protected void close() {
-		// TODO Auto-generated method stub
-		
+	public void close() {
+		getNet().close();
+		os.close();
 	}
 
 	@Override
@@ -217,7 +243,7 @@ public class StandardManager implements FileSystemManager {
 		return os.getContext().uid.longValue();
 	}
 
-	public char getLetter() {
+	public String getDrivePath() {
 		return driveletter;
 	}
 

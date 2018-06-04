@@ -23,6 +23,7 @@ public abstract class AbstractFSMessageManager extends AbstractMessageManager {
 		 */
 
 		/**
+		 *
 		 */
 		public static final byte  GET_DIR = (byte) 20;
 		public static final byte  SEND_DIR = (byte) 21;
@@ -32,6 +33,8 @@ public abstract class AbstractFSMessageManager extends AbstractMessageManager {
 		public static final byte  SEND_FILE_CHUNK = (byte) 25;
 		public static final byte  GET_OBJECT = (byte) 26;
 		public static final byte  SEND_OBJECT = (byte) 27;
+		public static final byte  GET_HOST_PROPERTIES = (byte) 28;
+		public static final byte  SEND_HOST_PROPERTIES = (byte) 29;
 		
 	
 }

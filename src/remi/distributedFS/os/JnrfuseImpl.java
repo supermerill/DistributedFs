@@ -59,17 +59,17 @@ public class JnrfuseImpl extends FuseStubFS {
 		this.manager = manager;
 	}
 	
-	public void init(char driveletter){
+	public void init(String drivepath){
 		
 		try {
 		    try {
 		        String path;
 		        switch (Platform.getNativePlatform().getOS()) {
 		            case WINDOWS:
-		                path = (""+driveletter).toUpperCase()+":\\";
+		                path = (""+drivepath.charAt(0)).toUpperCase()+":\\";
 		                break;
 		            default:
-		                path = "/tmp/mntm_"+driveletter;
+		                path = drivepath;//"/tmp/mntm_"+driveletter;
 		        }
 		        System.out.println("prepare to mount into "+path);
 			    try {
@@ -868,4 +868,8 @@ public class JnrfuseImpl extends FuseStubFS {
     public int fallocate(String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {
         return -ErrorCodes.ENOSYS();
     }
+    
+	public void close() {
+		this.umount();
+	}
 }

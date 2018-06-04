@@ -86,6 +86,17 @@ public class Parameters {
 		return Long.parseLong(data.get(key));
 	}
 	
+	public String getStringOrDef(String key, String def){
+		def = def.replace("\n", " ");
+		String obj = data.get(key);
+		if(obj == null){
+			data.put(key, def);
+			save();
+			return def;
+		}
+		return obj;
+	}
+	
 	public long getLongOrDef(String key, long def){
 		String obj = data.get(key);
 		if(obj == null){
@@ -114,6 +125,35 @@ public class Parameters {
 			return def;
 		}
 		return Integer.parseInt(obj);
+	}
+	
+	public String set(String key, String def){
+		def = def.replace("\n", " ");
+		data.put(key, def);
+		save();
+		return def;
+	}
+	
+	public String setString(String key, String def){
+		return set(key, def);
+	}
+	
+	public long setLong(String key, long def){
+		data.put(key, ""+def);
+		save();
+		return def;
+	}
+
+	public boolean setBool(String key, boolean def) {
+		data.put(key, ""+def);
+		save();
+		return def;
+	}
+
+	public int setInt(String key, int def) {
+		data.put(key, ""+def);
+		save();
+		return def;
 	}
 
 }
