@@ -1,15 +1,9 @@
 package remi.distributedFS.gui;
 
-import java.awt.Dimension;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 
 import com.sun.javafx.collections.ObservableListWrapper;
 
@@ -29,6 +23,7 @@ import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
+import remi.distributedFS.datastruct.PUGA;
 import remi.distributedFS.fs.FileSystemManager;
 
 //TODO: add details when clicking on a file or directory
@@ -67,10 +62,62 @@ public class PanelRequest extends GridPane{
 
 //		directories.setText("directories");
 //		files.setText("files");
-		
+		listDirs.setOnMouseClicked((me)->{
+			String item = listDirs.getSelectionModel().getSelectedItem();
+			if(item != null){
+				refreshDir(currentPath+"/"+item);
+			}
+		});
+
+		listFiles.setOnMouseClicked((me)->{
+			System.out.println("mouse click");
+			String item = listFiles.getSelectionModel().getSelectedItem();
+			System.out.println("mouse click on "+item);
+			if(item != null){
+				refreshDir(currentPath+"/"+item);
+			}
+		});
 		
 	}
 	
+	private void refreshDir(String path) {
+		FsObject obj = FsDirectoryMethods.getPathObj(this.manager.getRoot(), path);
+		StringBuilder str = new StringBuilder();
+		addItem(str,"id: ",20).append(obj.getId());
+		addItem(str,"name: ",20).append(obj.getName());
+		addItem(str,"permissions: :",20).append(new PUGA(obj.getPUGA()).toStringShort());
+		addItem(str,"computer id: ",20).append(obj.getComputerId());
+		addItem(str,"group id: ",20).append(obj.getGroupId());
+		addItem(str,"user id: ",20).append(obj.getUserId());
+		addItem(str,"creator uid: ",20).append(obj.getCreatorUID());
+		addItem(str,"creation date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getCreationDate())));
+		addItem(str,"modify uid: ",20).append(obj.getModifyUID());
+		addItem(str,"modify date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getModifyDate())));
+		addItem(str,"delete uid: ",20).append(obj.getDeleteUID()>0?obj.getDeleteUID():"");
+		addItem(str,"delete date: ",20).append(obj.getDeleteDate()>0?new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getDeleteDate())):"");
+//		addItem(str,": ",20).append(obj.get);
+		FsFile fic = obj.asFile();
+		if(fic != null){
+			addItem(str,"size: ",20).append(fic.getSize());
+			addItem(str,"nb chunks: ",20).append(fic.getAllChunks().size());
+			addItem(str,"nb local chunks: ",20).append(fic.getChunks().size());
+		}
+		FsDirectory dir = obj.asDirectory();
+		if(dir != null){
+			addItem(str,"nb dirs: ",20).append(dir.getDirs().size());
+			addItem(str,"nb files: ",20).append(dir.getFiles().size());
+			addItem(str,"nb deleted things: ",20).append(dir.getDelete().size());
+		}
+	}
+	
+	public static StringBuilder addItem(StringBuilder str, String toAdd, int max) {
+		str.append(toAdd);
+		for(int i=toAdd.length(); i<max;i++) {
+			str.append(' ');
+		}
+		return str;
+	}
+
 	public void init(FileSystemManager manager) {
 		this.manager = manager;
 		btValidate.setOnAction((ActionEvent)->{

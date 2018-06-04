@@ -33,7 +33,7 @@ public class MainWindow extends Application {
 	PanelRequest req;
 	TabPane tabs;
 
-	FileSystemManager manager;
+	StandardManager manager;
 
 	@Override
 	public void start(Stage frame) throws Exception {
@@ -56,7 +56,10 @@ public class MainWindow extends Application {
 		mainScene = new Scene(tabs);
 
 		myFrame = frame;
-		frame.setOnCloseRequest(e->System.exit(0));
+		frame.setOnCloseRequest(e->{
+			manager.close();
+			System.exit(0);
+		});
 		myFrame.setScene(mainScene);
 		
 		frame.setTitle("Install & configure a distributed hard drive instance");

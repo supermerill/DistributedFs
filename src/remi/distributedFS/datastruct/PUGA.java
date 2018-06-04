@@ -43,6 +43,14 @@ public class PUGA {
 				+ ", userWrite=" + userWrite + ", groupRead=" + groupRead + ", groupWrite=" + groupWrite + ", allRead="
 				+ allRead + ", allWrite=" + allWrite + ", canExec=" + canExec + "]";
 	}
+
+	public String toStringShort() {
+		return "PUGA [computer=" + (computerRead?"R":"/") + (computerWrite?"W":"/") + 
+				", user=" + (userRead?"R":"/") + (userWrite?"W":"/") + 
+				", group=" + (groupRead?"R":"/") + (groupWrite?"W":"/") + 
+				", all=" + (allRead?"R":"/") + (allWrite?"W":"/") + 
+				", canExec=" + canExec + "]";
+	}
 	
 	
 }

@@ -21,6 +21,7 @@ import remi.distributedFS.datastruct.FsChunk;
 public class Cleaner extends Thread{
 	
 	boolean canDelete;
+	boolean canElage;
 	int minKnownDuplicate;
 	long idealSize;
 	long maxSize;
@@ -38,11 +39,12 @@ public class Cleaner extends Thread{
 		this.manager = manager;
 		
 		Parameters params = new Parameters(manager.getRootFolder()+"/cleaner.properties");
-		this.canDelete = params.getBoolOrDef("canDelete", true);
-		this.minKnownDuplicate = params.getIntOrDef("minKnownDuplicate", 1);
-		this.idealSize = params.getLongOrDef("idealSize", 1024*1024*10);
-		this.maxSize = params.getLongOrDef("maxSize", 1024*1024*1024);
-		this.stimeBeforeDelete = params.getLongOrDef("stimeBeforeDelete", 1000*60);
+		this.canDelete = params.getBoolOrDef("CanDelete", true);
+		this.canElage = params.getBoolOrDef("CanElage", true);
+		this.minKnownDuplicate = params.getIntOrDef("MinKnownDuplicate", 1);
+		this.idealSize = params.getLongOrDef("IdealSize", 1024*1024*10);
+		this.maxSize = params.getLongOrDef("MaxSize", 1024*1024*1024);
+		this.stimeBeforeDelete = params.getLongOrDef("SecTimeBeforeDelete", 1000*60);
 		
 		//scheduled next remove op in 100sec from creation, to elt time for the fs to load and rest
 		nextCleaningOp = System.currentTimeMillis() + 100000 *0;
@@ -69,12 +71,12 @@ public class Cleaner extends Thread{
 			e.printStackTrace();
 		}
 		
-		if(System.currentTimeMillis() > nextRemoveOp){
+		if(System.currentTimeMillis() > nextRemoveOp  && canElage){
 			checkLiberateSpace();
 			nextRemoveOp = System.currentTimeMillis() + 1000;
 		}
 		System.out.println(System.currentTimeMillis()+" > "+nextCleaningOp+" == "+(System.currentTimeMillis() > nextCleaningOp));
-		if(System.currentTimeMillis() > nextCleaningOp){
+		if(System.currentTimeMillis() > nextCleaningOp && canDelete){
 			manager.getDb().removeOldDelItem(System.currentTimeMillis() - 1000L*stimeBeforeDelete);
 //			nextCleaningOp = System.currentTimeMillis() + 1000 * 60 * 60 * 2; //every 2 hour
 			nextCleaningOp = System.currentTimeMillis() + 1000 * 20; //testing : every 20 seconds
@@ -136,9 +138,9 @@ public class Cleaner extends Thread{
 		}
 	}
 
-	//TODO: this impl is linked strongly with the basic impl fromm bd (use files as chunk), you HAVE TO change that to make an implen-independant impl
+	//TODO: this impl is linked strongly with the basic impl from bd (use files as chunk), you HAVE TO change that to make an implentation-independant impl
 	protected void checkLiberateSpace() {
-		System.out.println("CHeckLiberateSpace");
+		System.out.println("CheckLiberateSpace");
 		Pattern patternNumeral = Pattern.compile("^[0-9]+$");
 		
 		File rootFolder = new File(manager.rootFolder);

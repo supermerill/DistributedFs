@@ -124,7 +124,7 @@ public class PanelPeers extends GridPane implements Runnable {
 		}
 
 	}
-	
+
 	public static int addItem(StringBuilder str, String toAdd, int deb, int max) {
 		str.append(toAdd);
 		for(int i=deb+toAdd.length(); i<max;i++) {
