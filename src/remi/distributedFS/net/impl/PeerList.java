@@ -26,7 +26,7 @@ public class PeerList extends ArrayList<Peer> {
 	
 	public Peer get(Peer other){
 		for(Peer e : this){
-			if(e.getConnectionId()==other.getConnectionId()){
+			if(e.getPeerId()==other.getPeerId()){
 				return e;
 			}
 		}
@@ -35,7 +35,7 @@ public class PeerList extends ArrayList<Peer> {
 	public List<Peer> getAll(Peer other){
 		ArrayList<Peer> list = new ArrayList<>();
 		for(Peer e : this){
-			if(e.getConnectionId()==other.getConnectionId()){
+			if(e.getPeerId()==other.getPeerId()){
 				list.add(e);
 			}
 		}

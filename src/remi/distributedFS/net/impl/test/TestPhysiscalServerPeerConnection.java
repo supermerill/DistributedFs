@@ -58,30 +58,30 @@ public class TestPhysiscalServerPeerConnection {
 		System.out.println("==================================");
 		System.out.println("==================================");
 
-		System.out.println("Serv1 has id: "+serv1.getId()+" ("+(serv1.getId()%100)+")");
+		System.out.println("Serv1 has id: "+serv1.getPeerId()+" ("+(serv1.getPeerId()%100)+")");
 		for(Peer peer : serv1.getPeers()){
-			System.out.println("Serv1 has conn with peer "+peer.getConnectionId()+" ("+(peer.getConnectionId()%100)+") "+peer.isAlive());
+			System.out.println("Serv1 has conn with peer "+peer.getPeerId()+" ("+(peer.getPeerId()%100)+") "+peer.isAlive());
 		}
 
 		System.out.println("==================================");
 
-		System.out.println("Serv2 has id: "+serv2.getId()+" ("+(serv2.getId()%100)+")");
+		System.out.println("Serv2 has id: "+serv2.getPeerId()+" ("+(serv2.getPeerId()%100)+")");
 		for(Peer peer : serv2.getPeers()){
-			System.out.println("Serv2 has conn with peer "+peer.getConnectionId()+" ("+(peer.getConnectionId()%100)+") "+peer.isAlive());
+			System.out.println("Serv2 has conn with peer "+peer.getPeerId()+" ("+(peer.getPeerId()%100)+") "+peer.isAlive());
 		}
 
 		System.out.println("==================================");
 
-		System.out.println("Serv3 has id: "+serv3.getId()+" ("+(serv3.getId()%100)+")");
+		System.out.println("Serv3 has id: "+serv3.getPeerId()+" ("+(serv3.getPeerId()%100)+")");
 		for(Peer peer : serv3.getPeers()){
-			System.out.println("Serv3 has conn with peer "+peer.getConnectionId()+" ("+(peer.getConnectionId()%100)+") "+peer.isAlive());
+			System.out.println("Serv3 has conn with peer "+peer.getPeerId()+" ("+(peer.getPeerId()%100)+") "+peer.isAlive());
 		}
 
 		System.out.println("==================================");
 
-		System.out.println("Serv4 has id: "+serv4.getId()+" ("+(serv4.getId()%100)+")");
+		System.out.println("Serv4 has id: "+serv4.getPeerId()+" ("+(serv4.getPeerId()%100)+")");
 		for(Peer peer : serv4.getPeers()){
-			System.out.println("Serv4 has conn with peer "+peer.getConnectionId()+" ("+(peer.getConnectionId()%100)+") "+peer.isAlive());
+			System.out.println("Serv4 has conn with peer "+peer.getPeerId()+" ("+(peer.getPeerId()%100)+") "+peer.isAlive());
 		}
 	}
 }

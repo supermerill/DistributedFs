@@ -87,9 +87,10 @@ public class PanelCreateNewCluster extends InstallPanel {
 
 	@Override
 	public void destroy() {
-		manager.savedData.put("createNewKey", true);
-		manager.savedData.put("createEmptyDrive", true);
-		manager.savedData.put("clusterId", txtClusterId.getText());
-		manager.savedData.put("clusterPwd", txtClusterPwd.getText());
+		System.out.println("destroy");
+		manager.savedData.put("CreateNewKey", true);
+		manager.savedData.put("CreateEmptyDrive", true);
+		manager.savedData.put("ClusterId", txtClusterId.getText());
+		manager.savedData.put("ClusterPwd", txtClusterPwd.getText());
 	}
 }

@@ -126,5 +126,34 @@ public class Parameters {
 		}
 		return Integer.parseInt(obj);
 	}
+	
+	public String set(String key, String def){
+		def = def.replace("\n", " ");
+		data.put(key, def);
+		save();
+		return def;
+	}
+	
+	public String setString(String key, String def){
+		return set(key, def);
+	}
+	
+	public long setLong(String key, long def){
+		data.put(key, ""+def);
+		save();
+		return def;
+	}
+
+	public boolean setBool(String key, boolean def) {
+		data.put(key, ""+def);
+		save();
+		return def;
+	}
+
+	public int setInt(String key, int def) {
+		data.put(key, ""+def);
+		save();
+		return def;
+	}
 
 }

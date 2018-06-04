@@ -40,9 +40,9 @@ import javafx.stage.DirectoryChooser;
  */
 public class PanelParameterPeer extends InstallPanel {
 
-	Label lblInstallPath = new Label("Install path");
+	Label lblInstallPath = new Label("Install directory");
 	Label lblDrivePath = new Label("Drive path");
-	Label lblListenPort = new Label("Install path");
+	Label lblListenPort = new Label("Instance port");
 	Label lblSizeIdeal = new Label("Ideal size (in mio)");
 	Label lblSizeMax = new Label("Maximum size (in mio)");
 	Label lblElagage = new Label("ReduceSize aggressively");
@@ -77,12 +77,13 @@ public class PanelParameterPeer extends InstallPanel {
 		txtTimeDelFS.setTooltip(new Tooltip("Number of seconds before the knowledge of the deletion is deleted. "
 				+ "Must be greater than the value behind, should be at least the maximum time you can be disconnected from the cluster."));
 		chkStoreOnlyPlainFiles.setTooltip(new Tooltip("Set it to false to be able to store only some parts of the files, to be more space-efficient.\nSet it to true if you want to be able to read stored files even if the program isn't launched."));
-		btNext.setText("Next");
+		btNext.setText("Finish");
 		btNext.setTooltip(new Tooltip("Create your instance and connect it."));
 		String localPath = new File(".").getAbsolutePath();
 //		txtInstallPath.setText(localPath.substring(0, localPath.length()-1)+"myNewDrive");
 //		txtInstallPath.setMultiSelectionEnabled(false);
 //		txtInstallPath.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		txtInstallPath.setText(new File(".").getAbsolutePath());
 		btInstallPath.setText("...");
 		txtDrivePath.setText("K");
 		txtListenPort.setText("30400");

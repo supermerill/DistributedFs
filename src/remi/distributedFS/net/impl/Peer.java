@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.management.RuntimeErrorException;
 
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.util.ByteBuff;
@@ -45,7 +46,7 @@ public class Peer implements Runnable {
 	}
 
 	public static class PeerKey {
-		private long otherServerId = 0; //use for leader election, connection establishment
+		private long otherPeerId = 0; //use for leader election, connection establishment
 		private final InetAddress address;
 		private int port = 0;
 
@@ -65,8 +66,8 @@ public class Peer implements Runnable {
 				if (o.address.equals(address)) {
 					if (o.port != 0 && port != 0) {
 						return o.port == port;
-					} else if (otherServerId != 0 && o.otherServerId != 0) {
-						return otherServerId == o.otherServerId;
+					} else if (otherPeerId != 0 && o.otherPeerId != 0) {
+						return otherPeerId == o.otherPeerId;
 					}
 				}
 			}
@@ -79,7 +80,7 @@ public class Peer implements Runnable {
 		}
 
 		public long getOtherServerId() {
-			return otherServerId;
+			return otherPeerId;
 		}
 
 		public InetAddress getAddress() {
@@ -96,7 +97,7 @@ public class Peer implements Runnable {
 	public boolean equals(Object arg0) {
 		if (arg0 instanceof Peer) {
 			Peer o = (Peer) arg0;
-			return o.myKey.address.equals(myKey.address) && o.myKey.otherServerId == myKey.otherServerId
+			return o.myKey.address.equals(myKey.address) && o.myKey.otherPeerId == myKey.otherPeerId
 					&& o.myKey.port == myKey.port;
 		}
 		return false;
@@ -155,7 +156,7 @@ public class Peer implements Runnable {
 	 * @return true if you should call ping quickly afterwards (connection phase)
 	 */
 	public boolean ping() {
-		System.out.println("peer "+this.myKey.otherServerId+" compId:"+this.distComputerId+" : is alive? "+this.alive.get());
+		System.out.println("peer "+this.myKey.otherPeerId+" compId:"+this.distComputerId+" : is alive? "+this.alive.get());
 		if (!alive.get())
 			return false;
 		try {
@@ -165,7 +166,7 @@ public class Peer implements Runnable {
 				// GetListenPort.get().write(getOut(), this);
 				// getOut().flush();
 			}
-			if (myKey.otherServerId == 0 || myState.lowerThan(PeerConnectionState.HAS_ID)) {
+			if (myKey.otherPeerId == 0 || myState.lowerThan(PeerConnectionState.HAS_ID)) {
 				myServer.writeMessage(this, AbstractMessageManager.GET_SERVER_ID, nullmsg);
 				// GetServerId.get().write(getOut(), this);
 				// getOut().flush();
@@ -221,12 +222,12 @@ public class Peer implements Runnable {
 			}
 		} catch (Exception e) {
 			 e.printStackTrace();
-			System.err.println( myServer.getId() % 100+" error in the communication stream between peers" + myServer.getId() % 100 + " and "
-					+ getKey().otherServerId % 100 + " : " + e);
+			System.err.println( myServer.getPeerId() % 100+" error in the communication stream between peers" + myServer.getPeerId() % 100 + " and "
+					+ getKey().otherPeerId % 100 + " : " + e);
 		}
 
 		// check if i'm not a duplicate
-		if (myServer.getPeers().getAll(this).size() > 1 || myServer.getId() == getConnectionId()) {
+		if (myServer.getPeers().getAll(this).size() > 1 || myServer.getPeerId() == getPeerId()) {
 			// i'm a duplicate, kill me!
 			myServer.removeExactPeer(this);
 			return;
@@ -290,7 +291,7 @@ public class Peer implements Runnable {
 
 	public boolean connect(Socket sock) throws InterruptedException, IOException {
 		System.out.println(
-				myServer.getId() % 100 + " " + myServer.getListenPort() + " going to connect with " + sock.getPort());
+				myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " going to connect with " + sock.getPort());
 		// System.out.println(this +" "+ alive.get()+" SETTO true "+myServer.getId()%100+ " for " + sock.getPort());
 		boolean alreadyAlive = alive.getAndSet(true);
 		if (alreadyAlive) {
@@ -304,8 +305,8 @@ public class Peer implements Runnable {
 
 			boolean iWin = false;
 			// now compare the numbers
-			if (myServer.getId() == myKey.otherServerId) {
-				System.out.println(myServer.getId() % 100 + " i have the same id as " + myKey.otherServerId % 100);
+			if (myServer.getPeerId() == myKey.otherPeerId) {
+				System.out.println(myServer.getPeerId() % 100 + " i have the same id as " + myKey.otherPeerId % 100);
 				// me and the other server must recreate a hash id.
 				// compare ips to choose
 				int winner = sock.getLocalAddress().getHostAddress().compareTo(sock.getInetAddress().getHostAddress());
@@ -318,7 +319,7 @@ public class Peer implements Runnable {
 				} else {
 					iWin = false;
 				}
-			} else if (myServer.getId() > myKey.otherServerId) {
+			} else if (myServer.getPeerId() > myKey.otherPeerId) {
 				iWin = true;
 			} else {
 				iWin = false;
@@ -327,16 +328,16 @@ public class Peer implements Runnable {
 			if (iWin) {
 				// i can kill this new one.
 				sock.close();
-				System.out.println(myServer.getId() % 100 + " now close the socket to " + myKey.otherServerId % 100);
+				System.out.println(myServer.getPeerId() % 100 + " now close the socket to " + myKey.otherPeerId % 100);
 			} else {
 				// I'm not the one to kill one connection. I have to wait the close event from the other computer.
 				sockWaitToDelete = sock;
 			}
 
-			System.out.println(myServer.getId() % 100 + "fail to connect (already connected) to " + sock.getPort());
+			System.out.println(myServer.getPeerId() % 100 + "fail to connect (already connected) to " + sock.getPort());
 			return false;
 		} else {
-			System.out.println(myServer.getId() % 100 + " win to connect with " + sock.getPort());
+			System.out.println(myServer.getPeerId() % 100 + " win to connect with " + sock.getPort());
 			// connect
 			this.sock = sock;
 			this.streamIn = new BufferedInputStream(sock.getInputStream());
@@ -355,19 +356,19 @@ public class Peer implements Runnable {
 
 			// while (myKey.otherServerId == 0) {
 			System.out.println(
-					myServer.getId() % 100 + " " + myServer.getListenPort() + " want to read " + getIn().available());
+					myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " want to read " + getIn().available());
 			readMessage();
-			System.out.println(myServer.getId() % 100 + " " + myServer.getListenPort() + " read id "
+			System.out.println(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " read id "
 					+ getKey().getOtherServerId());
 			// }
 			// while (myKey.port == 0) {
 			readMessage();
-			System.out.println(myServer.getId() % 100 + " " + myServer.getListenPort() + " read port " + getKey().port);
+			System.out.println(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " read port " + getKey().port);
 			// }
 
 			aliveAndSet = true;
 
-			System.out.println(myServer.getId() % 100 + " " + myServer.getListenPort() + " succeed to connect to "
+			System.out.println(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " succeed to connect to "
 					+ sock.getPort());
 			return true;
 		}
@@ -376,7 +377,7 @@ public class Peer implements Runnable {
 	public void startListen() {
 
 		if (myCurrentThread != null) {
-			System.err.println(myServer.getId() % 100 + " error, a listening thread is already started for addr "
+			System.err.println(myServer.getPeerId() % 100 + " error, a listening thread is already started for addr "
 					+ myKey.address + "...");
 		} else {
 			myCurrentThread = new Thread(this);
@@ -472,7 +473,7 @@ public class Peer implements Runnable {
 				System.err.println("Stream error: not same byte for message id : "+newByte+" != "+sameByte);
 				return;
 			}
-			System.out.println(myServer.getId() % 100 + " read message id :" + newByte);
+			System.out.println(myServer.getPeerId() % 100 + " read message id :" + newByte);
 			if (newByte == -1)
 				throw new IOException("End of stream");
 			if(newByte<0 || newByte >50){
@@ -527,14 +528,15 @@ public class Peer implements Runnable {
 					setServerId(buffIn.getLong());
 					//check if the cluster is ok
 					long clusterId = buffIn.getLong();
-					if(clusterId >0 && myServer.getServerIdDb().clusterId < 0){
+					if(clusterId >0 && myServer.getServerIdDb().getClusterId() < 0){
 						//set our cluster id
-						myServer.getServerIdDb().clusterId = clusterId;
-						changeState(PeerConnectionState.HAS_ID, true);
-					}else if(clusterId >0 && myServer.getServerIdDb().clusterId != clusterId){
+//						myServer.getServerIdDb().setClusterId(clusterId);
+						throw new RuntimeException("Error, we haven't a clusterid !! Can we pick one from an existing network? : not anymore!");
+//						changeState(PeerConnectionState.HAS_ID, true);
+					}else if(clusterId >0 && myServer.getServerIdDb().getClusterId() != clusterId){
 						//error, not my cluster!
-						System.err.println("Error, trying to connect with "+getConnectionId()%100+" but his cluster is "+clusterId+" and mine is "
-						+myServer.getServerIdDb().clusterId+" => closing connection");
+						System.err.println("Error, trying to connect with "+getPeerId()%100+" but his cluster is "+clusterId+" and mine is "
+						+myServer.getServerIdDb().getClusterId()+" => closing connection");
 						this.close();
 					}
 				}
@@ -548,7 +550,7 @@ public class Peer implements Runnable {
 				}
 				
 				// standard case, give the peer id. Our physical server should be able to retrieve us.
-				myServer.propagateMessage(getConnectionId(), (byte) newByte, buffIn);
+				myServer.propagateMessage(getPeerId(), (byte) newByte, buffIn);
 				
 			} catch (IOException | IllegalBlockSizeException | BadPaddingException e) {
 				e.printStackTrace();
@@ -595,7 +597,7 @@ public class Peer implements Runnable {
 
 	//// functions calleds by messages ///////////////////////////////////////////////////////////////////
 	public void setServerId(long newId) {
-		myKey.otherServerId = newId;
+		myKey.otherPeerId = newId;
 	}
 
 	public PhysicalServer getMyServer() {
@@ -610,8 +612,8 @@ public class Peer implements Runnable {
 		return streamIn;
 	}
 
-	public long getConnectionId() {
-		return myKey.otherServerId;
+	public long getPeerId() {
+		return myKey.otherPeerId;
 	}
 
 	public String getIP() {
@@ -671,6 +673,10 @@ public class Peer implements Runnable {
 
 	public boolean hasState(PeerConnectionState stateToVerify) {
 		return !myState.lowerThan(stateToVerify);
+	}
+	
+	public PeerConnectionState getState() {
+		return myState;
 	}
 
 }

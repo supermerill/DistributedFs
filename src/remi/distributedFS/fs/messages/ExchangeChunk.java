@@ -220,7 +220,7 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 		buff.flip();
 		int nbMessageEmitted = 0;
 		for(short compId : serverIdPresent){
-			long peerId = manager.getNet().getSenderId(compId);
+			long peerId = manager.getNet().getPeerId(compId);
 			if(peerId>=0){
 				//ok, i may be here
 				 if(manager.getNet().writeMessage(peerId, GET_FILE_CHUNK, buff)){

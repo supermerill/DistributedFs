@@ -1,4 +1,4 @@
-//package remi.distributedFS.datastruct.memoryFs;
+package remi.distributedFS.datastruct.memoryFs;
 //
 //import java.nio.ByteBuffer;
 //import java.nio.charset.Charset;
@@ -22,7 +22,8 @@
 //import ru.serce.jnrfuse.FuseStubFS;
 //import ru.serce.jnrfuse.examples.MemoryFS;
 //
-//public class Testjnr {
+public class Testjnr {
+}
 //	static class FsBout implements FsChunk{
 //
 //		ByteBuff data;

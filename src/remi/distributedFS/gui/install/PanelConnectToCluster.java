@@ -2,6 +2,7 @@ package remi.distributedFS.gui.install;
 
 import javafx.beans.value.ObservableValue;
 import javafx.geometry.Insets;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
@@ -17,7 +18,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
-import javafx.scene.control.Alert;
+import remi.distributedFS.net.impl.PhysicalServerDummy;
 
 /**
  * 
@@ -48,7 +49,8 @@ public class PanelConnectToCluster extends InstallPanel {
 	TextField txtPubKey = new TextField();
 	TextField txtPrivKey = new TextField();
 //	ComboBox hasAesEncoding = new TextField();
-	
+
+	Button btTestConnection = new Button();
 	Button btNext = new Button();
 	
 	public PanelConnectToCluster() {
@@ -92,6 +94,47 @@ public class PanelConnectToCluster extends InstallPanel {
 			}
 			manager.goToPanel(new PanelParameterPeer());
 		});
+		btTestConnection.setText("Test cluster connection");
+		btTestConnection.setTooltip(new Tooltip("Try to see if this peer is joinable."));
+		btTestConnection.setOnAction((ActionEvent)->{
+			//TODO: check values
+			System.out.println(txtClusterId.getText().length());
+			if(txtClusterId.getText().length()<6 || txtClusterId.getText().length()>32) {
+				Alert alert = new Alert(Alert.AlertType.WARNING);alert.setTitle("Error");alert.setHeaderText("Error:");
+				alert.setContentText("you must have a cluster name with at least 6 characaters and maximum 32");
+				alert.showAndWait();
+				return;
+			}
+			if(txtClusterPwd.getText().length()<6 || txtClusterPwd.getText().length()>32) {
+				Alert alert = new Alert(Alert.AlertType.WARNING);alert.setTitle("Error");alert.setHeaderText("Error:");
+				alert.setContentText("you must have a cluster password with at least 6 characaters and maximum 32");
+				alert.showAndWait();
+				return;
+			}
+			if(!txtClusterIpPort.getText().matches("^[0-9:\\.]+:[0-9][0-9][0-9]?[0-9]?[0-9]?$")) {
+				Alert alert = new Alert(Alert.AlertType.WARNING);alert.setTitle("Error");alert.setHeaderText("Error:");
+				alert.setContentText("you must have a ip:port well formatted string (example1: 192.168.0.1:300) (example2: ::1:300)");
+				alert.showAndWait();
+				return;	
+			}
+			//try to connect with a dummy peer
+			//TODO test it.
+			// I fear this will create "gosty" peers inside the cluster.
+			PhysicalServerDummy servDummy = new PhysicalServerDummy(txtClusterId.getText().hashCode(), txtClusterPwd.getText());
+			servDummy.connect(txtClusterIpPort.getText().split(":")[0], Integer.parseInt(txtClusterIpPort.getText().split(":")[1]));
+			try {
+				Thread.sleep(5000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			
+			Alert alert = new Alert(Alert.AlertType.INFORMATION);
+			alert.setTitle("Number of acessible peers (in 5s)");
+			alert.setHeaderText("Number of acessible peers (in 5s)");
+			alert.setContentText("You can connect with these parameters to "+servDummy.getNbPeers()+" peers.");
+			alert.showAndWait();
+			
+		});
 		chkNewOld.selectedProperty().addListener((ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue)->{
 			panelPubPrivKey.setDisable(!newValue);
 			txtPrivKey.setEditable(newValue);
@@ -125,7 +168,7 @@ public class PanelConnectToCluster extends InstallPanel {
 
 
 		grid.add(lblClusterIpPort, 0, 0, 1, 1);
-		grid.add(txtPrivKey, 1, 0, 3, 1);
+		grid.add(txtClusterIpPort, 1, 0, 3, 1);
 
 		grid.add(lblClusterId, 0, 1, 1, 1);
 		grid.add(txtClusterId, 1, 1, 3, 1);
@@ -161,8 +204,11 @@ public class PanelConnectToCluster extends InstallPanel {
 		manager.savedData.put("ClusterId", txtClusterId.getText());
 		manager.savedData.put("ClusterPwd", txtClusterPwd.getText());
 		if(chkNewOld.isSelected()) {
+			manager.savedData.put("CreateNewKey", false);
 			manager.savedData.put("PrivKey", txtPrivKey.getText());
 			manager.savedData.put("PubKey", txtPubKey.getText());
+		}else {
+			manager.savedData.put("CreateNewKey", true);
 		}
 	}
 

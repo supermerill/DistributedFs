@@ -19,7 +19,13 @@ public interface FsObject extends FsId {
 	public void setName(String newName) ;
 
 	public abstract void accept(FsObjectVisitor visitor);
+	/**
+	 * @return this casting in FsDirectory if it's an FsDirectory or null if it's not
+	 */
 	public FsDirectory asDirectory();
+	/**
+	 * @return this casting in FsFile if it's an FsFile or null if it's not
+	 */
 	public FsFile asFile();
 	
 	public long getModifyUID() ;

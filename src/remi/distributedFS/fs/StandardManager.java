@@ -100,6 +100,11 @@ public class StandardManager implements FileSystemManager {
 
 
 
+	/**
+	 * Initialize a new network cluster.
+	 * Do it if you want to start a cluster, when you can't join any other live instances.
+	 */
+	@Deprecated
 	public void initializeNewCluster() {
 		//check if we havn't any id
 		if(getComputerId() < 0){
@@ -111,6 +116,13 @@ public class StandardManager implements FileSystemManager {
 		
 	}
 
+	/**
+	 * Launch the manager,<br>
+	 * It load the filesystem<br>
+	 * The it listen to port for incoming connections.
+	 * @param dataPath path of the filesystem on the local drive
+	 * @param port port to listen to.
+	 */
 	public void initBdNet(String dataPath, int port) {
 		try{
 			rootFolder = dataPath;
@@ -119,13 +131,13 @@ public class StandardManager implements FileSystemManager {
 			if(!new File(rootFolder).exists()){
 				new File(rootFolder).mkdirs();
 			}
-			
-			System.out.println("begin");
+
+			System.out.println("== begin init bd");
 			FsTableLocalFactory storageFactory = new FsTableLocal.FsTableLocalFactory();
-			storageFactory.rootRep = dataPath;
+			storageFactory.rootRep = dataPath+"/data";
 			storageFactory.filename = dataPath+"/"+"localdb.data";
 			storageFactory.manager = this;
-			if(dataPath.contains("R")){
+			if(dataPath.endsWith("Backup")){
 				storageFactory.factory = new FsChunkOneFile.StorageFactory();
 			}else{
 				storageFactory.factory = new ObjectFactory.StandardFactory(); //ie FSChunkFromFile.StorageFactory();
@@ -135,7 +147,9 @@ public class StandardManager implements FileSystemManager {
 			storage.cleanUnusedSectors(true);
 	
 			if(port>0){
+				System.out.println("== create net");
 				net = new PhysicalServer(this, false, dataPath);
+				System.out.println("== init net");
 				net.init(port);
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
@@ -144,6 +158,7 @@ public class StandardManager implements FileSystemManager {
 
 			//TODO: serialize & gui
 //			cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
+			System.out.println("== create cleaner");
 			cleaner = new Cleaner(this);
 			cleaner.start();
 			

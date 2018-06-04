@@ -69,7 +69,7 @@ public class DistributedBigDataClientMananger extends StandardManager {
 				try {
 					//get jar
 					File jarFile = new File("./jar/"+jarName);
-					if(!jarFile.exists()) throw new RuntimeException("Error, now jar "+jarName);
+					if(!jarFile.exists()) throw new RuntimeException("Error, no jar "+jarName);
 					
 					URLClassLoader child = new URLClassLoader (new URL[] {jarFile.toURI().toURL()}, this.getClass().getClassLoader());
 					Class classToLoad = Class.forName (objectName, true, child);
