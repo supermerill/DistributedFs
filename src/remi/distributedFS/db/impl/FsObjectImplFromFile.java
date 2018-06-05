@@ -184,14 +184,14 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	public int goToNextOrCreate(ByteBuffer buff, Ref<Integer> sectorNum){//Ref<Long> currentSector){
 		assert buff.position() == FsTableLocal.FS_SECTOR_SIZE-8 : "Error: try to goToNextOrCreate next sector id at wrong pos ("+buff.position()+" != "+(FsTableLocal.FS_SECTOR_SIZE-8);
 		final long nextSector = (sectors==null || sectors.size()<sectorNum.get())? -1 : sectors.getLong(sectorNum.get());
-//		System.out.println("--get (save) sector "+nextSector+" "+(nextSector <= 0)+" @"+(buff.position())+" ? "+(FsTableLocal.FS_SECTOR_SIZE-8));
+		System.out.println("--get (save) sector "+nextSector+" "+(nextSector <= 0)+" @"+(buff.position())+" ? "+(FsTableLocal.FS_SECTOR_SIZE-8));
 		if(nextSector <= 0){
 			long newSectorId = master.requestNewSector();
-//			System.out.println("--create (read) sector "+newSectorId);
+			System.out.println("--create (read) sector "+newSectorId);
 			buff.putLong(newSectorId);
 			buff.rewind();
 			long currentSector = sectorNum.get()==0? sector : sectors.getLong(sectorNum.get()-1);
-//			System.out.println("--save my sector "+currentSector);
+			System.out.println("--save my sector "+currentSector);
 			master.saveSector(buff, currentSector);
 			if(sectors==null) sectors = new LongArrayList(2);
 			assert sectors.size()<=sectorNum.get() :"Error, trying to add sector n°"+sectorNum.get()+" : "+newSectorId+" when my sector array is "+sectors;
@@ -209,7 +209,7 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 		}else{
 			//save
 			long newSectorId = sectors.getLong(sectorNum.get());
-//			System.out.println("--infer (read) sector "+newSectorId+" from array "+sectors);
+			System.out.println("--infer (read) sector "+newSectorId+" from array "+sectors);
 			buff.putLong(newSectorId);
 			buff.rewind();
 			long currentSector = sectorNum.get()==0? sector : sectors.getLong(sectorNum.get()-1);

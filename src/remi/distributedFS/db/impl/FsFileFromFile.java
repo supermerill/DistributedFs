@@ -46,6 +46,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		//ensure long-distance from end
 		buffer.position(buffer.position() + 8 - (buffer.position()%8));
 		//get how many int read we can do
+		//wrong int canRead =  FsTableLocal.FS_SECTOR_SIZE/4 - (buffer.position()/4 + 2);
 		int canRead =  FsTableLocal.FS_SECTOR_SIZE/4 - (buffer.position()/4 + 2);
 		
 		ByteBuffer currentBuffer = buffer;
@@ -60,9 +61,9 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 			}
 		}
 		//note: it works because i write longs before ints
-		
+
+		for(int ii=0;ii<currentBuffer.limit();ii++){System.out.print(currentBuffer.get(ii)+" "); }
 		//read chunk pos
-		canRead = canRead*2;
 		for(int i=0;i<nbChunks;i++){
 			chunks.add(allChunks.get(currentBuffer.getInt()));
 			canRead--;
@@ -122,6 +123,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		}
 
 //		//fill last sector with zeros
+		for(int ii=0;ii<currentBuffer.limit();ii++){System.out.print(currentBuffer.get(ii)+" ");}
 		flushLastSector(currentBuffer, sectorNum);
 //		Arrays.fill(currentBuffer.array(), currentBuffer.position(), currentBuffer.limit(), (byte)0);
 //		//write last sector

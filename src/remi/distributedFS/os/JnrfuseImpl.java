@@ -143,9 +143,8 @@ public class JnrfuseImpl extends FuseStubFS {
 //        	System.out.println(">>>>NC getattr for (path) : "+path);
 //        	System.out.println(/*">>>>NC */"get attr for (path) : "+path);
     	FsObject obj = getPathObj(manager.getRoot(), path);
-//    	System.out.println("get attr for (obj) : "+obj);
     	if(obj ==null){
-//    		System.out.println(">> getattr : error: can't find "+path);
+    		System.err.println(">> getattr : warn: can't find "+path);
     		return -ErrorCodes.ENOENT();
     	}
     	long mode = PUGAToMode(obj);
@@ -530,13 +529,26 @@ public class JnrfuseImpl extends FuseStubFS {
 
     @Override
     public int open(String path, FuseFileInfo fi) {
-    	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC Open for (path) : "+path);
-        if (getPathFile(manager.getRoot(), path) == null) {
-        	System.err.println("can't open this file");
-            return -ErrorCodes.ENOENT();
-        }
-    	System.out.println("open : ok, no problem");
+    	try{
+	    	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+	    	System.out.println(">>>>NC Open for (path) : "+path+" with flags: "+fi.flags.get());
+	        if (getPathFile(manager.getRoot(), path) == null) {
+	        	System.err.println("can't open this file");
+	            return -ErrorCodes.ENOENT();
+	        }
+	        Object padseek = fi.nonseekable;
+	        jnr.ffi.Pointer point;
+	        fi.fh.struct();
+	//    	System.out.println("open : ok, no problem");
+	//    	System.out.println("nonseekable:"+fi.nonseekable);
+	//    	System.out.println("direct_io:"+fi.direct_io);
+	//    	System.out.println("padding:"+fi.padding);
+	//    	System.out.println("keep_cache:"+fi.keep_cache);
+	//    	System.out.println("lock_owner:"+fi.lock_owner);
+	//    	System.out.println("flock_release:"+fi.flock_release);
+    	}catch(Exception e){
+    		e.printStackTrace();
+    	}
         return 0;
     }
 
@@ -569,7 +581,7 @@ public class JnrfuseImpl extends FuseStubFS {
 	
 	    	buf.put(0, buff.array(), 0, readsize);
 //	    	System.out.println("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
-	    	System.out.println("read : size = "+ buff.array().length);
+//	    	System.out.println("read : size = "+ buff.array().length);
 	    	return readsize;
     	}catch(TimeoutException e){
     		return -ErrorCodes.ETIME();
@@ -643,48 +655,56 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int flush(String path, FuseFileInfo fi) {
+    	System.out.println(">>>>NC flush '"+path+"'");
         return 0;
     }
 
     @Override
     @NotImplemented
     public int release(String path, FuseFileInfo fi) {
+    	System.out.println(">>>>NC release '"+path+"'");
         return 0;
     }
 
     @Override
     @NotImplemented
     public int fsync(String path, int isdatasync, FuseFileInfo fi) {
+    	System.out.println(">>>>NC fsync "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int setxattr(String path, String name, Pointer value, @size_t long size, int flags) {
+    	System.out.println(">>>>NC setxattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int getxattr(String path, String name, Pointer value, @size_t long size) {
+    	System.out.println(">>>>NC getxattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int listxattr(String path, Pointer list, @size_t long size) {
+    	System.out.println(">>>>NC listxattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int removexattr(String path, String name) {
+    	System.out.println(">>>>NC removexattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int opendir(String path, FuseFileInfo fi) {
+    	System.out.println(">>>>NC opendir "+path);
         return 0;
     }
 
@@ -704,11 +724,11 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	filter.apply(buf, ".",  null, 0);
 	    	filter.apply(buf, "..",  null, 0);
 	    	for(FsDirectory childDir : dir.getDirs()){
-	        	System.out.println(dir.getName()+" have a dir");
+//	        	System.out.println(dir.getName()+" have a dir");
 	        	filter.apply(buf, childDir.getName(), null, 0);
 	    	}
 	    	for(FsFile childFile : dir.getFiles()){
-	        	System.out.println(dir.getName()+" have a file");
+//	        	System.out.println(dir.getName()+" have a file");
 	        	filter.apply(buf, childFile.getName(), null, 0);
 	    	}
     	}catch(WrongSectorTypeException e)
@@ -745,6 +765,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int access(String path, int mask) {
+    	System.out.println(">>>>NC access "+path);
         return 0;
     }
 
@@ -763,7 +784,9 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int lock(String path, FuseFileInfo fi, int cmd, Flock flock) {
-        return -ErrorCodes.ENOSYS();
+    	System.out.println(">>>>NC lock "+path);
+//        return -ErrorCodes.ENOSYS();
+    	return 0;
     }
 
     @Override
@@ -784,9 +807,11 @@ public class JnrfuseImpl extends FuseStubFS {
         return -ErrorCodes.ENOSYS();
     }
 
+    //TODO
     @Override
     @NotImplemented
     public int poll(String path, FuseFileInfo fi, FusePollhandle ph, Pointer reventsp) {
+    	System.out.println("poll "+path);
         return -ErrorCodes.ENOSYS();
     }
 
@@ -794,6 +819,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int write_buf(String path, FuseBufvec buf, @off_t long off, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+    	System.out.println("write_buf "+path);
     	// TODO.
         // Some problem in implementation, but it not enabling by default
         int res;
@@ -835,6 +861,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int read_buf(String path, Pointer bufp, @size_t long size, @off_t long off, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
+    	System.out.println("read_buf "+path);
         // should be implemented or null
         long vecmem = MemoryIO.getInstance().allocateMemory(Struct.size(new FuseBufvec(Runtime.getSystemRuntime())), false);
         if (vecmem == 0) {
@@ -860,16 +887,24 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int flock(String path, FuseFileInfo fi, int op) {
-        return -ErrorCodes.ENOSYS();
+    	System.out.println("flock "+path);
+//        return -ErrorCodes.ENOSYS();
+    	return 0;
     }
 
     @Override
     @NotImplemented
     public int fallocate(String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {
-        return -ErrorCodes.ENOSYS();
+    	System.out.println("fallocate "+path);
+//        return -ErrorCodes.ENOSYS();
+    	return 0;
     }
     
 	public void close() {
-		this.umount();
+		try{
+			this.umount();
+		}catch(Exception e){
+			e.printStackTrace();
+		}
 	}
 }

@@ -122,8 +122,8 @@ public class PanelRequest extends GridPane{
 		this.manager = manager;
 		btValidate.setOnAction((ActionEvent)->{
 			refreshList();
-			
 		});
+		refreshList();
 	}
 	
 	public void refreshList() {

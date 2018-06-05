@@ -651,7 +651,7 @@ public class ByteBuff
 	public ByteBuff write(BufferedOutputStream out) throws IOException {
 		readcheck(limit()-position());
 		out.write(array(),position(),limit()-position());
-		System.out.println("write"+Arrays.toString(toArray()));
+//		System.out.println("write"+Arrays.toString(toArray()));
 		position = limit;
 		return this;
 	}

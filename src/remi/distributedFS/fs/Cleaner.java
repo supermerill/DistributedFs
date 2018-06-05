@@ -42,8 +42,8 @@ public class Cleaner extends Thread{
 		this.canDelete = params.getBoolOrDef("CanDelete", true);
 		this.canElage = params.getBoolOrDef("CanElage", true);
 		this.minKnownDuplicate = params.getIntOrDef("MinKnownDuplicate", 1);
-		this.idealSize = params.getLongOrDef("IdealSize", 1024*1024*10);
-		this.maxSize = params.getLongOrDef("MaxSize", 1024*1024*1024);
+		this.idealSize = 1024*params.getLongOrDef("IdealSizeKB", 1024*10);
+		this.maxSize = 1024*params.getLongOrDef("MaxSizeKB", 1024*1024);
 		this.stimeBeforeDelete = params.getLongOrDef("SecTimeBeforeDelete", 1000*60);
 		
 		//scheduled next remove op in 100sec from creation, to elt time for the fs to load and rest
@@ -210,6 +210,7 @@ public class Cleaner extends Thread{
 		
 			//remove all files from this list -> map as long as my space isn't low enough (or no more file)
 			long sizeToRemove = Math.max(fsSpace+chunkSpace-maxSize, chunkSpace-idealSize);
+			System.out.println("fsSpace+chunkSpace= "+(fsSpace+chunkSpace)+" ,maxSize="+maxSize+", chunkSpace="+chunkSpace+" idealSize="+idealSize);
 			System.out.println("Need to remove "+sizeToRemove+" bytes ("+(sizeToRemove/1000)+"KB) "+lastAccess2id.size());
 			ObjectBidirectionalIterator<it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<ScoreDeletion>> it = lastAccess2id.object2LongEntrySet().iterator();
 			while(it.hasNext() && sizeToRemove>0){

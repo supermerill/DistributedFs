@@ -62,14 +62,14 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 
 			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ)){
 				
-				System.out.println("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
+//				System.out.println("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
 				ByteBuffer buff = toAppend.toByteBuffer();
 				buff.limit(buff.position()+size);
 //				buff.position(buff.position()); //already done in toByteBuffer()
 				dataChannel.read(buff, offset);
 
 				toAppend.position(toAppend.position()+size);
-				System.out.println("pos after = "+toAppend.position());
+//				System.out.println("pos after = "+toAppend.position());
 				lastaccess = System.currentTimeMillis();
 				return true;
 			} catch (IOException e) {
