@@ -98,7 +98,8 @@ public class MainWindow extends Application {
 					//wait to be sure you are really connected
 					System.out.println("WAIT CONNECTION");
 					try {
-						Thread.sleep(1000);
+						Thread.sleep(3000);
+						//TODO: loop while connection has not failed.
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}

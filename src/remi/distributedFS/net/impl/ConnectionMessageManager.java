@@ -73,15 +73,11 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 			System.out.println(clusterMananger.getPeerId()%100+" received SEND_SERVER_LIST from "+senderId%100);
 
 //			System.out.println(p.getMyServer().getId()%100+" read "+myId+" for "+p.getKey().getOtherServerId()%100);
-			short peerId = message.getShort();
+			short senderComputerId = message.getShort();
 			//add this id in our list, to be sure we didn't use it and we can transmit it.
 			synchronized (this.clusterMananger.getServerIdDb()) {
-				System.out.println(clusterMananger.getPeerId()%100+" receive peer computerId:  "+peerId+" from "+senderId%100);
-				if(peerId>0) {
-					if(!this.clusterMananger.getServerIdDb().id2PublicKey.containsKey(peerId)){
-						this.clusterMananger.getServerIdDb().id2PublicKey.put(peerId, null);
-					}
-				}
+				System.out.println(clusterMananger.getPeerId()%100+" receive peer computerId:  "+senderComputerId+" from "+senderId%100);
+				this.clusterMananger.getServerIdDb().addPeer(senderComputerId);
 			}
 			int nb = message.getTrailInt();
 			for(int i=0;i<nb;i++){
@@ -93,15 +89,16 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 				//add this id in our list, to be sure we didn't use it and we can transmit it.
 				synchronized (this.clusterMananger.getServerIdDb()) {
 					System.out.println(clusterMananger.getPeerId()%100+" receive a distant computerId:  "+computerId+" of "+id%100+" from "+senderId%100);
-					if(!this.clusterMananger.getServerIdDb().id2PublicKey.containsKey(computerId) && id != clusterMananger.getPeerId()){
-						this.clusterMananger.getServerIdDb().id2PublicKey.put(computerId, null);
-					}
+					this.clusterMananger.getServerIdDb().addPeer(computerId);
 				}
 //				System.out.println(p.getMyServer().getId()%100+" i have found "+ip+":"+ port);
 				
 				
 //					InetSocketAddress addr = new InetSocketAddress(ip,port);
-				clusterMananger.connectTo(ip, port);
+				if(computerId >0 && computerId != clusterMananger.getComputerId() && computerId != senderComputerId
+						&& id != clusterMananger.getPeerId() && id != senderId){
+					clusterMananger.connectTo(ip, port);
+				}
 			}
 			clusterMananger.getServerIdDb().receivedServerList.add(this.clusterMananger.getPeer(senderId));
 			clusterMananger.chooseComputerId();

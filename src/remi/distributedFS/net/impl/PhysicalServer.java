@@ -16,6 +16,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
@@ -142,11 +143,32 @@ public class PhysicalServer implements ClusterManager {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
+		
+		//clean peer list
+		synchronized (peers) {
+			Iterator<Peer> itPeers = peers.iterator();
+			while(itPeers.hasNext()){
+				Peer nextP = itPeers.next();
+				if(nextP.getComputerId() == this.getComputerId()){
+					System.err.println("Error: a peer is me (same computerid) "+this.getComputerId());
+					getServerIdDb().loadedPeers.remove(nextP);
+					getServerIdDb().id2PublicKey.remove(this.getComputerId());
+					nextP.close();
+					itPeers.remove();
+				}else if(nextP.getKey().getPeerId() == this.getPeerId()){
+					System.err.println("Error: a peer is me (same peerId) "+this.getPeerId());
+					getServerIdDb().loadedPeers.remove(nextP);
+					getServerIdDb().id2PublicKey.remove(this.getComputerId());
+					nextP.close();
+					itPeers.remove();
+				}
+			}
+		}
 		
 		System.out.println(getPeerId() % 100 + " update " + myFs.getDrivePath());
 		for (Peer peer : getPeers()) {
 			System.out.println(getPeerId() % 100 + " update peer " + peer.getPeerId() % 100);
+			//if we emit something to someone, wait a bit more for the next update.
 			quickUpdate = quickUpdate || peer.ping();
 		}
 		// toutes les heures
@@ -227,7 +249,7 @@ public class PhysicalServer implements ClusterManager {
 					}
 					if (otherPeer == null) {
 						System.out.println(getPeerId() % 100 + " 'new' accept connection to "
-								+ peer.getKey().getOtherServerId() % 100);
+								+ peer.getKey().getPeerId() % 100);
 						// peers.put(peer.getKey(), peer);
 						if (!peers.contains(peer)) {
 							System.err.println(
@@ -251,32 +273,32 @@ public class PhysicalServer implements ClusterManager {
 					} else {
 						if (otherPeer.isAlive() && !peer.isAlive()) {
 							System.err.println(getPeerId() % 100 + " 'warn' , close a new dead connection to "
-									+ peer.getKey().getOtherServerId() % 100 + " is already here.....");
+									+ peer.getKey().getPeerId() % 100 + " is already here.....");
 							peer.close();
 						} else if (!otherPeer.isAlive() && peer.isAlive()) {
 							System.err.println(getPeerId() % 100 + " warn,  close an old dead  a connection to "
-									+ peer.getKey().getOtherServerId() % 100 + " is already here.....");
+									+ peer.getKey().getPeerId() % 100 + " is already here.....");
 							otherPeer.close();
 							// peers.put(peer.getKey(), peer);
 							peers.add(peer);
 							peer.startListen();
 							return true;
-						} else if (otherPeer.getKey().getOtherServerId() != 0) {
-							if (otherPeer.getKey().getOtherServerId() < getPeerId()) {
+						} else if (otherPeer.getKey().getPeerId() != 0) {
+							if (otherPeer.getKey().getPeerId() < getPeerId()) {
 								System.err.println(getPeerId() % 100 + " warn, (I AM LEADER) a connection to "
-										+ peer.getKey().getOtherServerId() % 100 + " is already here.....");
+										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								peer.close();
 							} else {
 								System.err.println(getPeerId() % 100 + " warn, (I am not leader) a connection to "
-										+ peer.getKey().getOtherServerId() % 100 + " is already here.....");
+										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								peers.add(peer);
 								peer.startListen();
 								return true;
 							}
-						} else if (peer.getKey().getOtherServerId() != 0) {
-							if (peer.getKey().getOtherServerId() < getPeerId()) {
+						} else if (peer.getKey().getPeerId() != 0) {
+							if (peer.getKey().getPeerId() < getPeerId()) {
 								System.err.println(getPeerId() % 100 + " warn, (I AM LEADER) a connection to "
-										+ peer.getKey().getOtherServerId() % 100 + " is already here.....");
+										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								otherPeer.close();
 								// peers.put(peer.getKey(), peer);
 								peers.add(peer);
@@ -284,25 +306,25 @@ public class PhysicalServer implements ClusterManager {
 								return true;
 							} else {
 								System.err.println(getPeerId() % 100 + " warn, (I am not leader) a connection to "
-										+ peer.getKey().getOtherServerId() % 100 + " is already here.....");
+										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								peers.add(peer);
 								peer.startListen();
 								return true;
 							}
 						} else {
 							System.err.println(getPeerId() % 100 + " warn, an unknown connection to "
-									+ peer.getKey().getOtherServerId() % 100 + " is already here.....");
+									+ peer.getKey().getPeerId() % 100 + " is already here.....");
 							peer.close();
 						}
 						System.out.println(getPeerId() % 100 + " 'old' accept connection to "
-								+ peer.getKey().getOtherServerId() % 100);
+								+ peer.getKey().getPeerId() % 100);
 					}
 				}
 
 				// test if id is ok
 				if (peer.getPeerId() == getPeerId()) {
 					System.err.println(getPeerId() % 100 + " my peerid is equal to  "
-							+ peer.getKey().getOtherServerId() % 100);
+							+ peer.getKey().getPeerId() % 100);
 					return rechooseId();
 				}
 				// TODO: test if id is inside
@@ -542,11 +564,11 @@ public class PhysicalServer implements ClusterManager {
 		synchronized (this.clusterIdMananger.getRegisteredPeers()) {
 			for (Peer peer : this.clusterIdMananger.getRegisteredPeers()) {
 				if(peer != null && peer.isAlive()){
-					System.out.println("write msg "+messageId+" to "+peer.getKey().getOtherServerId()%100);
+					System.out.println("write msg "+messageId+" to "+peer.getKey().getPeerId()%100);
 					writeMessage(peer, messageId, message);
 					nbEmit ++;
 				}else{
-					System.out.println("peer "+peer.getKey().getOtherServerId()%100+" is not alive, can't send msg");
+					System.out.println("peer "+peer.getKey().getPeerId()%100+" is not alive, can't send msg");
 				}
 			}
 		}
@@ -626,13 +648,13 @@ public class PhysicalServer implements ClusterManager {
 			// check if we have a clusterId
 			System.out.println(getPeerId() % 100 + " getServerIdDb().myId=" + getServerIdDb().myComputerId);
 			if (getServerIdDb().myComputerId < 0) {
+				//first, wait a bit to let us contact everyone.
 				List<Peer> lstpeerCanConnect = null;
 				synchronized (peers) {
 					lstpeerCanConnect = new ArrayList<>(peers);
 				}
 				System.out.println(getPeerId() % 100 + " lstpeerCanConnect.size=" + lstpeerCanConnect.size());
-				System.out.println(
-						getPeerId() % 100 + " receivedServerList.size=" + getServerIdDb().receivedServerList.size());
+				System.out.println( getPeerId() % 100 + " receivedServerList=" + getServerIdDb().receivedServerList);
 				for (Peer okP : getServerIdDb().receivedServerList) {
 					if (lstpeerCanConnect.contains(okP)) {
 						lstpeerCanConnect.remove(okP);
@@ -679,7 +701,8 @@ public class PhysicalServer implements ClusterManager {
 			} else {
 				// yes
 				// there are a conflict?
-				if (getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId) != null /* && !getServerIdDb().id2PublicKey.get(getServerIdDb().myId).equals(getServerIdDb().publicKey)*/) {
+				
+				if (getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId) != null && !Arrays.equals(getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId).getEncoded(), getServerIdDb().publicKey.getEncoded())) {
 					try{
 						System.out.println("id is already there, with my id : "+getServerIdDb().myComputerId);
 						System.out.println(", my pub key : "+getServerIdDb().publicKey);

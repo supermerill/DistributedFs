@@ -811,7 +811,6 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int poll(String path, FuseFileInfo fi, FusePollhandle ph, Pointer reventsp) {
-    	System.out.println("poll "+path);
         return -ErrorCodes.ENOSYS();
     }
 

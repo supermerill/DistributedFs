@@ -278,19 +278,27 @@ public class ServerIdDb {
 			
 			//write peers
 			synchronized (registeredPeers) {
-				int nbPeers = registeredPeers.size();
+				int nbPeers = 0;
+				for(int i=0;i<nbPeers;i++){
+					Peer p = registeredPeers.get(i);
+					if(id2PublicKey.get(p.getComputerId()) != null){
+						nbPeers++;
+					}
+				}
 				bufferReac.reset().putInt(nbPeers).flip().write(out);
 				for(int i=0;i<nbPeers;i++){
 					Peer p = registeredPeers.get(i);
-					//save ip
-					bufferReac.reset().putShortUTF8(p.getIP()).flip().write(out);
-					//save port
-					bufferReac.reset().putInt(p.getPort()).flip().write(out);
-					//save id
-					bufferReac.reset().putShort(p.getComputerId()).flip().write(out);
-					//savePubKey
-					encodedPubKey = id2PublicKey.get(p.getComputerId()).getEncoded();
-					bufferReac.reset().putInt(encodedPubKey.length).put(encodedPubKey).flip().write(out);
+					if(id2PublicKey.get(p.getComputerId()) != null){
+						//save ip
+						bufferReac.reset().putShortUTF8(p.getIP()).flip().write(out);
+						//save port
+						bufferReac.reset().putInt(p.getPort()).flip().write(out);
+						//save id
+						bufferReac.reset().putShort(p.getComputerId()).flip().write(out);
+						//savePubKey
+						encodedPubKey = id2PublicKey.get(p.getComputerId()).getEncoded();
+						bufferReac.reset().putInt(encodedPubKey.length).put(encodedPubKey).flip().write(out);
+					}
 				}
 			}
 			
@@ -441,6 +449,16 @@ public class ServerIdDb {
 				return;
 			}
 		}
+
+		//check if the other side is ok and sent us something (it's a pre-emptive check)
+		if(buffIn.limit() == 2 && buffIn.getShort() == -1){
+			System.err.println(serv.getPeerId()%100+" (answerIdentity) he ask use somethign whithout a message! it's crazy!!! "+peer.getComputerId()+" : "+peer.getPeerId()%100);
+			//not ready, maybe he didn't choose his computerid yet?
+			//we have to ask him a bit later.
+			//ping() is already in charge of that
+			return;
+		}
+		
 		ByteBuff buffDecoded = getIdentityDecodedMessage(theirPubKey, buffIn);
 		short unverifiedCompId = buffDecoded.getShort(); ///osef short distId = because we can't verify it.
 		String msgDecoded = buffDecoded.getUTF8();
@@ -470,6 +488,15 @@ public class ServerIdDb {
 				requestPublicKey(peer);
 				return;
 			}
+		}
+		
+		//check if the other side is ok and sent us something
+		if(buffIn.limit() == 2 && buffIn.getShort() == -1){
+			System.out.println(serv.getPeerId()%100+" (receiveIdentity) he doesn't want to give us his identity! "+peer.getComputerId()+" : "+peer.getPeerId()%100);
+			//not ready, maybe he didn't choose his computerid yet?
+			//we have to ask him a bit later.
+			//ping() is already in charge of that
+			return;
 		}
 		
 		ByteBuff buffDecoded = getIdentityDecodedMessage(theirPubKey, buffIn);
@@ -522,7 +549,7 @@ public class ServerIdDb {
 			if(!alreadyTaken){
 				synchronized (id2PublicKey) {
 					//check if the public key is the same
-					if(!this.id2PublicKey.containsKey(distId) || this.id2PublicKey.get(distId) == null){
+					if(!this.id2PublicKey.containsKey(distId) || this.id2PublicKey.get(distId) == null && distId>0){
 						System.out.println(serv.getPeerId()%100+" (receiveIdentity) assign new publickey  for computerid "+distId+" , connId="+peer.getPeerId()%100);
 						//validate this peer
 						this.id2PublicKey.put(distId, theirPubKey);
@@ -536,9 +563,11 @@ public class ServerIdDb {
 						
 					}else{
 						if(!Arrays.equals(this.id2PublicKey.get(distId).getEncoded(), theirPubKey.getEncoded())){
-							System.err.println(serv.getPeerId()%100+" (receiveIdentity) error, cluster id "+distId+"has a wrong public key (not the one i registered) "+peer.getPeerId()%100+" ");
+							System.err.println(serv.getPeerId()%100+" (receiveIdentity) error, cluster id "+distId+" has a wrong public key (not the one i registered) "+peer.getPeerId()%100+" ");
 							System.err.println(serv.getPeerId()%100+" (receiveIdentity) what i have : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
 							System.err.println(serv.getPeerId()%100+" (receiveIdentity) what i received : "+Arrays.toString(this.id2PublicKey.get(distId).getEncoded()));
+						}else if(distId<=0){
+							System.err.println(serv.getPeerId()%100+" (receiveIdentity) error, cluster id "+distId+" hasn't a clusterId > 0 ");
 						}else{
 							System.out.println(serv.getPeerId()%100+" (receiveIdentity) publickey ok for computerid "+distId);
 							peer.setComputerId(distId);
@@ -830,11 +859,17 @@ public class ServerIdDb {
 		clusterId = Math.abs(new Random().nextLong());
 	}
 
-	//when receiving it from network?
-//	public void setClusterId(long clusterId2) {
-//		// TODO Auto-generated method stub
-//		
-//	}
+	/**
+	 * Add a computer id to the list of known computerid. This is maintained up-to-date to let other know what id is not available.
+	 * But these are not saved as they are not registered (no verified public keys). => it's half-assed we should just trash them if they are not verified ?
+	 * @param computerId some computerId, maybe already stored or just plain wrong.
+	 */
+	public void addPeer(short computerId) {
+		//check the computerId
+		if(this.serv.getComputerId() != computerId && computerId >0){
+			id2PublicKey.put(computerId, null);
+		}
+	}
 
 	
 	

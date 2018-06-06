@@ -79,7 +79,7 @@ public class Peer implements Runnable {
 			return address.hashCode();
 		}
 
-		public long getOtherServerId() {
+		public long getPeerId() {
 			return otherPeerId;
 		}
 
@@ -106,6 +106,11 @@ public class Peer implements Runnable {
 	@Override
 	public int hashCode() {
 		return myKey.hashCode();
+	}
+	
+	@Override
+	public String toString() {
+		return myKey.address +":"+ myKey.otherPeerId+":"+ myKey.port;
 	}
 
 	private PhysicalServer myServer;
@@ -359,7 +364,7 @@ public class Peer implements Runnable {
 					myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " want to read " + getIn().available());
 			readMessage();
 			System.out.println(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " read id "
-					+ getKey().getOtherServerId());
+					+ getKey().getPeerId());
 			// }
 			// while (myKey.port == 0) {
 			readMessage();
@@ -459,7 +464,7 @@ public class Peer implements Runnable {
 					nb5++;
 				}else{
 					nb5 = 0;
-					System.err.println("stream error: receive "+newByte+" isntead of 5");
+					System.err.println("stream error: receive "+newByte+" instead of 5  ,peerid=" +getKey().getPeerId()%100);
 				}
 //				System.out.println(myServer.getId() % 100 + " read second 5 :" + newByte);
 				if (newByte == -1)
@@ -639,6 +644,8 @@ public class Peer implements Runnable {
 	}
 
 	public void close() {
+		System.out.println("Closing "+getKey().getPeerId()%100);
+		System.out.println(Thread.getAllStackTraces().get(Thread.currentThread()));
 		alive.set(false);
 		changeState(PeerConnectionState.DEAD, false);
 		try {
@@ -678,5 +685,7 @@ public class Peer implements Runnable {
 	public PeerConnectionState getState() {
 		return myState;
 	}
+	
+	
 
 }
