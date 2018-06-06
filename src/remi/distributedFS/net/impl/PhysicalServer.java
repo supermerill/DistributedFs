@@ -356,7 +356,8 @@ public class PhysicalServer implements ClusterManager {
 			// System.out.println(mySocket.getInetAddress().getHostName()+" =?= "+ip);
 		}
 
-		System.out.println(getPeerId() % 100 + " want to CONNECT with " + port);
+		System.out.println(getPeerId() % 100 + " i am " +mySocket.getInetAddress().getHostAddress()+":"+ mySocket.getLocalPort());
+		System.out.println(getPeerId() % 100 + " want to CONNECT with " +ip+":"+ port);
 		final InetSocketAddress addr = new InetSocketAddress(ip, port);
 		final Socket tempSock = new Socket();
 		try {
@@ -816,6 +817,15 @@ public class PhysicalServer implements ClusterManager {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	@Override
+	public boolean isConnecting() {
+		int nb = 0;
+		for(Peer p : getPeers()){
+			if(p.isAlive()) nb++;
+		}
+		return this.getComputerId()<=0 && nb > 0;
 	}
 
 }

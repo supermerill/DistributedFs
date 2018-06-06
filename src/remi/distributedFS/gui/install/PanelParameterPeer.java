@@ -104,7 +104,7 @@ public class PanelParameterPeer extends InstallPanel {
 				alert.showAndWait();
 				return;
 			}
-			if (!txtDrivePath.getText().matches("^[A-Z]$") /* TODO: && isWindows() */) {
+			if (!txtDrivePath.getText().matches("^[A-Z]$") && System.getProperty("os.name").contains("Windows")) {
 				System.out.println("txtDrivePath: " + txtDrivePath.getText().length());
 				Alert alert = new Alert(Alert.AlertType.WARNING);
 				alert.setTitle("Error");

@@ -33,7 +33,8 @@ public class PanelRequest extends GridPane{
 	TextField path;
 	Button btValidate;
 	Label currentPath;
-	TextArea data;
+	ListView<String> listData;
+	ObservableListWrapper<String> listDataString = new ObservableListWrapper<String>(new ArrayList<String>());
 	ListView<String> listDirs;
 	ObservableListWrapper<String> listDirsString = new ObservableListWrapper<String>(new ArrayList<String>());
 	ListView<String> listFiles;
@@ -48,10 +49,8 @@ public class PanelRequest extends GridPane{
 		path.setPrefColumnCount(60);
 		btValidate = new Button("goto");
 		currentPath = new Label("/");
-		data = new TextArea();
-		data.setEditable(false);
-//		data.setText("sfqsfqfqffqs");
-		data.setDisable(true); // it's enabled when there are something
+		listData = new ListView();
+		listData.setItems(listDataString);
 		listDirs = new ListView<>();
 		listDirs.setItems(listDirsString);
 		listFiles = new ListView<>();
@@ -65,7 +64,7 @@ public class PanelRequest extends GridPane{
 		listDirs.setOnMouseClicked((me)->{
 			String item = listDirs.getSelectionModel().getSelectedItem();
 			if(item != null){
-				refreshDir(currentPath+"/"+item);
+				refreshDir(currentPath.getText()+"/"+item);
 			}
 		});
 
@@ -74,7 +73,7 @@ public class PanelRequest extends GridPane{
 			String item = listFiles.getSelectionModel().getSelectedItem();
 			System.out.println("mouse click on "+item);
 			if(item != null){
-				refreshDir(currentPath+"/"+item);
+				refreshDir(currentPath.getText()+"/"+item);
 			}
 		});
 		
@@ -82,32 +81,43 @@ public class PanelRequest extends GridPane{
 	
 	private void refreshDir(String path) {
 		FsObject obj = FsDirectoryMethods.getPathObj(this.manager.getRoot(), path);
+		if(obj == null){
+			System.err.println("Error, can't access "+path);
+			return;
+		}
+		List<String> lstStr = new ArrayList<>();
 		StringBuilder str = new StringBuilder();
-		addItem(str,"id: ",20).append(obj.getId());
-		addItem(str,"name: ",20).append(obj.getName());
-		addItem(str,"permissions: :",20).append(new PUGA(obj.getPUGA()).toStringShort());
-		addItem(str,"computer id: ",20).append(obj.getComputerId());
-		addItem(str,"group id: ",20).append(obj.getGroupId());
-		addItem(str,"user id: ",20).append(obj.getUserId());
-		addItem(str,"creator uid: ",20).append(obj.getCreatorUID());
-		addItem(str,"creation date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getCreationDate())));
-		addItem(str,"modify uid: ",20).append(obj.getModifyUID());
-		addItem(str,"modify date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getModifyDate())));
-		addItem(str,"delete uid: ",20).append(obj.getDeleteUID()>0?obj.getDeleteUID():"");
-		addItem(str,"delete date: ",20).append(obj.getDeleteDate()>0?new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getDeleteDate())):"");
+		str = new StringBuilder(); lstStr.add(addItem(str,"id: ",20).append(obj.getId()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"name: ",20).append(obj.getName()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"permissions: :",20).append(new PUGA(obj.getPUGA()).toStringShort()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"computer id: ",20).append(obj.getComputerId()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"group id: ",20).append(obj.getGroupId()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"user id: ",20).append(obj.getUserId()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"creator uid: ",20).append(obj.getCreatorUID()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"creation date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getCreationDate()))).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"modify uid: ",20).append(obj.getModifyUID()).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"modify date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getModifyDate()))).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"delete uid: ",20).append(obj.getDeleteUID()>0?obj.getDeleteUID():"").toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"delete date: ",20).append(obj.getDeleteDate()>0?new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getDeleteDate())):"").toString());
 //		addItem(str,": ",20).append(obj.get);
 		FsFile fic = obj.asFile();
 		if(fic != null){
-			addItem(str,"size: ",20).append(fic.getSize());
-			addItem(str,"nb chunks: ",20).append(fic.getAllChunks().size());
-			addItem(str,"nb local chunks: ",20).append(fic.getChunks().size());
+			str = new StringBuilder(); addItem(str,"size: ",20);
+			if(fic.getSize()>1000000000){ str.append((fic.getSize()/1000000000)%1000).append("go ");}
+			if(fic.getSize()>1000000){ str.append((fic.getSize()/1000000)%1000).append("mo ");}
+			if(fic.getSize()>1000){ str.append((fic.getSize()/1000)%1000).append("ko ");}
+			str.append(fic.getSize()%1000).append("o");
+			lstStr.add(str.toString());
+			str = new StringBuilder(); lstStr.add(addItem(str,"nb chunks: ",20).append(fic.getAllChunks().size()).toString());
+			str = new StringBuilder(); lstStr.add(addItem(str,"nb local chunks: ",20).append(fic.getChunks().size()).toString());
 		}
 		FsDirectory dir = obj.asDirectory();
 		if(dir != null){
-			addItem(str,"nb dirs: ",20).append(dir.getDirs().size());
-			addItem(str,"nb files: ",20).append(dir.getFiles().size());
-			addItem(str,"nb deleted things: ",20).append(dir.getDelete().size());
+			str = new StringBuilder(); lstStr.add(addItem(str,"nb dirs: ",20).append(dir.getDirs().size()).toString());
+			str = new StringBuilder(); lstStr.add(addItem(str,"nb files: ",20).append(dir.getFiles().size()).toString());
+			str = new StringBuilder(); lstStr.add(addItem(str,"nb deleted things: ",20).append(dir.getDelete().size()).toString());
 		}
+		listDataString.setAll(lstStr);
 	}
 	
 	public static StringBuilder addItem(StringBuilder str, String toAdd, int max) {
@@ -171,8 +181,8 @@ public class PanelRequest extends GridPane{
 		grid.add(path, 0, 0, 2, 1);
 		grid.add(btValidate, 2, 0, 1, 1);
 		grid.add(currentPath, 0, 1, 3, 1);
-		grid.add(data, 0, 2, 1, 2);
-		PanelRequest.setConstraints(data, 0, 2, 1, 2, HPos.CENTER, VPos.CENTER, Priority.ALWAYS, Priority.ALWAYS, Insets.EMPTY);
+		grid.add(listData, 0, 2, 1, 2);
+		PanelRequest.setConstraints(listData, 0, 2, 1, 2, HPos.CENTER, VPos.CENTER, Priority.ALWAYS, Priority.ALWAYS, Insets.EMPTY);
 		grid.add(listDirs, 1, 2, 2, 1);
 		PanelRequest.setConstraints(listDirs, 1, 2, 2, 1, HPos.CENTER, VPos.CENTER, Priority.ALWAYS, Priority.SOMETIMES, Insets.EMPTY);
 		grid.add(listFiles, 1, 3, 2, 1);

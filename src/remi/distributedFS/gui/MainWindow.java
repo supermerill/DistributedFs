@@ -94,11 +94,14 @@ public class MainWindow extends Application {
 				System.out.println("CONNECT");
 				int nbConnection = manager.getNet().connect();
 				
+				boolean iAmTheMaster =false;
 				if(nbConnection < 2) {
 					//wait to be sure you are really connected
 					System.out.println("WAIT CONNECTION");
 					try {
-						Thread.sleep(3000);
+						do{
+							Thread.sleep(3000);
+						}while(manager.getNet().isConnecting());
 						//TODO: loop while connection has not failed.
 					} catch (InterruptedException e) {
 						e.printStackTrace();
@@ -117,6 +120,7 @@ public class MainWindow extends Application {
 							Optional<ButtonType> ret = alert.showAndWait();
 							if(ret.get().getButtonData().isDefaultButton()) {
 								manager.getNet().initializeNewCluster();
+								iAmTheMaster = true;
 								paramsNet.setBool("FirstConnection", false);
 							}else {
 								paramsNet.setBool("FirstConnection", true);
@@ -135,6 +139,7 @@ public class MainWindow extends Application {
 							}
 						}else {
 							manager.getNet().initializeNewCluster();
+							iAmTheMaster = true;
 						}
 					}
 				}else{
@@ -143,6 +148,18 @@ public class MainWindow extends Application {
 					nbConnection = manager.getNet().getNbPeers();
 				}
 
+				//ask the whole fstab
+				if(!iAmTheMaster){
+					manager.requestDirUpdate();
+					//wait to receive the root
+//					manager.getDb().getRoot().
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+				
 				System.out.println("INIT OS");
 				manager.initOs("./data"+drivePath, drivePath);
 

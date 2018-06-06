@@ -73,4 +73,9 @@ public interface ClusterManager {
 	public long getPeerId(short compId); //get a peerId (senderId) from a computerId
 
 	public InetSocketAddress getListening();
+	/**
+	 * 
+	 * @return true if the net is currently connecting to the cluster
+	 */
+	public boolean isConnecting();
 }
