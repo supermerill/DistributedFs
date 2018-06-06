@@ -132,7 +132,7 @@ public class JnrfuseImpl extends FuseStubFS {
     	if(puga.allRead) mode |= FileStat.S_IROTH;
     	if(puga.allRead && puga.canExec) mode |= FileStat.S_IXOTH;
     	if(puga.allWrite) mode |= FileStat.S_IWOTH;
-    	if(obj instanceof FsDirectory) mode |= FileStat.S_IFDIR;
+    	if(obj instanceof FsDirectory){ mode |= FileStat.S_IFDIR; }else{ mode |= FileStat.S_IFREG; }
 		return mode;
 	}
 
@@ -152,9 +152,11 @@ public class JnrfuseImpl extends FuseStubFS {
     	stat.st_ino.set(Long.valueOf(obj.getId()));
     	stat.st_uid.set(Long.valueOf(obj.getUserId()));
     	stat.st_gid.set(Long.valueOf(obj.getGroupId()));
-    	stat.st_birthtime.tv_sec.set(Long.valueOf(obj.getCreationDate()/1000));
-    	stat.st_birthtime.tv_nsec.set(Long.valueOf(obj.getCreationDate()*1000));
-    	if(obj instanceof FsFile){
+    	if(stat.st_birthtime != null){
+	    	stat.st_birthtime.tv_sec.set(Long.valueOf(obj.getCreationDate()/1000));
+	    	stat.st_birthtime.tv_nsec.set(Long.valueOf(obj.getCreationDate()*1000));
+    	}
+    	if(obj.asFile() != null){
         	stat.st_size.set(Long.valueOf(((FsFile)obj).getSize()));
     	}
 //		System.out.println(">> getattr : mode "+mode+" == "+modeToPUGAObj(mode)+", uid : "+stat.st_uid);
@@ -724,11 +726,11 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	filter.apply(buf, ".",  null, 0);
 	    	filter.apply(buf, "..",  null, 0);
 	    	for(FsDirectory childDir : dir.getDirs()){
-//	        	System.out.println(dir.getName()+" have a dir");
+	        	System.out.println(dir.getName()+" have a dir "+childDir.getName());
 	        	filter.apply(buf, childDir.getName(), null, 0);
 	    	}
 	    	for(FsFile childFile : dir.getFiles()){
-//	        	System.out.println(dir.getName()+" have a file");
+	        	System.out.println(dir.getName()+" have a file "+childFile.getName());
 	        	filter.apply(buf, childFile.getName(), null, 0);
 	    	}
     	}catch(WrongSectorTypeException e)

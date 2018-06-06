@@ -279,8 +279,7 @@ public class ServerIdDb {
 			//write peers
 			synchronized (registeredPeers) {
 				int nbPeers = 0;
-				for(int i=0;i<nbPeers;i++){
-					Peer p = registeredPeers.get(i);
+				for(Peer p : registeredPeers){
 					if(id2PublicKey.get(p.getComputerId()) != null){
 						nbPeers++;
 					}
@@ -769,18 +768,18 @@ public class ServerIdDb {
 		if(peer.getComputerId()>=0 && isChoosen(peer.getComputerId())){
 			try{
 				//decrypt the key
-				//0° : get the message
+				//0 : get the message
 				byte aesStateMsg = message.get();
 				System.out.println(serv.getPeerId()%100+" (receiveAesKey) receive SEND_SERVER_AES_KEY state:"+((aesStateMsg&AES_FLAG_CONFIRM)==0?"PROPOSAL":"CONFIRM"));
 				int nbBytesMsg = message.getInt();
 				byte[] aesKeyEncrypt = message.get(nbBytesMsg);
 				System.out.println(serv.getPeerId()%100+" (receiveAesKey) EncryptKey2 : "+Arrays.toString(aesKeyEncrypt));
-				//1°: decrypt with our private key
+				//1: decrypt with our private key
 				Cipher cipher = Cipher.getInstance("RSA");
 				cipher.init(Cipher.DECRYPT_MODE, this.privateKey);
 				ByteBuff aesKeySemiDecrypt = blockCipher(aesKeyEncrypt, Cipher.DECRYPT_MODE, cipher);
 				System.out.println(serv.getPeerId()%100+" (receiveAesKey) EncryptKey : "+Arrays.toString(aesKeySemiDecrypt.array()));
-				//2° deccrypt with his public key
+				//2 deccrypt with his public key
 				Cipher cipher2 = Cipher.getInstance("RSA");
 				cipher2.init(Cipher.DECRYPT_MODE, id2PublicKey.get(peer.getComputerId()));
 				ByteBuff aesKeyDecrypt = blockCipher(aesKeySemiDecrypt.array(), Cipher.DECRYPT_MODE, cipher2);

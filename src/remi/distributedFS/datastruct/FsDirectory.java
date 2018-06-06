@@ -67,6 +67,7 @@ public interface FsDirectory extends FsObject {
 		
 		/**
 		 * please, only use '/'
+		 * @param dir root
 		 * @param path a correct path
 		 * @return a file or nul if i can't find.
 		 */
@@ -77,6 +78,7 @@ public interface FsDirectory extends FsObject {
 	
 		/**
 		 * please, only use '/'
+		 * @param dir root
 		 * @param path a correct path
 		 * @return a dir or null if i can't find.
 		 */
