@@ -64,7 +64,25 @@ public class PanelRequest extends GridPane{
 		listDirs.setOnMouseClicked((me)->{
 			String item = listDirs.getSelectionModel().getSelectedItem();
 			if(item != null){
-				refreshDir(currentPath.getText()+"/"+item);
+				if(me.getClickCount()==1) {
+					refreshDir(currentPath.getText()+"/"+item);
+				}else {
+					//double clic -> goto
+					if(item.equals("..")) {
+						if(path.getText().lastIndexOf("/") == 0) {
+							path.setText("/");
+						}else {
+							String newPath = path.getText().substring(path.getText().lastIndexOf("/"));
+							path.setText(newPath);
+						}
+					}else {
+						StringBuilder newPath = new StringBuilder(path.getText());
+						if(!path.getText().endsWith("/")) newPath.append("/");
+						newPath.append(item);
+						path.setText(newPath.toString());
+					}
+					refreshList();
+				}
 			}
 		});
 
@@ -141,6 +159,9 @@ public class PanelRequest extends GridPane{
 		if(mainDir != null) {
 			
 			List<String> lstDirStr = new ArrayList<>();
+			if(path.getText().length()>1) {
+				lstDirStr.add("..");
+			}
 			for(FsDirectory dir : mainDir.getDirs()) {
 				lstDirStr.add(dir.getName());
 			}
@@ -183,6 +204,7 @@ public class PanelRequest extends GridPane{
 		grid.add(currentPath, 0, 1, 3, 1);
 		grid.add(listData, 0, 2, 1, 2);
 		PanelRequest.setConstraints(listData, 0, 2, 1, 2, HPos.CENTER, VPos.CENTER, Priority.ALWAYS, Priority.ALWAYS, Insets.EMPTY);
+		listData.setMinWidth(450);
 		grid.add(listDirs, 1, 2, 2, 1);
 		PanelRequest.setConstraints(listDirs, 1, 2, 2, 1, HPos.CENTER, VPos.CENTER, Priority.ALWAYS, Priority.SOMETIMES, Insets.EMPTY);
 		grid.add(listFiles, 1, 3, 2, 1);
