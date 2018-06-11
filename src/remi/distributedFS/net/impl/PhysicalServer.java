@@ -1,6 +1,5 @@
 package remi.distributedFS.net.impl;
 
-import java.awt.TrayIcon.MessageType;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,7 +10,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
@@ -20,6 +18,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
+import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.net.ClusterManager;
@@ -146,6 +146,7 @@ public class PhysicalServer implements ClusterManager {
 		
 		//clean peer list
 		synchronized (peers) {
+			//remove peers that are me
 			Iterator<Peer> itPeers = peers.iterator();
 			while(itPeers.hasNext()){
 				Peer nextP = itPeers.next();
@@ -160,6 +161,23 @@ public class PhysicalServer implements ClusterManager {
 					getServerIdDb().loadedPeers.remove(nextP);
 					getServerIdDb().id2PublicKey.remove(this.getComputerId());
 					nextP.close();
+					itPeers.remove();
+				}
+			}
+			//remove old connection from same peer
+			//remove old connection from unregistered peers
+			Short2ObjectMap<Peer> states = new Short2ObjectOpenHashMap<>();
+			for(Peer p : peers) {
+				if(!states.containsKey(p.getComputerId()) || states.get(p.getComputerId()).getState().lowerThan(p.getState())) {
+					states.put(p.getComputerId(), p);
+				}
+			}
+			itPeers = peers.iterator();
+			while(itPeers.hasNext()){
+				Peer nextP = itPeers.next();
+				if(nextP.getComputerId() <= 0){
+					itPeers.remove();
+				}else if( nextP.getState().lowerThan(states.get(nextP.getComputerId()).getState()) ) {
 					itPeers.remove();
 				}
 			}
