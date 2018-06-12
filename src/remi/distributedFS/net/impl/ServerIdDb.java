@@ -38,6 +38,12 @@ import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.net.impl.Peer.PeerConnectionState;
 import remi.distributedFS.util.ByteBuff;
 
+/**
+ * If on linux it block on key generation, change jre/security/java.security -> change /dev/random by /dev/urandom 
+ * and NativePRNGBlocking by SHA1PRNG
+ * @author centai
+ *
+ */
 public class ServerIdDb {
 
 	PrivateKey privateKey;
@@ -314,6 +320,7 @@ public class ServerIdDb {
 
 	//send our public key to the peer
 	public void sendPublicKey(Peer peer) {
+		System.out.println(serv+" (sendPublicKey) emit GET_SERVER_PUBLIC_KEY to "+peer);
 		System.out.println(serv.getPeerId()%100+" (sendPublicKey) emit SEND_SERVER_PUBLIC_KEY to "+peer.getPeerId()%100);
 		
 		ByteBuff buff = new ByteBuff();
@@ -603,7 +610,9 @@ public class ServerIdDb {
 			save(filepath+"_1");
 			// remove first file
 			File fic = new File(filepath);
-			if(fic.exists()) fic.delete();
+			File ficBak = new File(filepath+".bak");
+			if(ficBak.exists()) ficBak.delete();
+			if(fic.exists()) fic.renameTo(ficBak);
 			// rename file
 			new File(filepath+"_1").renameTo(fic);
 		}

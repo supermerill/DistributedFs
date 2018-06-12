@@ -103,11 +103,11 @@ public class MainInstall extends Application {
 		
 		// cleaner.properties
 		remi.distributedFS.fs.Parameters paramsClean = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/cleaner.properties");
-		paramsClean.getIntOrDef("MaxSizeKB", Integer.parseInt(savedData.get("SizeMax").toString()));
+		paramsClean.getLongOrDef("MaxSizeKB", 1000 * Integer.parseInt(savedData.get("SizeMax").toString()));
 		
 		paramsClean.getBoolOrDef("CanElage", (Boolean)savedData.get("CanElage"));
 		paramsClean.getIntOrDef("MinKnownDuplicate", ((Boolean)savedData.get("CanElageAggressively"))?1:2);
-		paramsClean.getIntOrDef("IdealSizeKB", Integer.parseInt(savedData.get("SizeIdeal").toString()));
+		paramsClean.getLongOrDef("IdealSizeKB", 1000 * Integer.parseInt(savedData.get("SizeIdeal").toString()));
 		
 		paramsClean.getBoolOrDef("CanDelete", !(Boolean)savedData.get("NoDelete"));
 		paramsClean.getLongOrDef("SecTimeBeforeDelete", Integer.parseInt(savedData.get("TimeDelFic").toString()));

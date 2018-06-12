@@ -143,6 +143,13 @@ public class PhysicalServer implements ClusterManager {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		synchronized (peers) {
+			System.out.println("======== peers =======");
+			for(Peer p : peers) {
+				System.out.println(p.getIP()+":"+p.getPort()+" "+p.getComputerId()+" "+p.isAlive());
+			}
+			System.out.println("======================");
+		}
 		
 		//clean peer list
 		synchronized (peers) {
@@ -175,9 +182,13 @@ public class PhysicalServer implements ClusterManager {
 			itPeers = peers.iterator();
 			while(itPeers.hasNext()){
 				Peer nextP = itPeers.next();
-				if(nextP.getComputerId() <= 0){
+				if(nextP.getComputerId() <= 0 && nextP.createdAt < System.currentTimeMillis()-2*60*1000){
+					System.err.println("Error: a peer has no id and is old(>2min) : "+this.getPeerId());
+					if(nextP.isAlive()) nextP.close();
 					itPeers.remove();
 				}else if( nextP.getState().lowerThan(states.get(nextP.getComputerId()).getState()) ) {
+					System.err.println("Error: multiple peer for "+this.getPeerId()+" : deleting the one with status "+nextP.getState());
+					if(nextP.isAlive()) nextP.close();
 					itPeers.remove();
 				}
 			}

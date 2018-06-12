@@ -97,7 +97,8 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 //					InetSocketAddress addr = new InetSocketAddress(ip,port);
 				if(computerId >0 && computerId != clusterMananger.getComputerId() && computerId != senderComputerId
 						&& id != clusterMananger.getPeerId() && id != senderId){
-					clusterMananger.connectTo(ip, port);
+					//note: connectTO can throw exception if it can't be joinable.
+						new Thread(()-> clusterMananger.connectTo(ip, port) ).start();
 				}
 			}
 			clusterMananger.getServerIdDb().receivedServerList.add(this.clusterMananger.getPeer(senderId));

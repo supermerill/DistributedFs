@@ -92,7 +92,7 @@ public class PanelParameterPeer extends InstallPanel {
 				+ "it was copied to a 'trusted' host (ie permanent storage or at least one with enough free space)"));
 		txtTimeDelFic.setTooltip(new Tooltip("Number of seconds before a file can be really deleted on this disk."));
 		chkCanDelFic.setTooltip(new Tooltip(
-				"Allow this instance to delete files stored locally when they are deleted in the distributed filesystem."));
+				"Do not allow this instance to delete files stored locally when they are deleted in the distributed filesystem."));
 		txtTimeDelFS.setTooltip(new Tooltip("Number of seconds before the knowledge of the deletion is deleted. "
 				+ "Must be greater than the value behind, should be at least the maximum time you can be disconnected from the cluster."));
 		chkStoreOnlyPlainFiles.setTooltip(new Tooltip("Set it to false to be able to store only some parts of the files, to be more space-efficient.\nSet it to true if you want to be able to read stored files even if the program isn't launched."));
@@ -298,7 +298,7 @@ public class PanelParameterPeer extends InstallPanel {
 		}
 		manager.savedData.put("SizeMax", txtSizeMax.getText());
 		manager.savedData.put("SizeMax", txtSizeMax.getText());
-		if (chkCanDelFic.isSelected()) {
+		if (!chkCanDelFic.isSelected()) {
 			manager.savedData.put("NoDelete", false);
 			manager.savedData.put("TimeDelFic", txtTimeDelFic.getText());
 		} else {

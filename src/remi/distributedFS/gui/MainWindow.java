@@ -124,6 +124,7 @@ public class MainWindow extends Application {
 						}else {
 							waitAbit = false;
 						}
+						nbConnection = manager.getNet().getNbPeers();
 					}while(nbConnection == 0 && waitAbit);
 					
 					if(nbConnection == 0) {

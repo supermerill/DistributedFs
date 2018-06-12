@@ -149,10 +149,13 @@ public class Peer implements Runnable {
 	Cipher encoder = null;
 	Cipher decoder = null;
 
+	public final long createdAt;
+
 	public Peer(PhysicalServer physicalServer, InetAddress inetAddress, int port) {
 		myServer = physicalServer;
 		myKey = new PeerKey(inetAddress);
 		myKey.port = port;
+		createdAt = System.currentTimeMillis();
 	}
 
 	// write only
