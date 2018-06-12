@@ -18,70 +18,11 @@ import remi.distributedFS.datastruct.FsChunk;
  * @author Admin
  *
  */
-public class Cleaner extends Thread{
-	
-	boolean canDelete;
-	boolean canElage;
-	int minKnownDuplicate;
-	long idealSize;
-	long maxSize;
-	long stimeBeforeDelete;
+public class CleanerDefault implements Cleaner{
 	
 	
-	int msSleepPerOp = 10;
-	long nextCleaningOp = 0;
-	long nextRemoveOp = 0;
-	
-	StandardManager manager;
-
-	public Cleaner(StandardManager manager) {
+	public CleanerDefault() {
 		super();
-		this.manager = manager;
-		
-		Parameters params = new Parameters(manager.getRootFolder()+"/cleaner.properties");
-		this.canDelete = params.getBoolOrDef("CanDelete", true);
-		this.canElage = params.getBoolOrDef("CanElage", true);
-		this.minKnownDuplicate = params.getIntOrDef("MinKnownDuplicate", 1);
-		this.idealSize = 1024*params.getLongOrDef("IdealSizeKB", 1024*10);
-		this.maxSize = 1024*params.getLongOrDef("MaxSizeKB", 1024*1024);
-		this.stimeBeforeDelete = params.getLongOrDef("SecTimeBeforeDelete", 1000*60);
-		
-		//scheduled next remove op in 100sec from creation, to elt time for the fs to load and rest
-		nextCleaningOp = System.currentTimeMillis() + 100000 *0;
-		nextRemoveOp = System.currentTimeMillis();
-	}
-	
-	public Cleaner(StandardManager manager, long idealSize, long maxSize, long mstimeBeforeDelete) {
-		super();
-		this.manager = manager;
-		this.idealSize = idealSize;
-		this.maxSize = maxSize;
-		this.stimeBeforeDelete = mstimeBeforeDelete /1000;
-		
-		//scheduled next remove op in 100sec from creation, to elt time for the fs to load and rest
-		nextCleaningOp = System.currentTimeMillis() + 100000 *0;
-		nextRemoveOp = System.currentTimeMillis();
-	}
-
-	@Override
-	public void run() {
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-		if(System.currentTimeMillis() > nextRemoveOp  && canElage){
-			checkLiberateSpace();
-			nextRemoveOp = System.currentTimeMillis() + 1000;
-		}
-		System.out.println(System.currentTimeMillis()+" > "+nextCleaningOp+" == "+(System.currentTimeMillis() > nextCleaningOp));
-		if(System.currentTimeMillis() > nextCleaningOp && canDelete){
-			manager.getDb().removeOldDelItem(System.currentTimeMillis() - 1000L*stimeBeforeDelete);
-//			nextCleaningOp = System.currentTimeMillis() + 1000 * 60 * 60 * 2; //every 2 hour
-			nextCleaningOp = System.currentTimeMillis() + 1000 * 20; //testing : every 20 seconds
-		}
-		
 	}
 	
 	public static class ScoreDeletion implements Comparable<ScoreDeletion>{
@@ -139,11 +80,11 @@ public class Cleaner extends Thread{
 	}
 
 	//TODO: this impl is linked strongly with the basic impl from bd (use files as chunk), you HAVE TO change that to make an implentation-independant impl
-	protected void checkLiberateSpace() {
+	public boolean checkLiberateSpace(CleanerManager manager) {
 		System.out.println("CheckLiberateSpace");
 		Pattern patternNumeral = Pattern.compile("^[0-9]+$");
 		
-		File rootFolder = new File(manager.rootFolder);
+		File rootFolder = new File(manager.manager.rootFolder);
 		//get space occupied by the fs
 		long fsSpace = 0;
 		for(File fic : rootFolder.listFiles()){
@@ -163,10 +104,10 @@ public class Cleaner extends Thread{
 			}
 		}
 		System.out.println("Chunks space used : "+((chunkSpace/(1000*1000*1000))%1000)+"go "+((chunkSpace/(1000*1000))%1000)+"mo "+((chunkSpace/1000)%1000)+"ko "+chunkSpace%1000+"o");
-		System.out.println("idealSize         : "+((idealSize/(1000*1000*1000))%1000)+"go "+((idealSize/(1000*1000))%1000)+"mo "+((idealSize/1000)%1000)+"ko "+idealSize%1000+"o");
+		System.out.println("idealSize         : "+((manager.idealSize/(1000*1000*1000))%1000)+"go "+((manager.idealSize/(1000*1000))%1000)+"mo "+((manager.idealSize/1000)%1000)+"ko "+manager.idealSize%1000+"o");
 		
 		//do we need to deleted some things?
-		if(chunkSpace > idealSize || fsSpace + chunkSpace > maxSize){
+		if(chunkSpace > manager.idealSize || fsSpace + chunkSpace > manager.maxSize){
 			
 			//get all files name (only now to avoid getting it when it's not necessary
 			LongList chunkNames = new LongArrayList();
@@ -183,12 +124,12 @@ public class Cleaner extends Thread{
 			Random aleat = new Random();
 			//for each:
 			for(long chunkId : chunkNames){
-				FsChunk chunk = manager.getDb().getChunkDirect(chunkId);
+				FsChunk chunk = manager.manager.getDb().getChunkDirect(chunkId);
 				// if it's not in the fs (bad file) , del it.
 				if(chunk == null){
 					System.out.println("bad file : "+chunkId);
 //					new File(rootFolder.getAbsolutePath()+"/"+chunkId).delete();
-				}else if(chunk.serverIdPresent().size()<=minKnownDuplicate){
+				}else if(chunk.serverIdPresent().size()<=manager.minKnownDuplicate){
 					// if i'm the only one to have it, do not del
 					System.out.println("chunk "+chunkId+" is alone");
 				}else{
@@ -209,14 +150,14 @@ public class Cleaner extends Thread{
 			}
 		
 			//remove all files from this list -> map as long as my space isn't low enough (or no more file)
-			long sizeToRemove = Math.max(fsSpace+chunkSpace-maxSize, chunkSpace-idealSize);
-			System.out.println("fsSpace+chunkSpace= "+(fsSpace+chunkSpace)+" ,maxSize="+maxSize+", chunkSpace="+chunkSpace+" idealSize="+idealSize);
+			long sizeToRemove = Math.max(fsSpace+chunkSpace-manager.maxSize, chunkSpace-manager.idealSize);
+			System.out.println("fsSpace+chunkSpace= "+(fsSpace+chunkSpace)+" ,maxSize="+manager.maxSize+", chunkSpace="+chunkSpace+" idealSize="+manager.idealSize);
 			System.out.println("Need to remove "+sizeToRemove+" bytes ("+(sizeToRemove/1000)+"KB) "+lastAccess2id.size());
 			ObjectBidirectionalIterator<it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<ScoreDeletion>> it = lastAccess2id.object2LongEntrySet().iterator();
 			while(it.hasNext() && sizeToRemove>0){
 				it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<ScoreDeletion> entry = it.next();
 				long idDel = entry.getLongValue();
-				FsChunk chunk = manager.getDb().getChunkDirect(idDel);
+				FsChunk chunk = manager.manager.getDb().getChunkDirect(idDel);
 				System.out.print("chunk "+idDel+" is removed, for a size of "+chunk.currentSize()+", access date = "+entry.getKey().lastaccess+" , size: "+entry.getKey().size+", copies: "+entry.getKey().nbCopy);
 				sizeToRemove -= chunk.currentSize();
 				System.out.println(", reste "+sizeToRemove+", "+it.hasNext());
@@ -226,7 +167,8 @@ public class Cleaner extends Thread{
 			
 			//end!
 		}
-		
+
+		return false;
 		
 	}
 	
