@@ -29,11 +29,11 @@ import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 
 /**
- * choix du role(4 boutons): - standard - sauvegarde - nas/cache - client léger
+ * choix du role(4 boutons): - standard - sauvegarde - nas/cache - client lï¿½ger
  * 
  * qui set tes parametres:
  * 
- * taille max idéale taille max max elagage agressif temps conservation suppression data temps conservation suppression fs
+ * taille max idï¿½ale taille max max elagage agressif temps conservation suppression data temps conservation suppression fs
  * 
  * 
  * bouton next -> create peer parameter and first launch!
@@ -125,6 +125,7 @@ public class PanelParameterPeer extends InstallPanel {
 				alert.showAndWait();
 				return;
 			}
+			System.out.println(System.getProperty("os.name"));
 			if (!txtDrivePath.getText().matches("^[A-Z]$") && System.getProperty("os.name").contains("Windows")) {
 				System.out.println("txtDrivePath: " + txtDrivePath.getText().length());
 				Alert alert = new Alert(Alert.AlertType.WARNING);

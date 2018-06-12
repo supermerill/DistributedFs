@@ -823,7 +823,7 @@ public class ServerIdDb {
 						}else{
 							System.err.println(serv.getPeerId()%100+" (receiveAesKey) warn, conflict");
 							//use one in random and send it, it should converge.
-							if(System.currentTimeMillis()%2==0){
+							if(new Random().nextInt(2)==0){
 								//use new one
 								id2AesKey.put(peer.getComputerId(), secretKeyReceived);
 								System.out.println(serv.getPeerId()%100+" (receiveAesKey) conflict: use new");

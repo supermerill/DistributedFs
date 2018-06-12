@@ -62,7 +62,7 @@ public class MainWindow extends Application {
 		});
 		myFrame.setScene(mainScene);
 		
-		frame.setTitle("Install & configure a distributed hard drive instance");
+		frame.setTitle("Virtual Distributed Hard drive instance");
 		frame.setWidth(900);
 		frame.setHeight(900);
 		frame.centerOnScreen();
@@ -108,6 +108,24 @@ public class MainWindow extends Application {
 					}
 					nbConnection = manager.getNet().getNbPeers();
 					System.out.println("nb connected peers = "+nbConnection);
+					boolean waitAbit = true;
+					do{
+						Alert alert = new Alert(AlertType.CONFIRMATION);
+						alert.setTitle("Can't connect to cluster");
+						alert.setHeaderText("The cluster seems unreacheable.");
+						alert.setContentText("Wait a bit more ?");
+						Optional<ButtonType> ret = alert.showAndWait();
+						if(ret.get().getButtonData().isDefaultButton()) {
+							waitAbit =true;
+							try {
+								Thread.sleep(5000);
+							} catch (InterruptedException e) {
+							}
+						}else {
+							waitAbit = false;
+						}
+					}while(nbConnection == 0 && waitAbit);
+					
 					if(nbConnection == 0) {
 						System.out.println("can't connect, create my new server ? " + !paramsNet.getBoolOrDef("FirstConnection", false));
 						//start a new net cluster
@@ -116,7 +134,7 @@ public class MainWindow extends Application {
 							Alert alert = new Alert(AlertType.CONFIRMATION);
 							alert.setTitle("Can't connect to cluster");
 							alert.setHeaderText("The cluster seems unreacheable.");
-							alert.setContentText("Do we abandon to connect to the cluster and create our own (click cancel if you want to try again alter) ?");
+							alert.setContentText("Do we abandon to connect to the cluster and create our own \n(click cancel if you want to try again alter) ?");
 							Optional<ButtonType> ret = alert.showAndWait();
 							if(ret.get().getButtonData().isDefaultButton()) {
 								manager.getNet().initializeNewCluster();
