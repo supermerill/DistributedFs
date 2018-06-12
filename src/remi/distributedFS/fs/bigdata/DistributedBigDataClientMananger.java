@@ -11,6 +11,8 @@ import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
 import remi.distributedFS.db.impl.bigdata.FsChunkStreamable;
 import remi.distributedFS.db.impl.bigdata.FsChunkStreaming;
 import remi.distributedFS.fs.Cleaner;
+import remi.distributedFS.fs.CleanerDefault;
+import remi.distributedFS.fs.CleanerManager;
 import remi.distributedFS.fs.StandardManager;
 import remi.distributedFS.fs.messages.PropagateChange;
 import remi.distributedFS.net.impl.PhysicalServer;
@@ -50,8 +52,8 @@ public class DistributedBigDataClientMananger extends StandardManager {
 
 			//TODO: serialize & gui
 //			cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
-			cleaner = new Cleaner(this);
-			cleaner.start();
+			cleanerM = new CleanerManager(this);
+			cleanerM.start();
 			
 		}catch (Exception e) {
 			e.printStackTrace();

@@ -5,12 +5,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
 
 import remi.distributedFS.datastruct.FsChunk;
-import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.db.UnreachableChunkException;
 import remi.distributedFS.db.impl.FsChunkFromFile;
 import remi.distributedFS.db.impl.FsDirectoryFromFile;

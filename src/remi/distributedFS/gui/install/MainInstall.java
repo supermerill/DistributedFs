@@ -106,7 +106,7 @@ public class MainInstall extends Application {
 		paramsClean.getIntOrDef("MaxSizeKB", Integer.parseInt(savedData.get("SizeMax").toString()));
 		
 		paramsClean.getBoolOrDef("CanElage", (Boolean)savedData.get("CanElage"));
-		paramsClean.getIntOrDef("minKnownDuplicate", ((Boolean)savedData.get("CanElageAggressively"))?1:2);
+		paramsClean.getIntOrDef("MinKnownDuplicate", ((Boolean)savedData.get("CanElageAggressively"))?1:2);
 		paramsClean.getIntOrDef("IdealSizeKB", Integer.parseInt(savedData.get("SizeIdeal").toString()));
 		
 		paramsClean.getBoolOrDef("CanDelete", !(Boolean)savedData.get("NoDelete"));
@@ -126,6 +126,12 @@ public class MainInstall extends Application {
 		if(savedData.containsKey("CreateNewKey") && !(Boolean)savedData.get("CreateNewKey")) {
 			paramsNet.getStringOrDef("PrivKey", savedData.get("PrivKey").toString());
 			paramsNet.getStringOrDef("PubKey", savedData.get("PubKey").toString());
+		}
+		switch(savedData.get("Cleaner").toString()) {
+			case "Remove not used chunks" : paramsClean.setString("Type", "CleanerDefault"); break;
+			case "Remove old files" : paramsClean.setString("Type", "CleanerKeepNewFiles"); break;
+			case "Don't remove" : paramsClean.setString("Type", "CleanerNone"); break;
+			default : paramsClean.setString("Type", "CleanerDefault");
 		}
 		
 		/*

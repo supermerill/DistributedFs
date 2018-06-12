@@ -3,19 +3,29 @@ package remi.distributedFS.gui.install;
 import java.io.File;
 import java.util.regex.Pattern;
 
+import com.sun.javafx.collections.ImmutableObservableList;
+
+import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
-import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.SingleSelectionModel;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.Border;
+import javafx.scene.layout.BorderStroke;
+import javafx.scene.layout.BorderStrokeStyle;
+import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 
 /**
@@ -42,19 +52,28 @@ public class PanelParameterPeer extends InstallPanel {
 	Label lblTimeDelFic = new Label("Time before deletion (files)");
 	Label lblTimeDelFS = new Label("Time before deletion (metadata)");
 	Label lblStoreOnlyPlainFiles = new Label("Store only plain files");
+	Label lblCanDelFic = new Label("Never remove files");
+	Label lblCleaner = new Label("Cleaner");
 
+	GridPane panelCleaner = new GridPane();
 	TextField txtInstallPath = new TextField();
 	Button btInstallPath = new Button();
 	TextField txtDrivePath = new TextField();
 	TextField txtListenPort = new TextField();
 	TextField txtSizeIdeal = new TextField();
-	CheckBox chkCanReduce = new CheckBox();
+//	CheckBox chkCanReduce = new CheckBox();
 	TextField txtSizeMax = new TextField();
 	CheckBox chkElagage = new CheckBox();
 	TextField txtTimeDelFic = new TextField();
 	CheckBox chkCanDelFic = new CheckBox();
 	TextField txtTimeDelFS = new TextField();
 	CheckBox chkStoreOnlyPlainFiles = new CheckBox();
+	ComboBox<String> cmbCleaner = new ComboBox<>();
+	ImmutableObservableList<String> cmbItems = new ImmutableObservableList<>(
+			"Remove not used chunks",
+			"Remove old files",
+			"Don't remove",
+			"Remove less requested by network (niy)");
 
 	Button btNext = new Button();
 
@@ -66,7 +85,7 @@ public class PanelParameterPeer extends InstallPanel {
 		txtDrivePath.setTooltip(new Tooltip("Drive path in the OS. (a drive letter for windows, like 'E')"));
 		txtListenPort.setTooltip(new Tooltip("Tcp port where we listen the connection from other peers."));
 		txtSizeIdeal.setTooltip(new Tooltip("Ideal maximum size that this drive can take in your local hard drive."));
-		chkCanReduce.setTooltip(new Tooltip("Allow this instance to delete local content to make space for new one."));
+//		chkCanReduce.setTooltip(new Tooltip("Allow this instance to delete local content to make space for new one."));
 		txtSizeMax.setTooltip(
 				new Tooltip("Absolute maximum size this drive can take in your hard drive (should be at least 1gio)."));
 		chkElagage.setTooltip(new Tooltip("Check it to allow the fs to erase file locally even if it's not sure that "
@@ -77,6 +96,8 @@ public class PanelParameterPeer extends InstallPanel {
 		txtTimeDelFS.setTooltip(new Tooltip("Number of seconds before the knowledge of the deletion is deleted. "
 				+ "Must be greater than the value behind, should be at least the maximum time you can be disconnected from the cluster."));
 		chkStoreOnlyPlainFiles.setTooltip(new Tooltip("Set it to false to be able to store only some parts of the files, to be more space-efficient.\nSet it to true if you want to be able to read stored files even if the program isn't launched."));
+		cmbCleaner.setTooltip(new Tooltip("When the space reserved for this instance is full, how to make some space for the new documents?"));
+		cmbCleaner.setItems(cmbItems);
 		btNext.setText("Finish");
 		btNext.setTooltip(new Tooltip("Create your instance and connect it."));
 		String localPath = new File(".").getAbsolutePath();
@@ -151,17 +172,37 @@ public class PanelParameterPeer extends InstallPanel {
 
 		chkCanDelFic.selectedProperty()
 				.addListener((ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) -> {
-					txtTimeDelFic.setDisable(!newValue);
-					txtTimeDelFic.setEditable(newValue);
+					txtTimeDelFic.setDisable(newValue);
+					txtTimeDelFic.setEditable(!newValue);
 				});
 		chkCanDelFic.setSelected(true);
 
-		chkCanReduce.selectedProperty()
+//		chkCanReduce.selectedProperty()
+//				.addListener((ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) -> {
+//					txtSizeIdeal.setDisable(!newValue);
+//					chkElagage.setDisable(!newValue);
+//				});
+//		chkCanReduce.setSelected(true);
+		
+		chkStoreOnlyPlainFiles.selectedProperty()
 				.addListener((ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) -> {
-					txtSizeIdeal.setDisable(!newValue);
-					chkElagage.setDisable(!newValue);
-				});
-		chkCanReduce.setSelected(true);
+					if(!newValue) {
+						chkCanDelFic.setSelected(false);
+					}
+					chkCanDelFic.setDisable(!newValue);
+		});
+		chkStoreOnlyPlainFiles.setSelected(true);
+		
+		cmbCleaner.valueProperty().addListener((ObservableValue<? extends String> observable, String oldValue, String newValue) -> {
+			if(oldValue != null && oldValue.equals("Don't remove")) {
+				txtSizeIdeal.setDisable(false);
+				chkElagage.setDisable(false);
+			}
+			if(newValue != null && newValue.equals("Don't remove")) {
+				txtSizeIdeal.setDisable(true);
+				chkElagage.setDisable(true);
+			}
+		});
 
 		grid.setHgap(10);
 		grid.setVgap(10);
@@ -176,6 +217,13 @@ public class PanelParameterPeer extends InstallPanel {
 		grid.getColumnConstraints().add(column);
 		grid.setMaxSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
 
+	    panelCleaner.setHgap(0);
+	    panelCleaner.setVgap(0);
+	    panelCleaner.setPadding(new Insets(3, 10, 2, 10));
+	    panelCleaner.setBorder(new Border(new BorderStroke(Color.BLACK, BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT)));
+	    panelCleaner.getColumnConstraints().add(new ColumnConstraints());
+	    panelCleaner.getColumnConstraints().add(column);
+
 		int y = 0;
 		grid.add(lblInstallPath, 0, y, 1, 1);
 		grid.add(txtInstallPath, 1, y, 2, 1);
@@ -187,27 +235,43 @@ public class PanelParameterPeer extends InstallPanel {
 		grid.add(lblListenPort, 0, y, 1, 1);
 		grid.add(txtListenPort, 1, y, 1, 1);
 		y++;
-		grid.add(lblSizeIdeal, 0, y, 1, 1);
-		grid.add(txtSizeIdeal, 1, y, 1, 1);
-		grid.add(chkCanReduce, 2, y, 1, 1);
-		y++;
-		grid.add(lblSizeMax, 0, y, 1, 1);
-		grid.add(txtSizeMax, 1, y, 1, 1);
-		y++;
-		grid.add(lblElagage, 0, y, 1, 1);
-		grid.add(chkElagage, 1, y, 1, 1);
-		y++;
-		grid.add(lblTimeDelFS, 0, y, 1, 1);
-		grid.add(txtTimeDelFS, 1, y, 1, 1);
-		y++;
-		grid.add(lblTimeDelFic, 0, y, 1, 1);
-		grid.add(txtTimeDelFic, 1, y, 1, 1);
-		grid.add(chkCanDelFic, 2, y, 1, 1);
-		y++;
 		grid.add(lblStoreOnlyPlainFiles, 0, y, 1, 1);
 		grid.add(chkStoreOnlyPlainFiles, 1, y, 1, 1);
 		y++;
+		grid.add(lblCanDelFic, 0, y, 1, 1);
+		grid.add(chkCanDelFic, 1, y, 1, 1);
+		
+		{
+
+			panelCleaner.add(lblSizeIdeal, 0, 0, 1, 1);
+			panelCleaner.add(txtSizeIdeal, 1, 0, 1, 1);
+//			panelCleaner.add(chkCanReduce, 2, 0, 1, 1);
+
+			panelCleaner.add(lblSizeMax, 0, 1, 1, 1);
+			panelCleaner.add(txtSizeMax, 1, 1, 1, 1);
+
+			panelCleaner.add(lblElagage, 0, 2, 1, 1);
+			panelCleaner.add(chkElagage, 1, 2, 1, 1);
+
+			panelCleaner.add(lblTimeDelFS, 0, 3, 1, 1);
+			panelCleaner.add(txtTimeDelFS, 1, 3, 1, 1);
+
+			panelCleaner.add(lblTimeDelFic, 0, 4, 1, 1);
+			panelCleaner.add(txtTimeDelFic, 1, 4, 1, 1);
+
+			panelCleaner.add(lblCleaner, 0, 5, 1, 1);
+			panelCleaner.add(cmbCleaner, 1, 5, 1, 1);
+		}
+		
+		y++;
+		grid.add(panelCleaner, 0, y, 3, 1);
+		y++;
 		grid.add(btNext, 3, y, 1, 1);
+		
+
+		chkCanDelFic.setSelected(false);
+		chkStoreOnlyPlainFiles.setSelected(false);
+		cmbCleaner.setValue(cmbItems.get(0));
 	}
 
 	@Override
@@ -221,14 +285,15 @@ public class PanelParameterPeer extends InstallPanel {
 		manager.savedData.put("InstallPath", txtInstallPath.getText());
 		manager.savedData.put("DrivePath", txtDrivePath.getText());
 		manager.savedData.put("ListenPort", txtListenPort.getText());
-		if (chkCanReduce.isSelected()) {
-			manager.savedData.put("CanElage", true);
-			manager.savedData.put("CanElageAggressively", chkElagage.isSelected());
-			manager.savedData.put("SizeIdeal", txtSizeIdeal.getText());
-		} else {
+		manager.savedData.put("Cleaner", cmbCleaner.getValue());
+		if (cmbCleaner.getValue().equals("Don't remove")) {
 			manager.savedData.put("CanElage", false);
 			manager.savedData.put("CanElageAggressively", false);
 			manager.savedData.put("SizeIdeal", -1);
+		}else {
+			manager.savedData.put("CanElage", true);
+			manager.savedData.put("CanElageAggressively", chkElagage.isSelected());
+			manager.savedData.put("SizeIdeal", txtSizeIdeal.getText());
 		}
 		manager.savedData.put("SizeMax", txtSizeMax.getText());
 		manager.savedData.put("SizeMax", txtSizeMax.getText());

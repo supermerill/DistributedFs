@@ -1,11 +1,18 @@
 package remi.distributedFS.datastruct;
 
 public interface FsId {
-	
+	/**
+	 * 
+	 * @return in ms
+	 */
 	public long getModifyDate();
 	public long getModifyUID() ;
 	public long getId();
 
+	/**
+	 * Visitor function.
+	 * @param visitor the visitor who visit this element.
+	 */
 	public abstract void accept(FsObjectVisitor visitor);
 	
 	/**
@@ -13,7 +20,10 @@ public interface FsId {
 	 * It's final and irrecoverable. If you want just mark this as "deleted", use removeDir/removeFile/removeChunk instead.
 	 */
 	public void delete(); 
-	
+
+	/**
+	 * Call this when a changes occur on this element. It updates the ModifyDate.
+	 */
 	public void changes();
 	
 	/**

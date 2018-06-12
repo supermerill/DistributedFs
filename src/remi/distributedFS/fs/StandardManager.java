@@ -1,7 +1,6 @@
 package remi.distributedFS.fs;
 
 import java.io.File;
-import java.io.IOException;
 
 import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
@@ -35,69 +34,11 @@ public class StandardManager implements FileSystemManager {
 	protected String driveletter;
 	protected String rootFolder = ".";
 	
-	protected Cleaner cleaner;
-	
-	public static void main(String[] args) throws IOException {
-		//TODO: read config file
-		System.out.println("args.length="+args.length);
-		if(args.length>1){
-			System.out.println("====================start client ====================");
-
-			new Thread(()->{
-				StandardManager manager = new StandardManager();
-				manager.initBdNet("./data"+args[0], Integer.parseInt(args[1]));
-				if(args.length<3){
-					manager.initializeNewCluster();
-				}
-
-				if(args.length>2){
-						try {
-							Thread.sleep(100);
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-						manager.net.connect("localhost",Integer.parseInt(args[2]));
-				}
-				
-				manager.initOs("./data"+args[0], args[0]);
-
-			}).start();
-		}else if(args.length == 1) {
-			//mode parameter file.
-			new Thread(()->{
-				StandardManager manager = new StandardManager();
-				manager.myParameters = new Parameters(args[0]);
-				
-				manager.initBdNet(manager.myParameters.get("MainDir"), manager.myParameters.getInt("ListenPort"));	
-				manager.initOs(manager.myParameters.get("MainDir"), manager.myParameters.get("DriveLetter"));
-
-			}).start();
-		}
-		
-		
-//		System.out.println("====================start second client ====================");
-//		new Thread(()->{
-//			StandardManager manager2 = new StandardManager();
-//			
-//			manager2.initBdNet("./data2", 17831);
-//			try {
-//				Thread.sleep(1000);
-//			} catch (InterruptedException e) {
-//				e.printStackTrace();
-//			}
-//			manager2.net.connect("localhost",17830);
-//
-//			manager2.initOs("./data2", (char)0//'R'
-//					);
-//		}).start();
-	}
-	
+	protected CleanerManager cleanerM;
 	
 	public StandardManager() {
 		super();
 	}
-
-
 
 
 	/**
@@ -159,8 +100,8 @@ public class StandardManager implements FileSystemManager {
 			//TODO: serialize & gui
 //			cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
 			System.out.println("== create cleaner");
-			cleaner = new Cleaner(this);
-			cleaner.start();
+			cleanerM = new CleanerManager(this);
+			cleanerM.start();
 			
 		}catch (Exception e) {
 			e.printStackTrace();
@@ -264,7 +205,7 @@ public class StandardManager implements FileSystemManager {
 		//request chunk to all servers
 		int nbReq = chunkRequester.requestchunk(serverIdPresent, file, chunk);
 		//register to the chunk requester
-		boolean ok = false;
+//		boolean ok = false;
 		FsChunk chunkReceived = null;
 		try{
 //			while(!ok){
@@ -272,7 +213,7 @@ public class StandardManager implements FileSystemManager {
 //				if(chunk.)
 				//TODO : check if it's our chunk
 				if(chunkReceived != null){
-					ok = true;
+//					ok = true;
 				}else{
 					System.out.println("Can't find chunk(1) "+file.getPath()+" id:"+chunk.getId());
 				}
