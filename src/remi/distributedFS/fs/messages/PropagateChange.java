@@ -115,10 +115,17 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		this.manager = manager;
 	}
 
+	/**
+	 * visit our dir change, propagate to other peers
+	 */
 	@Override
 	public void visit(FsDirectory dir) {
 		manager.getNet().writeBroadcastMessage(SEND_DIR, createDirectoryMessage(dir));
 	}
+
+	/**
+	 * visit our file change, propagate to other peers
+	 */
 	@Override
 	public void visit(FsFile fic) {
 		manager.getNet().writeBroadcastMessage(SEND_FILE_DESCR, createFileDescrMessage(fic));
@@ -201,50 +208,6 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		}
 	}
 	
-//	public boolean getHeader(ByteBuff message, FsObject obj){
-//		System.out.println(this.manager.getComputerId()%100+" getHeader ");
-////		if(obj.getId() != id) System.err.println("Error, file id is <"+id+"> for "+obj.getPath());
-//		long modifyDate = message.getLong();
-//		if(modifyDate > obj.getModifyDate()){
-//			System.out.println(this.manager.getComputerId()%100+" sended dir is new! nice! : "+modifyDate+ " > "+obj.getModifyDate());
-//			//more recent, update!
-//			obj.setParentId(message.getLong());
-//			obj.setUserId(message.getLong());
-//			obj.setGroupId(message.getLong());
-//			obj.setPUGA(message.getShort());
-//			
-//			obj.setCreationDate(message.getLong());
-//			obj.setModifyDate(modifyDate);
-//			obj.setDeleteDate(message.getLong());
-//
-//			obj.setName(message.getUTF8());
-//
-//			obj.setCreatorUID(message.getLong());
-//			obj.setModifyUID(message.getLong());
-//			obj.setDeleteUID(message.getLong());
-//			return true;
-//		}else{
-//			System.out.println(this.manager.getComputerId()%100+" sended dir is OOOOld: "+modifyDate+ " < "+obj.getModifyDate());
-//			//just parse, ignore it.
-//			message.getLong(); // pid
-//			message.getLong(); // uid
-//			message.getLong(); // gid
-//			message.getShort(); // puga
-//
-//			message.getLong(); // dateC
-//			message.getLong(); // dateD
-//			
-//			message.getUTF8();
-//			
-//			message.getLong(); // cuid
-//			message.getLong(); // muid
-//			message.getLong(); // duid
-//			
-//			return false;
-//			
-//		}
-//	}
-
 	private ByteBuff createNotFindPathMessage(String path) {
 		System.out.println(this.manager.getComputerId()%100+" WRITE SEND NO PATH OBJ "+path);
 		ByteBuff message = new ByteBuff();
@@ -338,8 +301,11 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		return message;
 	}
 
+	protected void getAChunk(FsChunk newCHunk) {
+//		System.out.println(this.manager.getComputerId()%100+" CHUNKCG !! aeff !! new chunk : "+newCHunk.getId());
+	}
 	
-	private void getAFileFrom(long senderId, ByteBuff message) {
+	protected void getAFileFrom(long senderId, ByteBuff message) {
 
 		if (message.get()==1){
 			String path = message.getUTF8();
@@ -455,6 +421,7 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 				fic.flush();
 				for(int i=0;i<fic.getChunks().size();i++){
 					FsChunk chunk = fic.getChunks().get(i);
+					getAChunk(chunk);
 					System.out.println(this.manager.getComputerId()%100+" FILECG : chunk "+i+" : "+chunk.getId()+", size="+chunk.currentSize()+" @"+(chunk.isPresent()?chunk.getModifyDate():-1));
 				}
 			}
@@ -975,7 +942,10 @@ public class PropagateChange extends AbstractFSMessageManager implements FsObjec
 		net.registerListener(SEND_FILE_DESCR, this);
 	}
 
-	//nothing ?
+
+	/**
+	 * visit our chunk change, do nothing?
+	 */
 	@Override
 	public void visit(FsChunk chunk) {
 		

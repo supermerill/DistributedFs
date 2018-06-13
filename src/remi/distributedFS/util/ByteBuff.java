@@ -592,7 +592,8 @@ public class ByteBuff
 	public ByteBuffer toByteBuffer() {
 		ByteBuffer buff = ByteBuffer.wrap(this.buffer);
 		buff.position(position);
-		buff.limit(limit);
+		if(limit<0) buff.limit(this.buffer.length);
+		else	buff.limit(limit);
 		return buff;
 	}
 

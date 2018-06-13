@@ -115,7 +115,7 @@ public class CleanerKeepNewFiles implements Cleaner{
 	private long checkRep(FsDirectory dir, Long2ObjectSortedMap<FsFile> time2FicToDel, long need2Del) {
 		
 		for(FsFile fic : dir.getFiles()) {
-			if(time2FicToDel.lastLongKey() > fic.getModifyDate()) {
+			if(time2FicToDel.isEmpty() || time2FicToDel.lastLongKey() > fic.getModifyDate()) {
 				long sizeOnDisk = 0;
 				for(FsChunk chunk : fic.getChunks()) {
 					if(chunk.isPresent()) {
@@ -127,7 +127,7 @@ public class CleanerKeepNewFiles implements Cleaner{
 					need2Del -= sizeOnDisk;
 				}
 
-				while(need2Del<0) {
+				while(need2Del<0 && !time2FicToDel.isEmpty()) {
 					sizeOnDisk = 0;
 					for(FsChunk chunk : time2FicToDel.get(time2FicToDel.lastLongKey()).getChunks()) {
 						if(chunk.isPresent()) {

@@ -1,16 +1,5 @@
 package remi.distributedFS.fs;
 
-import java.io.File;
-import java.util.Random;
-import java.util.regex.Pattern;
-
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongList;
-import it.unimi.dsi.fastutil.objects.Object2LongAVLTreeMap;
-import it.unimi.dsi.fastutil.objects.Object2LongSortedMap;
-import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
-import remi.distributedFS.datastruct.FsChunk;
-
 public class CleanerManager extends Thread{
 	
 	public long idealSize;
@@ -51,7 +40,7 @@ public class CleanerManager extends Thread{
 			case "CleanerKeepNewFiles" : this.cleaner = new CleanerKeepNewFiles(); break;
 			case "CleanerNone" : this.cleaner = new CleanerNone(); break;
 			case "CleanerDefault" :
-			default : this.cleaner = new CleanerDefault();
+			default : this.cleaner = new CleanerKeepWantedFiles();
 		}
 		
 	}

@@ -94,38 +94,39 @@ public class MainInstall extends Application {
 		
 		// standardManager.properties
 		remi.distributedFS.fs.Parameters paramsMana = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/standardManager.properties");
-		paramsMana.getStringOrDef("DriveLetter", savedData.get("DrivePath").toString());
-		paramsMana.getIntOrDef("ListenPort", Integer.parseInt(savedData.get("ListenPort").toString()));
-		paramsMana.getStringOrDef("StorageType", ((Boolean)savedData.get("PlainFileOnly"))?
-				"remi.distributedFS.db.impl.ObjectFactory.StandardFactory":
-				"remi.distributedFS.db.impl.readable.FsChunkOneFile.StorageFactory");
-		paramsMana.getStringOrDef("MainDir", mainDir.getAbsolutePath());
+		paramsMana.setString("DriveLetter", savedData.get("DrivePath").toString());
+		paramsMana.setInt("ListenPort", Integer.parseInt(savedData.get("ListenPort").toString()));
+		paramsMana.setString("StorageType", ((Boolean)savedData.get("PlainFileOnly"))?
+				"remi.distributedFS.db.impl.readable.FsChunkOneFile.StorageFactory":
+					"remi.distributedFS.db.impl.ObjectFactory.StandardFactory");
+		paramsMana.setString("MainDir", mainDir.getAbsolutePath());
+		paramsMana.setString("AlgoPropagate", savedData.get("AlgoPropagate").toString());
 		
 		// cleaner.properties
 		remi.distributedFS.fs.Parameters paramsClean = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/cleaner.properties");
-		paramsClean.getLongOrDef("MaxSizeKB", 1000 * Integer.parseInt(savedData.get("SizeMax").toString()));
+		paramsClean.setLong("MaxSizeKB", 1000 * Integer.parseInt(savedData.get("SizeMax").toString()));
 		
-		paramsClean.getBoolOrDef("CanElage", (Boolean)savedData.get("CanElage"));
-		paramsClean.getIntOrDef("MinKnownDuplicate", ((Boolean)savedData.get("CanElageAggressively"))?1:2);
-		paramsClean.getLongOrDef("IdealSizeKB", 1000 * Integer.parseInt(savedData.get("SizeIdeal").toString()));
+		paramsClean.setBool("CanElage", (Boolean)savedData.get("CanElage"));
+		paramsClean.setInt("MinKnownDuplicate", ((Boolean)savedData.get("CanElageAggressively"))?1:2);
+		paramsClean.setLong("IdealSizeKB", 1000 * Integer.parseInt(savedData.get("SizeIdeal").toString()));
 		
-		paramsClean.getBoolOrDef("CanDelete", !(Boolean)savedData.get("NoDelete"));
-		paramsClean.getLongOrDef("SecTimeBeforeDelete", Integer.parseInt(savedData.get("TimeDelFic").toString()));
+		paramsClean.setBool("CanDelete", !(Boolean)savedData.get("NoDelete"));
+		paramsClean.setLong("SecTimeBeforeDelete", Integer.parseInt(savedData.get("TimeDelFic").toString()));
 		
 		// network parameters (stored in "clear" only before it start and then it can erase this file)
 		remi.distributedFS.fs.Parameters paramsNet = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/network.properties");
-		paramsNet.getLongOrDef("ClusterId", Math.abs(savedData.get("ClusterId").hashCode()));
-		paramsNet.getStringOrDef("ClusterPassphrase", savedData.get("ClusterPwd").toString());
+		paramsNet.setLong("ClusterId", Math.abs(savedData.get("ClusterId").hashCode()));
+		paramsNet.setString("ClusterPassphrase", savedData.get("ClusterPwd").toString());
 		
 		if(savedData.containsKey("ClusterIpPort")) {
-			paramsNet.getStringOrDef("PeerIp", savedData.get("ClusterIpPort").toString().split(":")[0]);
-			paramsNet.getLongOrDef("PeerPort", Long.parseLong(savedData.get("ClusterIpPort").toString().split(":")[1]));
+			paramsNet.setString("PeerIp", savedData.get("ClusterIpPort").toString().split(":")[0]);
+			paramsNet.setLong("PeerPort", Long.parseLong(savedData.get("ClusterIpPort").toString().split(":")[1]));
 			paramsNet.setBool("FirstConnection", true);
 		}
 		
 		if(savedData.containsKey("CreateNewKey") && !(Boolean)savedData.get("CreateNewKey")) {
-			paramsNet.getStringOrDef("PrivKey", savedData.get("PrivKey").toString());
-			paramsNet.getStringOrDef("PubKey", savedData.get("PubKey").toString());
+			paramsNet.setString("PrivKey", savedData.get("PrivKey").toString());
+			paramsNet.setString("PubKey", savedData.get("PubKey").toString());
 		}
 		switch(savedData.get("Cleaner").toString()) {
 			case "Remove not used chunks" : paramsClean.setString("Type", "CleanerDefault"); break;
@@ -133,6 +134,7 @@ public class MainInstall extends Application {
 			case "Don't remove" : paramsClean.setString("Type", "CleanerNone"); break;
 			default : paramsClean.setString("Type", "CleanerDefault");
 		}
+		
 		
 		/*
 		 * {clusterPwd=nøtQWERTYplz, PlainFileOnly=false, SizeIdeal=8000, TimeDelFS=5184000, 

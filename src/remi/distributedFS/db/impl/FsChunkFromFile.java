@@ -25,7 +25,10 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	protected int idx; //not used
 	protected int currentSize;
 	protected int maxSize;
-	protected boolean isValid; // false if data isn't available locally
+	/**
+	 * false if data isn't available locally
+	 */
+	protected boolean isValid;
 	protected long lastChange = 0;
 	protected long lastaccess = 0;
 	protected ShortList serverIdPresent = new ShortArrayList(2);
@@ -49,6 +52,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	@Override
 	public boolean read(ByteBuff toAppend, int offset, int size) {
 		ensureLoaded();
+		System.out.println("read chunk");
 		ensureDatafield();
 		if(!data.exists()){
 			System.err.println("data '"+data.getPath()+"' doesn't exist!");
@@ -132,7 +136,11 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 		}
 	}
 	
+	/**
+	 * grab the data from the network if not available locally
+	 */
 	protected void ensureDatafield(){
+		System.out.println("ensureDatafield");
 		if(data==null){
 			//it never change & is unique (TODO: multiple dirs to not e with 1million files in the same dir)
 			//create folder path
@@ -149,6 +157,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //				}
 //			}
 			if(isValid){
+				System.out.println("isValid");
 				ensureDataPath();
 			}else{
 				//request it (via network)

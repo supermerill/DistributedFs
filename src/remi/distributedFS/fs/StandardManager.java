@@ -14,10 +14,12 @@ import remi.distributedFS.db.impl.ObjectFactory;
 import remi.distributedFS.db.impl.readable.FsChunkOneFile;
 import remi.distributedFS.fs.messages.ExchangeChunk;
 import remi.distributedFS.fs.messages.PropagateChange;
+import remi.distributedFS.fs.messages.PropagateChangeAndGrabData;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.net.impl.PhysicalServer;
 import remi.distributedFS.os.JnrfuseImpl;
 
+//TODO: allow to be a gateway : wantRead -> me -> hasZeData (it doesn't work right now)
 public class StandardManager implements FileSystemManager {
 	
 	protected StorageManager storage = null;
@@ -28,7 +30,7 @@ public class StandardManager implements FileSystemManager {
 	
 	protected Parameters myParameters;
 
-	protected PropagateChange algoPropagate = new PropagateChange(this);
+	protected PropagateChange algoPropagate;
 	protected ExchangeChunk chunkRequester = new ExchangeChunk(this);
 	
 	protected String driveletter;
@@ -66,6 +68,9 @@ public class StandardManager implements FileSystemManager {
 	 */
 	public void initBdNet(String dataPath, int port) {
 		try{
+			File mainDir = new File(".");
+			remi.distributedFS.fs.Parameters paramsMana = new remi.distributedFS.fs.Parameters(mainDir.getAbsolutePath()+"/standardManager.properties");
+			
 			rootFolder = dataPath;
 			
 			//check if folder exist
@@ -78,7 +83,7 @@ public class StandardManager implements FileSystemManager {
 			storageFactory.rootRep = dataPath+"/data";
 			storageFactory.filename = dataPath+"/"+"localdb.data";
 			storageFactory.manager = this;
-			if(dataPath.endsWith("Backup")){
+			if(paramsMana.getStringOrDef("StorageType", "Default").contains("FsChunkOneFile")){
 				storageFactory.factory = new FsChunkOneFile.StorageFactory();
 			}else{
 				storageFactory.factory = new ObjectFactory.StandardFactory(); //ie FSChunkFromFile.StorageFactory();
@@ -86,6 +91,19 @@ public class StandardManager implements FileSystemManager {
 			storage = storageFactory.create();
 //			storage = new FsTableLocal(dataPath, dataPath+"/"+"localdb.data", this, true);
 			storage.cleanUnusedSectors(true);
+			
+
+			
+			//algo propagate
+			if(paramsMana.getStringOrDef("AlgoPropagate", "Default").equals("Grab")) {
+				System.out.println("PropagateChangeAndGrabData");
+				algoPropagate = new PropagateChangeAndGrabData(this);
+			}else {
+				//"Default"
+				System.out.println("PropagateChange");
+				algoPropagate = new PropagateChange(this);
+			}
+			
 	
 			if(port>0){
 				System.out.println("== create net");
@@ -102,7 +120,6 @@ public class StandardManager implements FileSystemManager {
 			System.out.println("== create cleaner");
 			cleanerM = new CleanerManager(this);
 			cleanerM.start();
-			
 		}catch (Exception e) {
 			e.printStackTrace();
 			close();

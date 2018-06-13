@@ -54,6 +54,7 @@ public class PanelParameterPeer extends InstallPanel {
 	Label lblStoreOnlyPlainFiles = new Label("Store only plain files");
 	Label lblCanDelFic = new Label("Never remove files");
 	Label lblCleaner = new Label("Cleaner");
+	Label lblGrab = new Label("Grab Everything");
 
 	GridPane panelCleaner = new GridPane();
 	TextField txtInstallPath = new TextField();
@@ -74,6 +75,7 @@ public class PanelParameterPeer extends InstallPanel {
 			"Remove old files",
 			"Don't remove",
 			"Remove less requested by network (niy)");
+	CheckBox chkGrab = new CheckBox();
 
 	Button btNext = new Button();
 
@@ -98,6 +100,7 @@ public class PanelParameterPeer extends InstallPanel {
 		chkStoreOnlyPlainFiles.setTooltip(new Tooltip("Set it to false to be able to store only some parts of the files, to be more space-efficient.\nSet it to true if you want to be able to read stored files even if the program isn't launched."));
 		cmbCleaner.setTooltip(new Tooltip("When the space reserved for this instance is full, how to make some space for the new documents?"));
 		cmbCleaner.setItems(cmbItems);
+		chkGrab.setTooltip(new Tooltip("Grab every data from other peers when they add or modify something."));
 		btNext.setText("Finish");
 		btNext.setTooltip(new Tooltip("Create your instance and connect it."));
 		String localPath = new File(".").getAbsolutePath();
@@ -241,6 +244,10 @@ public class PanelParameterPeer extends InstallPanel {
 		y++;
 		grid.add(lblCanDelFic, 0, y, 1, 1);
 		grid.add(chkCanDelFic, 1, y, 1, 1);
+
+		y++;
+		grid.add(lblGrab, 0, y, 1, 1);
+		grid.add(chkGrab, 1, y, 1, 1);
 		
 		{
 
@@ -273,6 +280,7 @@ public class PanelParameterPeer extends InstallPanel {
 		chkCanDelFic.setSelected(false);
 		chkStoreOnlyPlainFiles.setSelected(false);
 		cmbCleaner.setValue(cmbItems.get(0));
+		chkGrab.setSelected(false);
 	}
 
 	@Override
@@ -307,5 +315,13 @@ public class PanelParameterPeer extends InstallPanel {
 		}
 		manager.savedData.put("TimeDelFS", txtTimeDelFS.getText());
 		manager.savedData.put("PlainFileOnly", chkStoreOnlyPlainFiles.isSelected());
+		
+		if (chkGrab.isSelected()) {
+			System.out.println("GRAB");
+			manager.savedData.put("AlgoPropagate", "Grab");
+		}else {
+			System.out.println("DON'T GRAB");
+			manager.savedData.put("AlgoPropagate", "Default");
+		}
 	}
 }
