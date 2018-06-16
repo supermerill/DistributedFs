@@ -12,6 +12,7 @@ import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectVisitor;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.util.Ref;
 
 public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDirectory{
@@ -47,7 +48,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 
 		// modification(s) ? -> set timestamp!
     	this.setModifyDate(System.currentTimeMillis());
-		System.out.println("new modifydate for folder '"+this.getPath()+"' : "+this.getModifyDate());
+		Logs.logDb.info("new modifydate for folder '"+this.getPath()+"' : "+this.getModifyDate());
 		this.setModifyUID(master.getUserId());
 	}
 	
@@ -61,9 +62,9 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		//check if it's a dir
 		byte type = buffer.get();
 		if(type !=FsTableLocal.DIRECTORY){
-			System.err.println("Error, "+type+" not a directory @"+getSector()+" "+buffer.position());
+			Logs.logDb.warning("Error, "+type+" not a directory @"+getSector()+" "+buffer.position());
 			super.load(buffer);
-			System.err.println("Error, "+type+" not a directory with name "+getName());
+			Logs.logDb.warning("Error, "+type+" not a directory with name "+getName());
 			throw new WrongSectorTypeException("Error, "+type+" not a directory @"+getSector());
 		}
 
@@ -120,16 +121,16 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		long nbDir = buffer.getLong();
 		long nbFile = buffer.getLong();
 		long nbDel = buffer.getLong();
-		System.out.println("nbDir = "+nbDir);
+		Logs.logDb.info("nbDir = "+nbDir);
 
 		int canRead = ((FsTableLocal.FS_SECTOR_SIZE-360)/8)-4;
-		System.out.println("Canread = "+canRead);
+		Logs.logDb.info("Canread = "+canRead);
 		ByteBuffer currentBuffer = buffer;
 //		long currentSector = this.getId();
 		Ref<Integer> sectorNum = new Ref<>(0);
 		//read folder
 		for(int i=0;i<nbDir;i++){
-			System.out.println("Dir : "+currentBuffer.getLong());
+			Logs.logDb.info("Dir : "+currentBuffer.getLong());
 			canRead--;
 			if(canRead == 0){
 				canRead = goToNextAndLoad(currentBuffer, sectorNum);
@@ -146,13 +147,13 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 
 	public synchronized void save(ByteBuffer buffer){
 		if(id<0){
-			System.err.println("WARN, can't save a directory without id : "+getPath()+" : "+getId()+" "+getParentId());
+			Logs.logDb.warning("WARN, can't save a directory without id : "+getPath()+" : "+getId()+" "+getParentId());
 			new Exception().printStackTrace();
 		}
-		System.out.println("save folder"+getPath()+" with id "+id+" and parentid "+parentId);
+		Logs.logDb.info("save folder"+getPath()+" with id "+id+" and parentid "+parentId);
 		//set "erased" or d"directory"
 		if(getParentId()<0){
-			System.err.println("WARN, can't save a directory without parent : "+getPath()+" : "+getId()+" "+getParentId());
+			Logs.logDb.warning("WARN, can't save a directory without parent : "+getPath()+" : "+getId()+" "+getParentId());
 			buffer.put(FsTableLocal.ERASED);
 			//TODO: erase also "extended" chunks
 //		}else if(deleteDate>0){
@@ -186,7 +187,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 //		Ref<Long> currentSector = new Ref<>(this.getSector());
 		currentBuffer.mark();
 		currentBuffer.position(FsTableLocal.FS_SECTOR_SIZE-8);
-		System.out.println("first sec end with "+currentBuffer.getLong());
+		Logs.logDb.info("first sec end with "+currentBuffer.getLong());
 		currentBuffer.reset();
 		Ref<Integer> sectorNum = new Ref<>(0);
 		//read folder
@@ -215,7 +216,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 
 		int pos = currentBuffer.position();
 		currentBuffer.position(FsTableLocal.FS_SECTOR_SIZE-8);
-		System.out.println("last sec end with "+currentBuffer.getLong());
+		Logs.logDb.info("last sec end with "+currentBuffer.getLong());
 		currentBuffer.position(pos);
 		
 		//save last sector (previous are saved in goToNextOrCreate)
@@ -225,7 +226,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 //		currentBuffer.rewind();
 //		master.saveSector(currentBuffer, currentSector.get());
 		setDirty(false);
-		System.out.println("end save folder"+getPath()+" with id "+id+" and parentid "+parentId);
+		Logs.logDb.info("end save folder"+getPath()+" with id "+id+" and parentid "+parentId);
 	}
 
 	@Override
@@ -311,7 +312,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		if(!deleteObjs.contains(fic)){
 			deleteObjs.add((FsObjectImplFromFile) fic);
 		}else{
-			System.err.println("Error: this file is already deleted!");
+			Logs.logDb.warning("Error: this file is already deleted!");
 			new Exception().printStackTrace();
 		}
 		setModifyDate();
@@ -331,7 +332,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		if(!deleteObjs.contains(dir)){
 			deleteObjs.add((FsObjectImplFromFile) dir);
 		}else{
-			System.err.println("Error: this dir is already deleted!");
+			Logs.logDb.warning("Error: this dir is already deleted!");
 			new Exception().printStackTrace();
 		}
 		setModifyDate();
@@ -375,7 +376,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 	public void moveDir(FsDirectory obj, FsDirectory newDir) {
 		dirs.remove(obj);
 		long modDate = System.currentTimeMillis();
-		System.out.println("MOVE DIR "+obj.getModifyDate()+" -> "+modDate);
+		Logs.logDb.info("MOVE DIR "+obj.getModifyDate()+" -> "+modDate);
 		obj.setModifyDate(modDate); 
 		obj.setModifyUID(master.getUserId());
 		obj.setParent(newDir);

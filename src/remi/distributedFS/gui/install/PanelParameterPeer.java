@@ -27,6 +27,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
+import remi.distributedFS.log.Logs;
 
 /**
  * choix du role(4 boutons): - standard - sauvegarde - nas/cache - client l�ger
@@ -128,9 +129,9 @@ public class PanelParameterPeer extends InstallPanel {
 				alert.showAndWait();
 				return;
 			}
-			System.out.println(System.getProperty("os.name"));
+			Logs.logGui.info(System.getProperty("os.name"));
 			if (!txtDrivePath.getText().matches("^[A-Z]$") && System.getProperty("os.name").contains("Windows")) {
-				System.out.println("txtDrivePath: " + txtDrivePath.getText().length());
+				Logs.logGui.info("txtDrivePath: " + txtDrivePath.getText().length());
 				Alert alert = new Alert(Alert.AlertType.WARNING);
 				alert.setTitle("Error");
 				alert.setHeaderText("Error:");
@@ -317,10 +318,8 @@ public class PanelParameterPeer extends InstallPanel {
 		manager.savedData.put("PlainFileOnly", chkStoreOnlyPlainFiles.isSelected());
 		
 		if (chkGrab.isSelected()) {
-			System.out.println("GRAB");
 			manager.savedData.put("AlgoPropagate", "Grab");
 		}else {
-			System.out.println("DON'T GRAB");
 			manager.savedData.put("AlgoPropagate", "Default");
 		}
 	}

@@ -10,6 +10,7 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import remi.distributedFS.log.Logs;
 
 /**
  * id du cluster (generateur aleat)
@@ -43,7 +44,6 @@ public class PanelCreateNewCluster extends InstallPanel {
 		btNext.setTooltip(new Tooltip("Ask peer paremeters"));
 		btNext.setOnAction((ActionEvent)->{
 			//check data
-			System.out.println(txtClusterId.getText().length());
 			if(txtClusterId.getText().length()<6 || txtClusterId.getText().length()>32) {
 				Alert alert = new Alert(Alert.AlertType.WARNING);alert.setTitle("Error");alert.setHeaderText("Error:");
 				alert.setContentText("you must have a cluster name with at least 6 characaters and maximum 32");
@@ -87,7 +87,6 @@ public class PanelCreateNewCluster extends InstallPanel {
 
 	@Override
 	public void destroy() {
-		System.out.println("destroy");
 		manager.savedData.put("CreateNewKey", true);
 		manager.savedData.put("CreateEmptyDrive", true);
 		manager.savedData.put("ClusterId", txtClusterId.getText());

@@ -3,6 +3,7 @@ package remi.distributedFS.gui.install;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.layout.VBox;
+import remi.distributedFS.log.Logs;
 
 public class PanelChoiceNewConnect extends InstallPanel {
 	private static final long serialVersionUID = -4861532843787270076L;
@@ -17,7 +18,7 @@ public class PanelChoiceNewConnect extends InstallPanel {
 	    vbox.setSpacing(8);
 		btNew = new Button("Create new cluster");
 		btNew.setOnAction((ActionEvent)->{
-			System.out.println("new cluster");
+			Logs.logGui.info("new cluster");
 			manager.goToPanel(new PanelCreateNewCluster());
 		});
 		vbox.getChildren().add(btNew);

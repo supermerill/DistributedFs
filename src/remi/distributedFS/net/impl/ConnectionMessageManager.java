@@ -2,6 +2,7 @@ package remi.distributedFS.net.impl;
 
 import java.util.List;
 
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.util.ByteBuff;
 
@@ -32,51 +33,51 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 
 	@Override
 	public void receiveMessage(long senderId, byte messageId, ByteBuff message) {
-		System.out.println(clusterMananger.getPeerId()%100+" receive message from "+senderId%100);
+		Logs.logNet.info(clusterMananger.getPeerId()%100+" receive message from "+senderId%100);
 		if (messageId == AbstractMessageManager.GET_SERVER_PUBLIC_KEY) {
-			System.out.println(clusterMananger.getPeerId()%100+" receive GET_SERVER_PUBLIC_KEY from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" receive GET_SERVER_PUBLIC_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().sendPublicKey(clusterMananger.getPeer(senderId));
 		}
 		if (messageId == AbstractMessageManager.SEND_SERVER_PUBLIC_KEY) {
-			System.out.println(clusterMananger.getPeerId()%100+" receive SEND_SERVER_PUBLIC_KEY from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" receive SEND_SERVER_PUBLIC_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().receivePublicKey(clusterMananger.getPeer(senderId), message);
 		}
 		if (messageId == AbstractMessageManager.GET_VERIFY_IDENTITY) {
-			System.out.println(clusterMananger.getPeerId()%100+" receive GET_VERIFY_IDENTITY from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" receive GET_VERIFY_IDENTITY from "+senderId%100);
 //			sendIdentity(p, createMessageForIdentityCheck(p, true), true);
 			clusterMananger.getServerIdDb().answerIdentity(clusterMananger.getPeer(senderId), message);
 		}
 		if (messageId == AbstractMessageManager.SEND_VERIFY_IDENTITY) {
-			System.out.println(clusterMananger.getPeerId()%100+" receive SEND_VERIFY_IDENTITY from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" receive SEND_VERIFY_IDENTITY from "+senderId%100);
 			clusterMananger.getServerIdDb().receiveIdentity(clusterMananger.getPeer(senderId), message);
 		}
 		if (messageId == AbstractMessageManager.GET_SERVER_AES_KEY) {
-			System.out.println(clusterMananger.getPeerId()%100+" receive GET_SERVER_AES_KEY from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" receive GET_SERVER_AES_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().sendAesKey(clusterMananger.getPeer(senderId), ServerIdDb.AES_PROPOSAL);
 		}
 		if (messageId == AbstractMessageManager.SEND_SERVER_AES_KEY) {
-			System.out.println(clusterMananger.getPeerId()%100+" receive SEND_SERVER_AES_KEY from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" receive SEND_SERVER_AES_KEY from "+senderId%100);
 			clusterMananger.getServerIdDb().receiveAesKey(clusterMananger.getPeer(senderId), message);
 		}
 		if(messageId == GET_SERVER_LIST){
-			System.out.println(clusterMananger.getPeerId()%100+"he ( "+senderId%100+" ) want my server list");
+			Logs.logNet.info(clusterMananger.getPeerId()%100+"he ( "+senderId%100+" ) want my server list");
 			synchronized (this.clusterMananger.getServerIdDb().getRegisteredPeers()) {
 				sendServerList(senderId, this.clusterMananger.getServerIdDb().getRegisteredPeers());
 			}
 		}
 		if(messageId == SEND_LISTEN_PORT){
-			System.out.println(clusterMananger.getPeerId()%100+" received SEND_LISTEN_PORT from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" received SEND_LISTEN_PORT from "+senderId%100);
 			Peer p = clusterMananger.getPeer(senderId);
 			p.setPort(message.getInt());
 		}
 		if(messageId == SEND_SERVER_LIST){
-			System.out.println(clusterMananger.getPeerId()%100+" received SEND_SERVER_LIST from "+senderId%100);
+			Logs.logNet.info(clusterMananger.getPeerId()%100+" received SEND_SERVER_LIST from "+senderId%100);
 
-//			System.out.println(p.getMyServer().getId()%100+" read "+myId+" for "+p.getKey().getOtherServerId()%100);
+//			Logs.logNet.info(p.getMyServer().getId()%100+" read "+myId+" for "+p.getKey().getOtherServerId()%100);
 			short senderComputerId = message.getShort();
 			//add this id in our list, to be sure we didn't use it and we can transmit it.
 			synchronized (this.clusterMananger.getServerIdDb()) {
-				System.out.println(clusterMananger.getPeerId()%100+" receive peer computerId:  "+senderComputerId+" from "+senderId%100);
+				Logs.logNet.info(clusterMananger.getPeerId()%100+" receive peer computerId:  "+senderComputerId+" from "+senderId%100);
 				this.clusterMananger.getServerIdDb().addPeer(senderComputerId);
 			}
 			int nb = message.getTrailInt();
@@ -88,10 +89,10 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 				
 				//add this id in our list, to be sure we didn't use it and we can transmit it.
 				synchronized (this.clusterMananger.getServerIdDb()) {
-					System.out.println(clusterMananger.getPeerId()%100+" receive a distant computerId:  "+computerId+" of "+id%100+" from "+senderId%100);
+					Logs.logNet.info(clusterMananger.getPeerId()%100+" receive a distant computerId:  "+computerId+" of "+id%100+" from "+senderId%100);
 					this.clusterMananger.getServerIdDb().addPeer(computerId);
 				}
-//				System.out.println(p.getMyServer().getId()%100+" i have found "+ip+":"+ port);
+//				Logs.logNet.info(p.getMyServer().getId()%100+" i have found "+ip+":"+ port);
 				
 				
 //					InetSocketAddress addr = new InetSocketAddress(ip,port);
@@ -119,7 +120,7 @@ public class ConnectionMessageManager extends AbstractMessageManager {
 			buff.putUTF8(peer.getIP());
 			buff.putTrailInt(peer.getPort());
 			buff.putShort(peer.getComputerId());
-//				System.out.println(/*serv.getListenPort()+*/" SEND SERVER "+peer.getPort()+ " to "+p.getKey().getPort());
+//				Logs.logNet.info(/*serv.getListenPort()+*/" SEND SERVER "+peer.getPort()+ " to "+p.getKey().getPort());
 		}
 		buff.flip();
 		clusterMananger.writeMessage(sendTo, SEND_SERVER_LIST, buff);

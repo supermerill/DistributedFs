@@ -8,6 +8,7 @@ import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectVisitor;
+import remi.distributedFS.log.Logs;
 
 public class RemoveOldDeletedItems implements FsObjectVisitor{
 	
@@ -15,7 +16,7 @@ public class RemoveOldDeletedItems implements FsObjectVisitor{
 
 	@Override
 	public void visit(FsDirectory dirParent) {
-		System.out.println("RemoveOldDeletedItems dir "+dirParent.getPath());
+		Logs.logDb.info("RemoveOldDeletedItems dir "+dirParent.getPath());
 		boolean modified = false;
 		try{
 			//profondeur d'abords
@@ -30,24 +31,24 @@ public class RemoveOldDeletedItems implements FsObjectVisitor{
 					modified = true;
 	//				dirParent.flush();
 				}
-				System.out.println(dir.getPath() + " "+dir.getId());
+				Logs.logDb.info(dir.getPath() + " "+dir.getId());
 			}
 			
 			//get all thing to del
 			List<FsObject> objToDel = null;
 			for(FsObject obj : dirParent.getDelete()){
 				if(obj.getDeleteDate() < dateThreshold){
-					System.out.println("find to del : "+obj.getPath()+" , diff of date : "+(obj.getDeleteDate() - dateThreshold));
+					Logs.logDb.info("find to del : "+obj.getPath()+" , diff of date : "+(obj.getDeleteDate() - dateThreshold));
 					if(objToDel==null) objToDel = new ArrayList<>();
 					objToDel.add(obj);
 				}else{
-					System.out.println("find to keep : "+obj.getPath()+" , diff of date : "+(obj.getDeleteDate() - dateThreshold));
+					Logs.logDb.info("find to keep : "+obj.getPath()+" , diff of date : "+(obj.getDeleteDate() - dateThreshold));
 				}
 			}
 			//del them
 			if(objToDel!=null){
 				for(FsObject obj : objToDel){
-					System.out.println("Delete definitively  : "+obj.getPath()+" , diff of date : "+(obj.getDeleteDate() - dateThreshold));
+					Logs.logDb.info("Delete definitively  : "+obj.getPath()+" , diff of date : "+(obj.getDeleteDate() - dateThreshold));
 					dirParent.removeCompletely(obj);
 					modified = true;
 				}

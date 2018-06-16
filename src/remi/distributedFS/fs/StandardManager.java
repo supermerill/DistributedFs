@@ -15,6 +15,7 @@ import remi.distributedFS.db.impl.readable.FsChunkOneFile;
 import remi.distributedFS.fs.messages.ExchangeChunk;
 import remi.distributedFS.fs.messages.PropagateChange;
 import remi.distributedFS.fs.messages.PropagateChangeAndGrabData;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.net.impl.PhysicalServer;
 import remi.distributedFS.os.JnrfuseImpl;
@@ -78,7 +79,7 @@ public class StandardManager implements FileSystemManager {
 				new File(rootFolder).mkdirs();
 			}
 
-			System.out.println("== begin init bd");
+			Logs.logManager.info("== begin init bd");
 			FsTableLocalFactory storageFactory = new FsTableLocal.FsTableLocalFactory();
 			storageFactory.rootRep = dataPath+"/data";
 			storageFactory.filename = dataPath+"/"+"localdb.data";
@@ -96,19 +97,19 @@ public class StandardManager implements FileSystemManager {
 			
 			//algo propagate
 			if(paramsMana.getStringOrDef("AlgoPropagate", "Default").equals("Grab")) {
-				System.out.println("PropagateChangeAndGrabData");
+				Logs.logManager.info("PropagateChangeAndGrabData");
 				algoPropagate = new PropagateChangeAndGrabData(this);
 			}else {
 				//"Default"
-				System.out.println("PropagateChange");
+				Logs.logManager.info("PropagateChange");
 				algoPropagate = new PropagateChange(this);
 			}
 			
 	
 			if(port>0){
-				System.out.println("== create net");
+				Logs.logManager.info("== create net");
 				net = new PhysicalServer(this, false, dataPath);
-				System.out.println("== init net");
+				Logs.logManager.info("== init net");
 				net.init(port);
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
@@ -117,7 +118,7 @@ public class StandardManager implements FileSystemManager {
 
 			//TODO: serialize & gui
 //			cleaner = new Cleaner(this, 1024*1024*256, 1024*1024*1024, 1000*60);
-			System.out.println("== create cleaner");
+			Logs.logManager.info("== create cleaner");
 			cleanerM = new CleanerManager(this);
 			cleanerM.start();
 		}catch (Exception e) {
@@ -147,7 +148,7 @@ public class StandardManager implements FileSystemManager {
 				driveletter = letter;
 			}else driveletter = " ";
 			
-			System.out.println("end of init");
+			Logs.logManager.info("end of init");
 			
 			try {
 				Thread.sleep(4000);
@@ -218,7 +219,7 @@ public class StandardManager implements FileSystemManager {
 
 	@Override
 	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent) {
-		System.out.println("REQUEST CHUNK "+chunk.getId());
+		Logs.logManager.info("REQUEST CHUNK "+chunk.getId());
 		//request chunk to all servers
 		int nbReq = chunkRequester.requestchunk(serverIdPresent, file, chunk);
 		//register to the chunk requester
@@ -232,12 +233,12 @@ public class StandardManager implements FileSystemManager {
 				if(chunkReceived != null){
 //					ok = true;
 				}else{
-					System.out.println("Can't find chunk(1) "+file.getPath()+" id:"+chunk.getId());
+					Logs.logManager.info("Can't find chunk(1) "+file.getPath()+" id:"+chunk.getId());
 				}
 //			}
 		}catch(RuntimeException ex){
 			ex.printStackTrace();
-			System.out.println("Can't find chunk(2) "+file.getPath()+" id:"+chunk.getId());
+			Logs.logManager.info("Can't find chunk(2) "+file.getPath()+" id:"+chunk.getId());
 		}
 		return chunkReceived;
 	}

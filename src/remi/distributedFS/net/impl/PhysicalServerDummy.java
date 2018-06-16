@@ -5,6 +5,8 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Random;
 
+import remi.distributedFS.log.Logs;
+
 /**
  * This object is used to test the connection with a cluster.
  * 
@@ -74,7 +76,7 @@ public class PhysicalServerDummy extends PhysicalServer{
 	@SuppressWarnings("resource")
 	@Override
 	public boolean connectTo(final String ip, final int port) {
-		System.out.println(getPeerId() % 100 + " want to CONNECT with " + port);
+		Logs.logNet.info(getPeerId() % 100 + " want to CONNECT with " + port);
 		final InetSocketAddress addr = new InetSocketAddress(ip, port);
 		final Socket tempSock = new Socket();
 		try {
@@ -94,12 +96,12 @@ public class PhysicalServerDummy extends PhysicalServer{
 					return initConnection(peer, tempSock);
 				} catch (InterruptedException | IOException e) {
 					// e.printStackTrace();
-					System.err.println(getPeerId() % 100 + " error in initialization : connection close with "
+					Logs.logNet.warning(getPeerId() % 100 + " error in initialization : connection close with "
 							+ peer.getPeerId() % 100 + " (" + peer.getPort() + ")");
 					peer.close();
 				}
 			} else {
-				System.out.println(getPeerId() % 100 + " already CONNECTED with " + port);
+				Logs.logNet.info(getPeerId() % 100 + " already CONNECTED with " + port);
 				return true;
 			}
 		} catch (IOException e) {

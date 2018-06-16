@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.util.Ref;
 
 public class FsUnknownObject extends FsObjectImplFromFile{
@@ -28,7 +29,7 @@ public class FsUnknownObject extends FsObjectImplFromFile{
 		}else if(type == FsTableLocal.DELETED){
 			me = new FsDeletedObject(master, getSector(), parent);
 		}else{
-			System.err.println("Error, not an object at "+getSector());
+			Logs.logDb.warning("Error, not an object at "+getSector());
 			throw new WrongSectorTypeException("Error, not an object at "+getSector());
 		}
 	}

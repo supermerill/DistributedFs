@@ -21,6 +21,7 @@ import java.util.Random;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectMap;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap;
 import remi.distributedFS.fs.FileSystemManager;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.net.impl.Peer.PeerConnectionState;
@@ -144,11 +145,11 @@ public class PhysicalServer implements ClusterManager {
 			e.printStackTrace();
 		}
 		synchronized (peers) {
-			System.out.println("======== peers =======");
+			Logs.logNet.info("======== peers =======");
 			for(Peer p : peers) {
-				System.out.println(p.getIP()+":"+p.getPort()+" "+p.getComputerId()+" "+p.isAlive());
+				Logs.logNet.info(p.getIP()+":"+p.getPort()+" "+p.getComputerId()+" "+p.isAlive());
 			}
-			System.out.println("======================");
+			Logs.logNet.info("======================");
 		}
 		
 		//clean peer list
@@ -158,13 +159,13 @@ public class PhysicalServer implements ClusterManager {
 			while(itPeers.hasNext()){
 				Peer nextP = itPeers.next();
 				if(nextP.getComputerId() == this.getComputerId()){
-					System.err.println("Error: a peer is me (same computerid) "+this.getComputerId());
+					Logs.logNet.warning("Error: a peer is me (same computerid) "+this.getComputerId());
 					getServerIdDb().loadedPeers.remove(nextP);
 					getServerIdDb().id2PublicKey.remove(this.getComputerId());
 					nextP.close();
 					itPeers.remove();
 				}else if(nextP.getKey().getPeerId() == this.getPeerId()){
-					System.err.println("Error: a peer is me (same peerId) "+this.getPeerId());
+					Logs.logNet.warning("Error: a peer is me (same peerId) "+this.getPeerId());
 					getServerIdDb().loadedPeers.remove(nextP);
 					getServerIdDb().id2PublicKey.remove(this.getComputerId());
 					nextP.close();
@@ -183,26 +184,26 @@ public class PhysicalServer implements ClusterManager {
 			while(itPeers.hasNext()){
 				Peer nextP = itPeers.next();
 				if(nextP.getComputerId() <= 0 && nextP.createdAt < System.currentTimeMillis()-2*60*1000){
-					System.err.println("Error: a peer has no id and is old(>2min) : "+this.getPeerId());
+					Logs.logNet.warning("Error: a peer has no id and is old(>2min) : "+this.getPeerId());
 					if(nextP.isAlive()) nextP.close();
 					itPeers.remove();
 				}else if( nextP.getState().lowerThan(states.get(nextP.getComputerId()).getState()) ) {
-					System.err.println("Error: multiple peer for "+this.getPeerId()+" : deleting the one with status "+nextP.getState());
+					Logs.logNet.warning("Error: multiple peer for "+this.getPeerId()+" : deleting the one with status "+nextP.getState());
 					if(nextP.isAlive()) nextP.close();
 					itPeers.remove();
 				}
 			}
 		}
 		
-		System.out.println(getPeerId() % 100 + " update " + myFs.getDrivePath());
+		Logs.logNet.info(getPeerId() % 100 + " update " + myFs.getDrivePath());
 		for (Peer peer : getPeers()) {
-			System.out.println(getPeerId() % 100 + " update peer " + peer.getPeerId() % 100);
+			Logs.logNet.info(getPeerId() % 100 + " update peer " + peer.getPeerId() % 100);
 			//if we emit something to someone, wait a bit more for the next update.
 			quickUpdate = quickUpdate || peer.ping();
 		}
 		// toutes les heures
 		if (lastDirUpdate + 1000 * 60 * 60 < System.currentTimeMillis()) {
-			System.out.println(getPeerId() % 100 + " REQUEST DIR UPDATE");
+			Logs.logNet.info(getPeerId() % 100 + " REQUEST DIR UPDATE");
 			myFs.requestDirUpdate();
 			lastDirUpdate = System.currentTimeMillis();
 		}
@@ -224,9 +225,9 @@ public class PhysicalServer implements ClusterManager {
 				socketListener = new Thread(() -> {
 					try {
 						while (true) {
-							// System.err.println("wait a connect...");
+							// Logs.logNet.warning("wait a connect...");
 							final Socket connexion = mySocket.accept();
-							// System.err.println("connected to a socketserver");
+							// Logs.logNet.warning("connected to a socketserver");
 							Peer peer = new Peer(this, connexion.getInetAddress(), 0);
 							final Peer argPeer = peer;
 							new Thread(() -> {
@@ -277,17 +278,17 @@ public class PhysicalServer implements ClusterManager {
 						}
 					}
 					if (otherPeer == null) {
-						System.out.println(getPeerId() % 100 + " 'new' accept connection to "
+						Logs.logNet.info(getPeerId() % 100 + " 'new' accept connection to "
 								+ peer.getKey().getPeerId() % 100);
 						// peers.put(peer.getKey(), peer);
 						if (!peers.contains(peer)) {
-							System.err.println(
+							Logs.logNet.warning(
 									getPeerId() % 100 + " 'warn' PROPAGATE " + peer.getPeerId() % 100 + "!");
 							// new peer: propagate!
 							peers.add(peer);
 							for (Peer oldPeer : peers) {
 								if(oldPeer.isAlive()){
-									System.err.println(
+									Logs.logNet.warning(
 											getPeerId() % 100 + " 'warn' PROPAGATE to " + oldPeer.getPeerId() % 100);
 									// MyServerList.get().write(peers, oldPeer);
 									messageManager.sendServerList(oldPeer.getPeerId(), peers);
@@ -301,11 +302,11 @@ public class PhysicalServer implements ClusterManager {
 						return true;
 					} else {
 						if (otherPeer.isAlive() && !peer.isAlive()) {
-							System.err.println(getPeerId() % 100 + " 'warn' , close a new dead connection to "
+							Logs.logNet.warning(getPeerId() % 100 + " 'warn' , close a new dead connection to "
 									+ peer.getKey().getPeerId() % 100 + " is already here.....");
 							peer.close();
 						} else if (!otherPeer.isAlive() && peer.isAlive()) {
-							System.err.println(getPeerId() % 100 + " warn,  close an old dead  a connection to "
+							Logs.logNet.warning(getPeerId() % 100 + " warn,  close an old dead  a connection to "
 									+ peer.getKey().getPeerId() % 100 + " is already here.....");
 							otherPeer.close();
 							// peers.put(peer.getKey(), peer);
@@ -314,11 +315,11 @@ public class PhysicalServer implements ClusterManager {
 							return true;
 						} else if (otherPeer.getKey().getPeerId() != 0) {
 							if (otherPeer.getKey().getPeerId() < getPeerId()) {
-								System.err.println(getPeerId() % 100 + " warn, (I AM LEADER) a connection to "
+								Logs.logNet.warning(getPeerId() % 100 + " warn, (I AM LEADER) a connection to "
 										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								peer.close();
 							} else {
-								System.err.println(getPeerId() % 100 + " warn, (I am not leader) a connection to "
+								Logs.logNet.warning(getPeerId() % 100 + " warn, (I am not leader) a connection to "
 										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								peers.add(peer);
 								peer.startListen();
@@ -326,7 +327,7 @@ public class PhysicalServer implements ClusterManager {
 							}
 						} else if (peer.getKey().getPeerId() != 0) {
 							if (peer.getKey().getPeerId() < getPeerId()) {
-								System.err.println(getPeerId() % 100 + " warn, (I AM LEADER) a connection to "
+								Logs.logNet.warning(getPeerId() % 100 + " warn, (I AM LEADER) a connection to "
 										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								otherPeer.close();
 								// peers.put(peer.getKey(), peer);
@@ -334,25 +335,25 @@ public class PhysicalServer implements ClusterManager {
 								peer.startListen();
 								return true;
 							} else {
-								System.err.println(getPeerId() % 100 + " warn, (I am not leader) a connection to "
+								Logs.logNet.warning(getPeerId() % 100 + " warn, (I am not leader) a connection to "
 										+ peer.getKey().getPeerId() % 100 + " is already here.....");
 								peers.add(peer);
 								peer.startListen();
 								return true;
 							}
 						} else {
-							System.err.println(getPeerId() % 100 + " warn, an unknown connection to "
+							Logs.logNet.warning(getPeerId() % 100 + " warn, an unknown connection to "
 									+ peer.getKey().getPeerId() % 100 + " is already here.....");
 							peer.close();
 						}
-						System.out.println(getPeerId() % 100 + " 'old' accept connection to "
+						Logs.logNet.info(getPeerId() % 100 + " 'old' accept connection to "
 								+ peer.getKey().getPeerId() % 100);
 					}
 				}
 
 				// test if id is ok
 				if (peer.getPeerId() == getPeerId()) {
-					System.err.println(getPeerId() % 100 + " my peerid is equal to  "
+					Logs.logNet.warning(getPeerId() % 100 + " my peerid is equal to  "
 							+ peer.getKey().getPeerId() % 100);
 					return rechooseId();
 				}
@@ -377,16 +378,16 @@ public class PhysicalServer implements ClusterManager {
 		// check if it's not me
 		if (mySocket.getLocalPort() == port
 				&& (mySocket.getInetAddress().getHostAddress().equals(ip) || ip.equals("127.0.0.1"))) {
-			System.out.println("DON't connect TO ME MYSELF");
+			Logs.logNet.info("DON't connect TO ME MYSELF");
 			return false;
 		} else {
-			// System.out.println(mySocket.getLocalPort()+" =?= "+port);
-			// System.out.println(mySocket.getInetAddress().getHostAddress()+" =?= "+ip);
-			// System.out.println(mySocket.getInetAddress().getHostName()+" =?= "+ip);
+			// Logs.logNet.info(mySocket.getLocalPort()+" =?= "+port);
+			// Logs.logNet.info(mySocket.getInetAddress().getHostAddress()+" =?= "+ip);
+			// Logs.logNet.info(mySocket.getInetAddress().getHostName()+" =?= "+ip);
 		}
 
-		System.out.println(getPeerId() % 100 + " i am " +mySocket.getInetAddress().getHostAddress()+":"+ mySocket.getLocalPort());
-		System.out.println(getPeerId() % 100 + " want to CONNECT with " +ip+":"+ port);
+		Logs.logNet.info(getPeerId() % 100 + " i am " +mySocket.getInetAddress().getHostAddress()+":"+ mySocket.getLocalPort());
+		Logs.logNet.info(getPeerId() % 100 + " want to CONNECT with " +ip+":"+ port);
 		final InetSocketAddress addr = new InetSocketAddress(ip, port);
 		final Socket tempSock = new Socket();
 		try {
@@ -414,13 +415,13 @@ public class PhysicalServer implements ClusterManager {
 					}
 				} catch (InterruptedException | IOException e) {
 					// e.printStackTrace();
-					System.err.println(getPeerId() % 100 + " error in initialization : connection close with "
+					Logs.logNet.warning(getPeerId() % 100 + " error in initialization : connection close with "
 							+ peer.getPeerId() % 100 + " (" + peer.getPort() + ")");
 					peer.close();
 				}
 				// }).start();
 			} else {
-				System.out.println(getPeerId() % 100 + " already CONNECTED with " + port);
+				Logs.logNet.info(getPeerId() % 100 + " already CONNECTED with " + port);
 				return true;
 			}
 		} catch (IOException e) {
@@ -510,7 +511,7 @@ public class PhysicalServer implements ClusterManager {
 	}
 
 	public boolean rechooseId() {
-		System.out.println("ERROR: i have to choose an other id....");
+		Logs.logNet.info("ERROR: i have to choose an other id....");
 		// change id
 		myPeerId = new Random().nextLong();
 		if (myPeerId <= 0)
@@ -523,7 +524,7 @@ public class PhysicalServer implements ClusterManager {
 		}
 		for (Peer oldp : oldConnection) {
 			oldp.close();
-			System.out.println("RECONNECT " + oldp.getIP() + " : " + oldp.getPort());
+			Logs.logNet.info("RECONNECT " + oldp.getIP() + " : " + oldp.getPort());
 			return connectTo(oldp.getIP(), oldp.getPort());
 		}
 		return false;
@@ -594,11 +595,11 @@ public class PhysicalServer implements ClusterManager {
 		synchronized (this.clusterIdMananger.getRegisteredPeers()) {
 			for (Peer peer : this.clusterIdMananger.getRegisteredPeers()) {
 				if(peer != null && peer.isAlive()){
-					System.out.println("write msg "+messageId+" to "+peer.getKey().getPeerId()%100);
+					Logs.logNet.info("write msg "+messageId+" to "+peer.getKey().getPeerId()%100);
 					writeMessage(peer, messageId, message);
 					nbEmit ++;
 				}else{
-					System.out.println("peer "+peer.getKey().getPeerId()%100+" is not alive, can't send msg");
+					Logs.logNet.info("peer "+peer.getKey().getPeerId()%100+" is not alive, can't send msg");
 				}
 			}
 		}
@@ -671,26 +672,26 @@ public class PhysicalServer implements ClusterManager {
 	}
 
 	public void chooseComputerId() {
-		System.out.println(getPeerId() % 100 + " chooseComputerId");
+		Logs.logNet.info(getPeerId() % 100 + " chooseComputerId");
 		// do not run this method in multi-thread (i use getServerIdDb() because i'm the only one to use it, to avoid possible dead sync issues)
 		synchronized (getServerIdDb()) {
 
 			// check if we have a clusterId
-			System.out.println(getPeerId() % 100 + " getServerIdDb().myId=" + getServerIdDb().myComputerId);
+			Logs.logNet.info(getPeerId() % 100 + " getServerIdDb().myId=" + getServerIdDb().myComputerId);
 			if (getServerIdDb().myComputerId < 0) {
 				//first, wait a bit to let us contact everyone.
 				List<Peer> lstpeerCanConnect = null;
 				synchronized (peers) {
 					lstpeerCanConnect = new ArrayList<>(peers);
 				}
-				System.out.println(getPeerId() % 100 + " lstpeerCanConnect.size=" + lstpeerCanConnect.size());
-				System.out.println( getPeerId() % 100 + " receivedServerList=" + getServerIdDb().receivedServerList);
+				Logs.logNet.info(getPeerId() % 100 + " lstpeerCanConnect.size=" + lstpeerCanConnect.size());
+				Logs.logNet.info( getPeerId() % 100 + " receivedServerList=" + getServerIdDb().receivedServerList);
 				for (Peer okP : getServerIdDb().receivedServerList) {
 					if (lstpeerCanConnect.contains(okP)) {
 						lstpeerCanConnect.remove(okP);
 					}
 				}
-				System.out.println(getPeerId() % 100 + " lstpeerCanConnect.restsize=" + lstpeerCanConnect.size());
+				Logs.logNet.info(getPeerId() % 100 + " lstpeerCanConnect.restsize=" + lstpeerCanConnect.size());
 				if (lstpeerCanConnect.isEmpty()) {
 					// ok, i am connected with everyone i can access and i have received every serverlist.
 
@@ -698,30 +699,30 @@ public class PhysicalServer implements ClusterManager {
 					Random rand = new Random();
 					short choosenId = (short) rand.nextInt(Short.MAX_VALUE);
 					if (choosenId < 0){
-						System.out.println(getPeerId() % 100 + " choosenId " + choosenId+" < 0");
+						Logs.logNet.info(getPeerId() % 100 + " choosenId " + choosenId+" < 0");
 						choosenId = (short) -choosenId;
-						System.out.println(getPeerId() % 100 + " now choosenId " + choosenId+" > 0 !!");
+						Logs.logNet.info(getPeerId() % 100 + " now choosenId " + choosenId+" > 0 !!");
 					}
 					// while it's not already taken
 					while (getServerIdDb().isChoosen(choosenId)) {
-						System.out.println(getPeerId() % 100 + " ClusterId " + choosenId
+						Logs.logNet.info(getPeerId() % 100 + " ClusterId " + choosenId
 								+ " is already taken, i will choose a new one");
 						choosenId = (short) rand.nextInt(Short.MAX_VALUE);
 						if (choosenId < 0){
-							System.out.println(getPeerId() % 100 + " choosenId " + choosenId+" < 0");
+							Logs.logNet.info(getPeerId() % 100 + " choosenId " + choosenId+" < 0");
 							choosenId = (short) -choosenId;
-							System.out.println(getPeerId() % 100 + " now choosenId " + choosenId+" > 0 !!");
+							Logs.logNet.info(getPeerId() % 100 + " now choosenId " + choosenId+" > 0 !!");
 						}
 					}
 
-					System.out.println(getPeerId() % 100 + " CHOOSE A NEW COMPUTER ID is =" + choosenId);
+					Logs.logNet.info(getPeerId() % 100 + " CHOOSE A NEW COMPUTER ID is =" + choosenId);
 					getServerIdDb().myComputerId = choosenId;
 					// emit this to everyone
 					// writeBroadcastMessage(AbstractMessageManager.GET_SERVER_PUBLIC_KEY, new ByteBuff());
 					synchronized (peers) {
-						System.out.println(getPeerId() % 100 + " want to send it to " + peers.size());
+						Logs.logNet.info(getPeerId() % 100 + " want to send it to " + peers.size());
 						for (Peer peer : peers) {
-							System.out.println(getPeerId() % 100 + " want to send it to peers " + peer.getPeerId()%100 + "  "+peer.getComputerId());
+							Logs.logNet.info(getPeerId() % 100 + " want to send it to peers " + peer.getPeerId()%100 + "  "+peer.getComputerId());
 							// as we can't emit directly (no message to encode), a request to them should trigger a request from them.
 							getServerIdDb().requestPublicKey(peer);
 						}
@@ -734,11 +735,11 @@ public class PhysicalServer implements ClusterManager {
 				
 				if (getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId) != null && !Arrays.equals(getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId).getEncoded(), getServerIdDb().publicKey.getEncoded())) {
 					try{
-						System.out.println("id is already there, with my id : "+getServerIdDb().myComputerId);
-						System.out.println(", my pub key : "+getServerIdDb().publicKey);
-						System.out.println(",  their: "+getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId));
-						System.out.println(", my pub key : "+Arrays.toString(getServerIdDb().publicKey.getEncoded()));
-						System.out.println(",  their: "+Arrays.toString(getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId).getEncoded()));
+						Logs.logNet.info("id is already there, with my id : "+getServerIdDb().myComputerId);
+						Logs.logNet.info(", my pub key : "+getServerIdDb().publicKey);
+						Logs.logNet.info(",  their: "+getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId));
+						Logs.logNet.info(", my pub key : "+Arrays.toString(getServerIdDb().publicKey.getEncoded()));
+						Logs.logNet.info(",  their: "+Arrays.toString(getServerIdDb().id2PublicKey.get(getServerIdDb().myComputerId).getEncoded()));
 					}catch(Exception e){
 						e.printStackTrace();
 					}
@@ -748,18 +749,18 @@ public class PhysicalServer implements ClusterManager {
 						// change!
 						// how: i have to reset all my connections?
 						// getServerIdDb().timeChooseId
-						System.err.println(getPeerId() % 100
+						Logs.logNet.warning(getPeerId() % 100
 								+ " ERROR! my ClusterId is already taken. Please destroy this instance/peer/server and create an other one.");
 						throw new RuntimeException(
 								"ERROR! my ClusterId is already taken. Please destroy this instance/peer/server and create an other one.");
 					} else {
-						System.err.println(getPeerId() % 100
+						Logs.logNet.warning(getPeerId() % 100
 								+ " Error, an other server/instance has picked the same ClusterId as me. Both of us should be destroyed and re-created, at a time when we can communicate with each other.");
 					}
 				} else {
 					// no
 					// nothing todo do ! everything is ok!!
-					System.out.println("ClusterId : everything ok, nothing to do");
+					Logs.logNet.info("ClusterId : everything ok, nothing to do");
 				}
 
 			}
@@ -771,11 +772,11 @@ public class PhysicalServer implements ClusterManager {
 	public void initializeNewCluster() {
 		myInformalState = ServerConnectionState.SOLO;
 		
-		System.out.println(getPeerId() % 100 + " CHOOSE A NEW COMPUTER ID to 1 ");
+		Logs.logNet.info(getPeerId() % 100 + " CHOOSE A NEW COMPUTER ID to 1 ");
 		getServerIdDb().myComputerId = 1;
 		if (getServerIdDb().getClusterId() == -1)
 			getServerIdDb().newClusterId();
-		System.out.println(getPeerId() % 100 + " creation of cluster " + getServerIdDb().getClusterId());
+		Logs.logNet.info(getPeerId() % 100 + " creation of cluster " + getServerIdDb().getClusterId());
 		getServerIdDb().requestSave();
 	}
 
@@ -809,7 +810,7 @@ public class PhysicalServer implements ClusterManager {
 					success++;
 				}
 			}catch(Exception e) {
-				System.out.println("can't connect to "+falsePeer.getIP()+" : "+falsePeer.getPort());
+				Logs.logNet.info("can't connect to "+falsePeer.getIP()+" : "+falsePeer.getPort());
 			}
 		}
 		return success;

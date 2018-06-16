@@ -1,5 +1,7 @@
 package remi.distributedFS.fs;
 
+import remi.distributedFS.log.Logs;
+
 public class CleanerManager extends Thread{
 	
 	public long idealSize;
@@ -62,7 +64,7 @@ public class CleanerManager extends Thread{
 			}
 			nextRemoveOp = System.currentTimeMillis() + 1000;
 		}
-		System.out.println(System.currentTimeMillis()+" > "+nextCleaningOp+" == "+(System.currentTimeMillis() > nextCleaningOp));
+		Logs.logManager.info(System.currentTimeMillis()+" > "+nextCleaningOp+" == "+(System.currentTimeMillis() > nextCleaningOp));
 		if(System.currentTimeMillis() > nextCleaningOp){
 			manager.getDb().removeOldDelItem(System.currentTimeMillis() - 1000L*stimeBeforeDelete);
 //			nextCleaningOp = System.currentTimeMillis() + 1000 * 60 * 60 * 2; //every 2 hour

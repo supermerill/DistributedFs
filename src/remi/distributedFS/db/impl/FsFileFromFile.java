@@ -9,6 +9,7 @@ import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsDirectory;
 import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObjectVisitor;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.util.Ref;
 
 public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
@@ -29,7 +30,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		//check if it's a file
 		byte type = buffer.get();
 		if(type != FsTableLocal.FILE){
-			System.err.println("Error, not a file at "+getSector());
+			Logs.logDb.warning("Error, not a file at "+getSector());
 			throw new WrongSectorTypeException("Error, not a file at "+getSector());
 		}
 		
@@ -186,13 +187,13 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 
 	@Override
 	public FsChunk createNewChunk(long id) {
-		System.out.println("Create new chunk from id : "+id);
+		Logs.logDb.info("Create new chunk from id : "+id);
 		long newSectorId = master.requestNewSector();
 		long goodId = id;
 		if(id<=0){
 //			newChunk.id = ((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL);
 			goodId = (((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL)); //assume only 2^48 sector will be ever needed
-//			System.out.println("Create new id : "+master.getComputerId()+" => "+(((long)master.getComputerId())<<48)+", sector = "+newSectorId +" => "+(newSectorId&0xFFFFFFFFFFFFL)
+//			Logs.logDb.info("Create new id : "+master.getComputerId()+" => "+(((long)master.getComputerId())<<48)+", sector = "+newSectorId +" => "+(newSectorId&0xFFFFFFFFFFFFL)
 //					+" , so | ="+(((long)master.getComputerId())<<48 | (newSectorId&0xFFFFFFFFFFFFL))+", + = "+((((long)master.getComputerId())<<48) + (newSectorId&0xFFFFFFFFFFFFL)));
 		}
 		FsChunkFromFile newChunk = master.factory.createChunk(master, newSectorId, this, goodId);
@@ -203,7 +204,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		newChunk.loaded = true;
 		allChunks.add(newChunk);
 		setDirty(true);
-		System.out.println("Create new chunk : sector="+newSectorId+", id = "+newChunk.getId());
+		Logs.logDb.info("Create new chunk : sector="+newSectorId+", id = "+newChunk.getId());
 //		new Exception().printStackTrace();
 		return newChunk;
 	}
@@ -225,7 +226,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 //		long currentSize = getSize();
 //		
 //		if(newSize>=currentSize){
-//			System.err.println("useless truncate on "+getPath());
+//			Logs.logDb.warning("useless truncate on "+getPath());
 //			return;
 //		}
 //		
@@ -233,7 +234,7 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 //		while(currentSize > newSize){
 //			idxChunk--;
 //			FsChunkFromFile chunk = chunks.get(idxChunk);
-//			System.out.println("trauncate chunk size "+chunk.currentSize+" > ? "+currentSize+" - "+newSize+" = "+(currentSize-newSize));
+//			Logs.logDb.info("trauncate chunk size "+chunk.currentSize+" > ? "+currentSize+" - "+newSize+" = "+(currentSize-newSize));
 //			if(chunk.currentSize < currentSize-newSize){
 //				if(idxChunk ==0){
 //					//just clean it
@@ -241,12 +242,12 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 //				}else{
 //					//delete this chunk
 //					chunks.remove(idxChunk);
-//					System.err.println("remove chunk "+idxChunk);
+//					Logs.logDb.warning("remove chunk "+idxChunk);
 //					chunk.unallocate();
 //					setDirty(true);
 //				}
 //			}else{
-//				System.err.println("reduce chunk from "+chunk.currentSize+" to "+(chunk.currentSize - currentSize + newSize));
+//				Logs.logDb.warning("reduce chunk from "+chunk.currentSize+" to "+(chunk.currentSize - currentSize + newSize));
 //				chunk.truncate(chunk.currentSize - currentSize + newSize);
 //			}
 //			currentSize = getSize();

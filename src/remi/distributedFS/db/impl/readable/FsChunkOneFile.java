@@ -13,6 +13,7 @@ import remi.distributedFS.db.impl.FsDirectoryFromFile;
 import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.db.impl.FsTableLocal;
 import remi.distributedFS.db.impl.ObjectFactory;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.util.ByteBuff;
 
 public class FsChunkOneFile extends FsChunkFromFile {
@@ -40,7 +41,7 @@ public class FsChunkOneFile extends FsChunkFromFile {
 		ensureLoaded();
 		ensureDatafield();
 		if(!data.exists()){
-			System.err.println("data '"+data.getPath()+"' doesn't exist!");
+			Logs.logDb.warning("data '"+data.getPath()+"' doesn't exist!");
 			return false;
 		}
 
@@ -58,14 +59,14 @@ public class FsChunkOneFile extends FsChunkFromFile {
 
 			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ)){
 				
-//				System.out.println("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
+//				Logs.logDb.info("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
 				ByteBuffer buff = toAppend.toByteBuffer();
 				buff.limit(buff.position()+size);
 //				buff.position(buff.position()); //already done in toByteBuffer()
 				dataChannel.read(buff, offset+myOffset);
 
 				toAppend.position(toAppend.position()+size);
-//				System.out.println("pos after = "+toAppend.position());
+//				Logs.logDb.info("pos after = "+toAppend.position());
 				lastaccess = System.currentTimeMillis();
 				return true;
 			} catch (IOException e) {
@@ -103,7 +104,7 @@ public class FsChunkOneFile extends FsChunkFromFile {
 				dataChannel.write(buff, offset+myOffset);
 				currentSize = Math.max(currentSize, offset+size);
 
-				System.out.println("toWrite.position = "+toWrite.position()+"+"+size+"=="+(toWrite.position()+size));
+				Logs.logDb.info("toWrite.position = "+toWrite.position()+"+"+size+"=="+(toWrite.position()+size));
 				toWrite.position(toWrite.position()+size);
 				lastChange = System.currentTimeMillis();
 				lastaccess = System.currentTimeMillis();
@@ -136,7 +137,7 @@ public class FsChunkOneFile extends FsChunkFromFile {
 //					//		for example, a rep for each 1000 sectorid.
 //					//create file
 //					data.createNewFile();
-////					System.out.println("data '"+data.getPath()+"' is now created");
+////					Logs.logDb.info("data '"+data.getPath()+"' is now created");
 //				} catch (IOException e) {
 //					e.printStackTrace();
 //				}
@@ -145,7 +146,7 @@ public class FsChunkOneFile extends FsChunkFromFile {
 				ensureDataPath();
 			}else{
 				//request it (via network)
-				System.out.println("REQUEST DATA FOR CHUNK "+getId());
+				Logs.logDb.info("REQUEST DATA FOR CHUNK "+getId());
 				FsChunk meWithData = master.getManager().requestChunk(this.parentFile, this, serverIdPresent());
 				if(meWithData == null){
 					//can't find it!

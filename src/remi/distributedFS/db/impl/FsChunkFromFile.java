@@ -14,6 +14,7 @@ import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.db.UnreachableChunkException;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.util.ByteBuff;
 import remi.distributedFS.util.Ref;
 
@@ -52,10 +53,10 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	@Override
 	public boolean read(ByteBuff toAppend, int offset, int size) {
 		ensureLoaded();
-		System.out.println("read chunk");
+		Logs.logDb.info("read chunk");
 		ensureDatafield();
 		if(!data.exists()){
-			System.err.println("data '"+data.getPath()+"' doesn't exist!");
+			Logs.logDb.warning("data '"+data.getPath()+"' doesn't exist!");
 			return false;
 		}
 //		String str = "Hello world!";
@@ -66,14 +67,14 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 
 			try(FileChannel dataChannel = FileChannel.open(data.toPath(), StandardOpenOption.READ)){
 				
-//				System.out.println("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
+//				Logs.logDb.info("pos before = "+toAppend.position()+", wanted to go "+size+" more. Size = "+toAppend.array().length+" == ms:"+this.getMaxSize()+" >= s:"+this.currentSize);
 				ByteBuffer buff = toAppend.toByteBuffer();
 				buff.limit(buff.position()+size);
 //				buff.position(buff.position()); //already done in toByteBuffer()
 				dataChannel.read(buff, offset);
 
 				toAppend.position(toAppend.position()+size);
-//				System.out.println("pos after = "+toAppend.position());
+//				Logs.logDb.info("pos after = "+toAppend.position());
 				lastaccess = System.currentTimeMillis();
 				return true;
 			} catch (IOException e) {
@@ -103,11 +104,11 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //				currentSize = (int) dataChannel.size();
 				currentSize = Math.max(currentSize, offset+size);
 				if((int) dataChannel.size() != currentSize){
-					System.err.println("Error: the chunk "+idx+" of file "+parentFile.getPath()+" has a file size of "+currentSize+" and the read fileahs a size of "+dataChannel.size());
+					Logs.logDb.warning("Error: the chunk "+idx+" of file "+parentFile.getPath()+" has a file size of "+currentSize+" and the read fileahs a size of "+dataChannel.size());
 				}
 				dataChannel.close();
 
-				System.out.println("toWrite.position = "+toWrite.position()+"+"+size+"=="+(toWrite.position()+size));
+				Logs.logDb.info("toWrite.position = "+toWrite.position()+"+"+size+"=="+(toWrite.position()+size));
 				toWrite.position(toWrite.position()+size);
 				lastChange = System.currentTimeMillis();
 				lastaccess = System.currentTimeMillis();
@@ -140,7 +141,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	 * grab the data from the network if not available locally
 	 */
 	protected void ensureDatafield(){
-		System.out.println("ensureDatafield");
+		Logs.logDb.info("ensureDatafield");
 		if(data==null){
 			//it never change & is unique (TODO: multiple dirs to not e with 1million files in the same dir)
 			//create folder path
@@ -151,17 +152,17 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //					//		for example, a rep for each 1000 sectorid.
 //					//create file
 //					data.createNewFile();
-////					System.out.println("data '"+data.getPath()+"' is now created");
+////					Logs.logDb.info("data '"+data.getPath()+"' is now created");
 //				} catch (IOException e) {
 //					e.printStackTrace();
 //				}
 //			}
 			if(isValid){
-				System.out.println("isValid");
+				Logs.logDb.info("isValid");
 				ensureDataPath();
 			}else{
 				//request it (via network)
-				System.out.println("REQUEST DATA FOR CHUNK "+getId());
+				Logs.logDb.info("REQUEST DATA FOR CHUNK "+getId());
 				FsChunk meWithData = master.getManager().requestChunk(this.parentFile, this, serverIdPresent());
 				if(meWithData == null){
 					//can't find it!
@@ -237,14 +238,14 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 		//check if it's a chunk
 		byte type = buffer.get(); //1
 		if(type != FsTableLocal.CHUNK){
-//			System.err.println("Error, not a file at "+getId());
+//			Logs.logDb.warning("Error, not a file at "+getId());
 			throw new WrongSectorTypeException("Error, not a chunk @"+sector+", type="+type+" != "+FsTableLocal.CHUNK+"=CHUNK");
 		}
 		
 		//check  id
 		this.id = buffer.getLong(); //9
 //		if(myId != id){
-//			System.err.println("Error, wrong chunk id : "+id + " <> "+myId);
+//			Logs.logDb.warning("Error, wrong chunk id : "+id + " <> "+myId);
 //			throw new RuntimeException("Error, wrong chunk id : "+id + " <> "+myId);
 //		}
 		
@@ -292,7 +293,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 		//lol it's not used as we use the id!!!
 //		data = new File(FsObjectImplFromFile.CHARSET.decode(nameBuffer).toString());
 //		ensureDatafield();
-//		System.out.println("chunk has data in "+data.getPath());
+//		Logs.logDb.info("chunk has data in "+data.getPath());
 		
 		this.loaded = true;
 		
@@ -458,7 +459,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 //				//		for example, a rep for each 1000 sectorid.
 //				//create file
 				data.createNewFile();
-//				System.out.println("data '"+data.getPath()+"' is now created");
+//				Logs.logDb.info("data '"+data.getPath()+"' is now created");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -468,13 +469,13 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	@Override
 	public void setPresent(boolean isPresentLocally) {
 		ensureLoaded();
-		System.out.println("Chunk : setPresent "+isValid+" -> "+isPresentLocally);
+		Logs.logDb.info("Chunk : setPresent "+isValid+" -> "+isPresentLocally);
 		isValid = isPresentLocally;
 		//if invalidate, remove local datafile
 		if(!isValid){
 			ensureDataPath();
 			if(data.exists()){
-				System.out.println("Chunk : delete data on disk");
+				Logs.logDb.info("Chunk : delete data on disk");
 				data.delete();
 			}
 			data = null;
@@ -501,7 +502,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 
 	public void deleteSectors(){
 		if(sector<=0){
-			System.err.println("Error, trying to del chunk "+id+" with sector id of "+getSector()+" :  impossible!");
+			Logs.logDb.warning("Error, trying to del chunk "+id+" with sector id of "+getSector()+" :  impossible!");
 			throw new RuntimeException("Error, trying to del chunk "+id+" with sector id of "+getSector()+" :  impossible!");
 		}
 		//delete entry into fs table
@@ -518,7 +519,7 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 				master.loadSector(buff, nextSector);
 				long type = buff.getLong();
 				if(type != FsTableLocal.EXTENSION){
-					System.err.println("Warn : deleted object "+id+" has an extedned sector occupied by somethign else. Sector id: "+nextSector+" : "+type);
+					Logs.logDb.warning("Warn : deleted object "+id+" has an extedned sector occupied by somethign else. Sector id: "+nextSector+" : "+type);
 					break;
 				}
 				buff.position(buff.limit()-8);

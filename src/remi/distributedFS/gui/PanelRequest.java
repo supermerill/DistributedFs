@@ -25,6 +25,7 @@ import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.PUGA;
 import remi.distributedFS.fs.FileSystemManager;
+import remi.distributedFS.log.Logs;
 
 //TODO: add details when clicking on a file or directory
 //TODO: contextual menu -> to restore deleted files ? or a button?
@@ -87,9 +88,9 @@ public class PanelRequest extends GridPane{
 		});
 
 		listFiles.setOnMouseClicked((me)->{
-			System.out.println("mouse click");
+			Logs.logGui.info("mouse click");
 			String item = listFiles.getSelectionModel().getSelectedItem();
-			System.out.println("mouse click on "+item);
+			Logs.logGui.info("mouse click on "+item);
 			if(item != null){
 				refreshDir(currentPath.getText()+"/"+item);
 			}
@@ -112,9 +113,9 @@ public class PanelRequest extends GridPane{
 		str = new StringBuilder(); lstStr.add(addItem(str,"group id: ",20).append(obj.getGroupId()).toString());
 		str = new StringBuilder(); lstStr.add(addItem(str,"user id: ",20).append(obj.getUserId()).toString());
 		str = new StringBuilder(); lstStr.add(addItem(str,"creator uid: ",20).append(obj.getCreatorUID()).toString());
-		str = new StringBuilder(); lstStr.add(addItem(str,"creation date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getCreationDate()))).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"creation date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss SSS").format(new Date(obj.getCreationDate()))).toString());
 		str = new StringBuilder(); lstStr.add(addItem(str,"modify uid: ",20).append(obj.getModifyUID()).toString());
-		str = new StringBuilder(); lstStr.add(addItem(str,"modify date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getModifyDate()))).toString());
+		str = new StringBuilder(); lstStr.add(addItem(str,"modify date: ",20).append(new SimpleDateFormat("yyyy.MM.dd HH.mm.ss SSS").format(new Date(obj.getModifyDate()))).toString());
 		str = new StringBuilder(); lstStr.add(addItem(str,"delete uid: ",20).append(obj.getDeleteUID()>0?obj.getDeleteUID():"").toString());
 		str = new StringBuilder(); lstStr.add(addItem(str,"delete date: ",20).append(obj.getDeleteDate()>0?new SimpleDateFormat("yyyy.MM.dd HH.mm.ss").format(new Date(obj.getDeleteDate())):"").toString());
 //		addItem(str,": ",20).append(obj.get);

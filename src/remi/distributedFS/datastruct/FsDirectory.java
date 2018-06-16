@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.function.BiFunction;
 
 import remi.distributedFS.db.impl.WrongSectorTypeException;
+import remi.distributedFS.log.Logs;
 
 public interface FsDirectory extends FsObject {
 
@@ -89,11 +90,11 @@ public interface FsDirectory extends FsObject {
 	
 		public static FsObject getPathObj(FsDirectory directory, String path){
 			return getPath(directory, path, (dir, filename) -> {
-	//			System.out.println("getPathObj=>"+dir+" / "+filename);
+	//			Logs.logDb.info("getPathObj=>"+dir+" / "+filename);
 				FsObject o = getDir(dir, filename);
-	//			System.out.println("getPathObj gert dir "+o);
+	//			Logs.logDb.info("getPathObj gert dir "+o);
 				if(o==null) o = getFile(dir, filename);
-	//			System.out.println("getPathObj gert file "+o);
+	//			Logs.logDb.info("getPathObj gert file "+o);
 				return o;
 			});
 		}
@@ -113,7 +114,7 @@ public interface FsDirectory extends FsObject {
 		 */
 		public static <N> N getPath(FsDirectory dir, String path, BiFunction<FsDirectory,String,N> func){
 			if(path.equals("/") && dir.getParent()==dir){
-//				System.out.println("getroot");
+//				Logs.logDb.info("getroot");
 				return func.apply(dir, ".");
 			}
 			while(path.startsWith("/")){
@@ -125,35 +126,35 @@ public interface FsDirectory extends FsObject {
 				String name = path.substring(0,slashPos);
 				String otherPath = path.substring(slashPos+1);
 				if(name.equals(".")){
-//					System.out.println("getMe");
+//					Logs.logDb.info("getMe");
 					return getPath(dir, otherPath, func);
 				}
 				if(name.equals("..")){
-//					System.out.println("getparent");
+//					Logs.logDb.info("getparent");
 					return getPath(dir.getParent(), otherPath, func);
 				}
-//				System.out.println("getchild "+name);
+//				Logs.logDb.info("getchild "+name);
 				FsDirectory dirChild = getDir(dir, name);
 				if(dirChild!=null) return getPath(dirChild, otherPath, func);
 				else{
-//					System.out.println("childdir null ");
+//					Logs.logDb.info("childdir null ");
 					return null;
 				}
 			}else{
 				//find a file
-//				System.out.println("getfile "+path);
+//				Logs.logDb.info("getfile "+path);
 				return func.apply(dir, path);
 			}
 		}
 		
 		public static FsDirectory getDir(FsDirectory dir, String name) {
-//			System.out.println("getDir : "+dir+" : "+name);
+//			Logs.logDb.info("getDir : "+dir+" : "+name);
 			if(name.equals(".")){
-	//			System.out.println("getme");
+	//			Logs.logDb.info("getme");
 				return dir;
 			}
 			if(name.equals("..")){
-	//			System.out.println("getparent");
+	//			Logs.logDb.info("getparent");
 				return dir.getParent();
 			}
 			FsDirectory bestCandidate = null;
@@ -163,13 +164,13 @@ public interface FsDirectory extends FsObject {
 						bestCandidate = dirChild;
 					}else if(bestCandidate.getModifyDate() < dirChild.getModifyDate() && dirChild.getDeleteDate()<=0){
 						bestCandidate = dirChild;
-						System.out.println("WARN : conflict in "+dirChild.getPath()+" : multiple directory with the same name!");
+						Logs.logDb.info("WARN : conflict in "+dirChild.getPath()+" : multiple directory with the same name!");
 					}else{
-						System.out.println("WARN : conflict in "+dirChild.getPath()+" : multiple directory with the same name!");
+						Logs.logDb.info("WARN : conflict in "+dirChild.getPath()+" : multiple directory with the same name!");
 					}
 				}
 			}
-	//		System.out.println("erf, '"+name+"'");
+	//		Logs.logDb.info("erf, '"+name+"'");
 			return bestCandidate;
 		}
 		
@@ -183,9 +184,9 @@ public interface FsDirectory extends FsObject {
 						bestCandidate = file;
 					}else if(bestCandidate.getModifyDate() < file.getModifyDate() && file.getDeleteDate()<=0){
 						bestCandidate = file;
-						System.out.println("WARN : conflict in "+file.getPath()+" : multiple file with the same name!");
+						Logs.logDb.info("WARN : conflict in "+file.getPath()+" : multiple file with the same name!");
 					}else{
-						System.out.println("WARN : conflict in "+file.getPath()+" : multiple file with the same name!");
+						Logs.logDb.info("WARN : conflict in "+file.getPath()+" : multiple file with the same name!");
 					}
 				}
 			}

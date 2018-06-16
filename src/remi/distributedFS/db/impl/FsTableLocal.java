@@ -23,6 +23,7 @@ import remi.distributedFS.datastruct.FsObject;
 import remi.distributedFS.datastruct.FsObjectVisitor;
 import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.fs.FileSystemManager;
+import remi.distributedFS.log.Logs;
 
 public class FsTableLocal implements StorageManager{
 
@@ -116,16 +117,16 @@ public class FsTableLocal implements StorageManager{
 			for(int i=0;i<nbEspace;i++){
 				spacer.append(" - ");
 			}
-			System.out.println(spacer+" "+((FsDirectoryFromFile)dirParent).getSector()+" DIR "+dirParent.getPath()+" "+dirParent.getId());
+			Logs.logDb.info(spacer+" "+((FsDirectoryFromFile)dirParent).getSector()+" DIR "+dirParent.getPath()+" "+dirParent.getId());
 			for(FsDirectory dir : dirParent.getDirs()){
-				System.out.println(spacer+" |->dir "+((FsDirectoryFromFile)dir).getSector());
+				Logs.logDb.info(spacer+" |->dir "+((FsDirectoryFromFile)dir).getSector());
 			}
 			for(FsFile fic : dirParent.getFiles()){
-				System.out.println(spacer+" |->fic "+((FsFileFromFile)fic).getSector());
+				Logs.logDb.info(spacer+" |->fic "+((FsFileFromFile)fic).getSector());
 			}
 			for(FsDirectory dir : dirParent.getDirs()){
-//				System.out.println(dirParent.getPath()+" "+dirParent.getId()+" visit "+dir.getPath()+" "+dir.getId());
-//				System.out.println(spacer+" |->dir "+((FsDirectoryFromFile)dir).getSector()+ " : ");
+//				Logs.logDb.info(dirParent.getPath()+" "+dirParent.getId()+" visit "+dir.getPath()+" "+dir.getId());
+//				Logs.logDb.info(spacer+" |->dir "+((FsDirectoryFromFile)dir).getSector()+ " : ");
 				nbEspace++;
 				visit(dir);
 			}
@@ -151,10 +152,10 @@ public class FsTableLocal implements StorageManager{
 		@Override
 		public void visit(FsDirectory dirParent) {
 			objectId2LoadedObj.put(dirParent.getId(), dirParent);
-//			System.out.print(" dir "+((FsObjectImplFromFile)dirParent).getSectorsUsed()); System.out.println(" : "+dirParent.getPath());
+//			System.out.print(" dir "+((FsObjectImplFromFile)dirParent).getSectorsUsed()); Logs.logDb.info(" : "+dirParent.getPath());
 			for(FsDirectory dir : new ArrayList<>(dirParent.getDirs())){
 				try{
-					System.out.print(pref+"(D) "+((FsObjectImplFromFile)dir).getSectorsUsed()); System.out.println(" :"+dir.getName()+" ("+dir.getPath()+")");
+					System.out.print(pref+"(D) "+((FsObjectImplFromFile)dir).getSectorsUsed()); Logs.logDb.info(" :"+dir.getName()+" ("+dir.getPath()+")");
 					pref = pref + "    ";
 					visit(dir);
 					pref = pref.substring(4);
@@ -179,8 +180,8 @@ public class FsTableLocal implements StorageManager{
 				}
 			}
 			for(FsObject obj : dirParent.getDelete()){
-				if(obj == dirParent) System.err.println("error, dir is inside deletes");
-				System.out.print(pref+"(R) "+((FsObjectImplFromFile)obj).getSectorsUsed()); System.out.println(obj.getPath()+" : " + obj.getId());
+				if(obj == dirParent) Logs.logDb.warning("error, dir is inside deletes");
+				System.out.print(pref+"(R) "+((FsObjectImplFromFile)obj).getSectorsUsed()); Logs.logDb.info(obj.getPath()+" : " + obj.getId());
 				obj.accept(this);
 //				objectId2LocalCluster.put(obj.getId(), obj);
 			}
@@ -191,14 +192,14 @@ public class FsTableLocal implements StorageManager{
 			try{
 				LongList sectUsed = new LongArrayList();
 				fic.getName(); // important, to trigger a load
-//				System.out.println(fic.getPath()+" (F) " + fic.getId());
+//				Logs.logDb.info(fic.getPath()+" (F) " + fic.getId());
 				objectId2LoadedObj.put(fic.getId(), fic);
 				for(FsChunk ch : fic.getAllChunks()){
 					visit(ch);
 					sectUsed.addAll(((FsChunkFromFile)ch).getSectorsUsed());
 				}
 				Collections.sort(sectUsed);
-				System.out.println(" (chunks : "+sectUsed+" )");
+				Logs.logDb.info(" (chunks : "+sectUsed+" )");
 			}catch(WrongSectorTypeException ex){
 				ex.printStackTrace();
 				//recover : del this
@@ -217,17 +218,17 @@ public class FsTableLocal implements StorageManager{
 	
 //	private void loadFs(FsDirectory fsDirectory) {
 //		objectId2LocalCluster.put(fsDirectory.getId(), fsDirectory);
-//		System.out.println(fsDirectory.getPath());
+//		Logs.logDb.info(fsDirectory.getPath());
 //		for(FsDirectory dir : fsDirectory.getDirs()){
 //			loadFs(dir);
 //		}
 //		for(FsFile fic : fsDirectory.getFiles()){
 //			objectId2LocalCluster.put(fic.getId(), fic);
-//			System.out.println(fsDirectory.getPath()+" (F)");
+//			Logs.logDb.info(fsDirectory.getPath()+" (F)");
 //		}
 //		for(FsObject obj : fsDirectory.getDelete()){
 //			objectId2LocalCluster.put(obj.getId(), obj);
-//			System.out.println(fsDirectory.getPath()+" (D)");
+//			Logs.logDb.info(fsDirectory.getPath()+" (D)");
 //		}
 //	}
 
@@ -269,7 +270,7 @@ public class FsTableLocal implements StorageManager{
 			int nbread = fsFile.read(buffer);
 			buffer.rewind();
 			if(nbread != FS_SECTOR_SIZE){
-				System.err.println("error, can't read enough bytes from file!!");
+				Logs.logDb.warning("error, can't read enough bytes from file!!");
 				throw new RuntimeException("error, can't read enough bytes from file!! : "+nbread);
 			}
 		
@@ -300,21 +301,21 @@ public class FsTableLocal implements StorageManager{
 			
 			}else if(state == ERASED){
 				//erased, return null;
-				System.err.println("error, shouldn't happen: you try to read a sector ("+sectorPos+") that is erased.");
+				Logs.logDb.warning("error, shouldn't happen: you try to read a sector ("+sectorPos+") that is erased.");
 				return null;
 			}else if(state == FILE){
 				//TODO: get/create file
-				System.err.println("error, shouldn't happen: root file.");
+				Logs.logDb.warning("error, shouldn't happen: root file.");
 			}else if(state == CHUNK){
 				//TODO: get/create chunk
 			}else if(state == EXTENSION){
 				//error
-				System.err.println("error, shouldn't happen: you try to read a sector that is an extension of an other? entry.");
+				Logs.logDb.warning("error, shouldn't happen: you try to read a sector that is an extension of an other? entry.");
 				return null;
 			}else if(state == MOVING){
 				//this entry is moved
 				//TODO: check te new sector
-				System.err.println("error, shouldn't happen: root moved.");
+				Logs.logDb.warning("error, shouldn't happen: root moved.");
 			}
 		
 		
@@ -349,22 +350,22 @@ public class FsTableLocal implements StorageManager{
 			}
 		}
 	
-		System.out.println("idRetNS="+idRet);
+		Logs.logDb.info("idRetNS="+idRet);
 		//create new
 		if(idRet<0){
 			idRet = fileSize/FS_SECTOR_SIZE;
 			fileSize += FS_SECTOR_SIZE;
 		}
 
-		System.out.println("new sector="+idRet);
+		Logs.logDb.info("new sector="+idRet);
 		return idRet;
 		
 	}
 
 	public void saveSector(ByteBuffer buff, long sectorId) {
-//		System.out.println("Save buffer : "+buff.limit()+" @"+sectorId);
+//		Logs.logDb.info("Save buffer : "+buff.limit()+" @"+sectorId);
 		if(buff.limit()-buff.position()!=FS_SECTOR_SIZE){
-			System.err.println("Error, someone want me to write an incomplete sector!");
+			Logs.logDb.warning("Error, someone want me to write an incomplete sector!");
 			throw new RuntimeException("Error, someone want me to write an incomplete sector! : "+(buff.limit()-buff.position())+" != "+FS_SECTOR_SIZE);
 		}
 		try {
@@ -440,7 +441,7 @@ public class FsTableLocal implements StorageManager{
 	@Override
 	public FsChunk getChunkDirect(long id) {
 		FsChunk obj = chunkId2LoadedObj.get(id);
-		if(obj==null) System.out.println("bad file : "+id+" from "+chunkId2LoadedObj.keySet());
+		if(obj==null) Logs.logDb.info("bad file : "+id+" from "+chunkId2LoadedObj.keySet());
 		return obj;
 	}
 
@@ -466,10 +467,10 @@ public class FsTableLocal implements StorageManager{
 //			if(fic != null){
 //				for(FsChunk ch : fic.getChunks()){
 //					try{
-//						System.out.println("add chunk "+ch.getId()+"  @"+((FsChunkFromFile)ch).getSector()+" from file "+fic.getName());
+//						Logs.logDb.info("add chunk "+ch.getId()+"  @"+((FsChunkFromFile)ch).getSector()+" from file "+fic.getName());
 //						chunkId2LocalCluster.put(ch.getId(), ch);
 //					}catch(Exception e){
-//						System.out.println("add NOT error chunk  @"+((FsChunkFromFile)ch).getSector()+" from file "+fic.getName());
+//						Logs.logDb.info("add NOT error chunk  @"+((FsChunkFromFile)ch).getSector()+" from file "+fic.getName());
 //					}
 //				}
 //			}
@@ -491,7 +492,7 @@ public class FsTableLocal implements StorageManager{
 				continue;
 			}
 			if(nbread<9){
-				System.err.println("Error: can't read more than "+nbread+"/9 !! (cleanUnusedSectors) at sector "+sector+"/"+maxSects);
+				Logs.logDb.warning("Error: can't read more than "+nbread+"/9 !! (cleanUnusedSectors) at sector "+sector+"/"+maxSects);
 				return;
 			}
 			buff.rewind();
@@ -501,7 +502,7 @@ public class FsTableLocal implements StorageManager{
 				//nothing, it's empty
 				if(!unusedSectors.contains(sector)){
 					synchronized (unusedSectors) {
-						System.out.println("add unused sector "+sector);
+						Logs.logDb.info("add unused sector "+sector);
 						unusedSectors.add(sector);
 					}
 				}
@@ -509,7 +510,7 @@ public class FsTableLocal implements StorageManager{
 				//check if root exist?
 				if(getDirect(id) == null){
 					//remove!
-					System.out.println("Cleaning: remove extension sector (obj_id:"+id+") @"+sector);
+					Logs.logDb.info("Cleaning: remove extension sector (obj_id:"+id+") @"+sector);
 					removeSector(sector);
 				}
 			}else if(type == FILE || type == DIRECTORY){
@@ -517,22 +518,22 @@ public class FsTableLocal implements StorageManager{
 				FsObject obj = getDirect(id);
 				if(obj == null || ((FsObjectImplFromFile)obj).getSector() != sector){
 					//remove!
-					System.out.println("Cleaning: remove object (obj_id:"+id+"@"+(obj==null?"null":((FsObjectImplFromFile)obj).getSector())+") @"+sector);
+					Logs.logDb.info("Cleaning: remove object (obj_id:"+id+"@"+(obj==null?"null":((FsObjectImplFromFile)obj).getSector())+") @"+sector);
 					removeSector(sector);
 				}
 			}else if(removeMoving && type == MOVING){
 				//remove!
-				System.out.println("Cleaning: remove moving sector @"+sector);
+				Logs.logDb.info("Cleaning: remove moving sector @"+sector);
 				removeSector(sector);
 			}else if(type == DELETED){
 				//remove!
-				System.out.println("Cleaning: remove deleted sector (because the type is not used and i don't know what to do with it) @"+sector);
+				Logs.logDb.info("Cleaning: remove deleted sector (because the type is not used and i don't know what to do with it) @"+sector);
 				removeSector(sector);
 			}else if(type == CHUNK){
 				FsChunk obj = chunkId2LoadedObj.get(id);
 				if(obj == null || ((FsChunkFromFile)obj).getSector() != sector){
 					//remove!
-					System.out.println("Cleaning: remove chunk (chunk_id:"+id+"@"+(obj==null?"null":((FsChunkFromFile)obj))+") @"+sector);
+					Logs.logDb.info("Cleaning: remove chunk (chunk_id:"+id+"@"+(obj==null?"null":((FsChunkFromFile)obj))+") @"+sector);
 					removeSector(sector);
 				}
 			}

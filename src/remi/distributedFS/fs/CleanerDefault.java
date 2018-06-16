@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.objects.Object2LongAVLTreeMap;
 import it.unimi.dsi.fastutil.objects.Object2LongSortedMap;
 import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
 import remi.distributedFS.datastruct.FsChunk;
+import remi.distributedFS.log.Logs;
 
 /**
  * A thread used for :
@@ -81,7 +82,7 @@ public class CleanerDefault implements Cleaner{
 
 	//TODO: this impl is linked strongly with the basic impl from bd (use files as chunk), you HAVE TO change that to make an implentation-independant impl
 	public boolean checkLiberateSpace(CleanerManager manager) {
-		System.out.println("CheckLiberateSpace");
+		Logs.logManager.info("CheckLiberateSpace");
 		Pattern patternNumeral = Pattern.compile("^[0-9]+$");
 		
 		File rootFolder = new File(manager.manager.rootFolder);
@@ -90,21 +91,21 @@ public class CleanerDefault implements Cleaner{
 		for(File fic : rootFolder.listFiles()){
 			if(!fic.isDirectory() && !patternNumeral.matcher(fic.getName()).matches()){
 				fsSpace += fic.length();
-				System.out.println("system file : "+fic.getName());
+				Logs.logManager.info("system file : "+fic.getName());
 			}
 		}
-		System.out.println("FS space used : "+((((int)fsSpace)/1000*1000*1000)%1000)+"go "+((((int)fsSpace)/1000*1000)%1000)+"mo "+((((int)fsSpace)/1000)%1000)+"ko "+((int)fsSpace)%1000+"o");
+		Logs.logManager.info("FS space used : "+((((int)fsSpace)/1000*1000*1000)%1000)+"go "+((((int)fsSpace)/1000*1000)%1000)+"mo "+((((int)fsSpace)/1000)%1000)+"ko "+((int)fsSpace)%1000+"o");
 		
 		//get space occupied by the files
 		long chunkSpace = 0;
 		for(File fic : rootFolder.listFiles()){
 			if(!fic.isDirectory() && patternNumeral.matcher(fic.getName()).matches()){
 				chunkSpace += fic.length();
-				System.out.println("chunk file : "+fic.getName()+" "+ fic.length());
+				Logs.logManager.info("chunk file : "+fic.getName()+" "+ fic.length());
 			}
 		}
-		System.out.println("Chunks space used : "+((chunkSpace/(1000*1000*1000))%1000)+"go "+((chunkSpace/(1000*1000))%1000)+"mo "+((chunkSpace/1000)%1000)+"ko "+chunkSpace%1000+"o");
-		System.out.println("idealSize         : "+((manager.idealSize/(1000*1000*1000))%1000)+"go "+((manager.idealSize/(1000*1000))%1000)+"mo "+((manager.idealSize/1000)%1000)+"ko "+manager.idealSize%1000+"o");
+		Logs.logManager.info("Chunks space used : "+((chunkSpace/(1000*1000*1000))%1000)+"go "+((chunkSpace/(1000*1000))%1000)+"mo "+((chunkSpace/1000)%1000)+"ko "+chunkSpace%1000+"o");
+		Logs.logManager.info("idealSize         : "+((manager.idealSize/(1000*1000*1000))%1000)+"go "+((manager.idealSize/(1000*1000))%1000)+"mo "+((manager.idealSize/1000)%1000)+"ko "+manager.idealSize%1000+"o");
 		
 		//do we need to deleted some things?
 		if(chunkSpace > manager.idealSize || fsSpace + chunkSpace > manager.maxSize){
@@ -114,7 +115,7 @@ public class CleanerDefault implements Cleaner{
 			for(File fic : rootFolder.listFiles()){
 				if(!fic.isDirectory() && patternNumeral.matcher(fic.getName()).matches()){
 					chunkNames.add(Long.parseLong(fic.getName()));
-					System.out.println("chunkname : "+fic.getName());
+					Logs.logManager.info("chunkname : "+fic.getName());
 				}
 			}
 
@@ -127,11 +128,11 @@ public class CleanerDefault implements Cleaner{
 				FsChunk chunk = manager.manager.getDb().getChunkDirect(chunkId);
 				// if it's not in the fs (bad file) , del it.
 				if(chunk == null){
-					System.out.println("bad file : "+chunkId);
+					Logs.logManager.info("bad file : "+chunkId);
 //					new File(rootFolder.getAbsolutePath()+"/"+chunkId).delete();
 				}else if(chunk.serverIdPresent().size()<=manager.minKnownDuplicate){
 					// if i'm the only one to have it, do not del
-					System.out.println("chunk "+chunkId+" is alone");
+					Logs.logManager.info("chunk "+chunkId+" is alone");
 				}else{
 					// if i'm not the only one to have it, put it in the map (last access -> filename)
 					long timeWithFlavor = chunk.getLastAccessDate()*10+aleat.nextInt(1000);
@@ -142,17 +143,17 @@ public class CleanerDefault implements Cleaner{
 						//add some flavour
 						timeWithFlavor = chunk.getLastAccessDate()*10+aleat.nextInt(1000);
 						stop++;
-						System.out.println("chunk "+chunkId+" is not alone (with flavour"+timeWithFlavor+")");
+						Logs.logManager.info("chunk "+chunkId+" is not alone (with flavour"+timeWithFlavor+")");
 					}
 					lastAccess2id.put(scoreDeletion, chunkId);
-					System.out.println("chunk "+chunkId+" is not alone");
+					Logs.logManager.info("chunk "+chunkId+" is not alone");
 				}
 			}
 		
 			//remove all files from this list -> map as long as my space isn't low enough (or no more file)
 			long sizeToRemove = Math.max(fsSpace+chunkSpace-manager.maxSize, chunkSpace-manager.idealSize);
-			System.out.println("fsSpace+chunkSpace= "+(fsSpace+chunkSpace)+" ,maxSize="+manager.maxSize+", chunkSpace="+chunkSpace+" idealSize="+manager.idealSize);
-			System.out.println("Need to remove "+sizeToRemove+" bytes ("+(sizeToRemove/1000)+"KB) "+lastAccess2id.size());
+			Logs.logManager.info("fsSpace+chunkSpace= "+(fsSpace+chunkSpace)+" ,maxSize="+manager.maxSize+", chunkSpace="+chunkSpace+" idealSize="+manager.idealSize);
+			Logs.logManager.info("Need to remove "+sizeToRemove+" bytes ("+(sizeToRemove/1000)+"KB) "+lastAccess2id.size());
 			ObjectBidirectionalIterator<it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<ScoreDeletion>> it = lastAccess2id.object2LongEntrySet().iterator();
 			while(it.hasNext() && sizeToRemove>0){
 				it.unimi.dsi.fastutil.objects.Object2LongMap.Entry<ScoreDeletion> entry = it.next();
@@ -160,7 +161,7 @@ public class CleanerDefault implements Cleaner{
 				FsChunk chunk = manager.manager.getDb().getChunkDirect(idDel);
 				System.out.print("chunk "+idDel+" is removed, for a size of "+chunk.currentSize()+", access date = "+entry.getKey().lastaccess+" , size: "+entry.getKey().size+", copies: "+entry.getKey().nbCopy);
 				sizeToRemove -= chunk.currentSize();
-				System.out.println(", reste "+sizeToRemove+", "+it.hasNext());
+				Logs.logManager.info(", reste "+sizeToRemove+", "+it.hasNext());
 				chunk.setPresent(false);
 				chunk.flush();
 			}

@@ -12,16 +12,16 @@ import remi.distributedFS.datastruct.FsFile;
 import remi.distributedFS.log.Logs;
 
 /**
- * This cleaner remove all files that are added (or modified) a long time ago to make space
+ * This cleaner remove all files that are added/modified/accessed a long time ago to make space
  * 
  * @author merill
  *
  */
-public class CleanerKeepNewFiles implements Cleaner{
+public class CleanerKeepWantedFiles implements Cleaner{
 	
 	//TODO parameter: minSizeFileForDel : minimul size a file should be to be deleted. (Do not delete small files)
 	
-	public CleanerKeepNewFiles() {
+	public CleanerKeepWantedFiles() {
 		super();
 	}
 	
@@ -116,15 +116,19 @@ public class CleanerKeepNewFiles implements Cleaner{
 	private long checkRep(FsDirectory dir, Long2ObjectSortedMap<FsFile> time2FicToDel, long need2Del) {
 		
 		for(FsFile fic : dir.getFiles()) {
-			if(time2FicToDel.isEmpty() || time2FicToDel.lastLongKey() > fic.getModifyDate()) {
-				long sizeOnDisk = 0;
-				for(FsChunk chunk : fic.getChunks()) {
-					if(chunk.isPresent()) {
-						sizeOnDisk += chunk.currentSize();
-					}
+			long ficdate = fic.getModifyDate();
+			long sizeOnDisk = 0;
+			for(FsChunk chunk : fic.getChunks()) {
+				if(chunk.isPresent()) {
+					sizeOnDisk += chunk.currentSize();
+					if(ficdate<chunk.getLastAccessDate()) ficdate = chunk.getLastAccessDate();
 				}
+			}
+					
+			if(time2FicToDel.isEmpty() || time2FicToDel.lastLongKey() > ficdate) {
+				
 				if(sizeOnDisk > 0) {
-					time2FicToDel.put(fic.getModifyDate(), fic);
+					time2FicToDel.put(ficdate, fic);
 					need2Del -= sizeOnDisk;
 				}
 

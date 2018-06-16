@@ -16,6 +16,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.management.RuntimeErrorException;
 
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.AbstractMessageManager;
 import remi.distributedFS.util.ByteBuff;
 
@@ -164,7 +165,7 @@ public class Peer implements Runnable {
 	 * @return true if you should call ping quickly afterwards (connection phase)
 	 */
 	public boolean ping() {
-		System.out.println("peer "+this.myKey.otherPeerId+" compId:"+this.distComputerId+" : is alive? "+this.alive.get());
+		Logs.logNet.info("peer "+this.myKey.otherPeerId+" compId:"+this.distComputerId+" : is alive? "+this.alive.get());
 		if (!alive.get())
 			return false;
 		try {
@@ -230,7 +231,7 @@ public class Peer implements Runnable {
 			}
 		} catch (Exception e) {
 			 e.printStackTrace();
-			System.err.println( myServer.getPeerId() % 100+" error in the communication stream between peers" + myServer.getPeerId() % 100 + " and "
+			Logs.logNet.warning( myServer.getPeerId() % 100+" error in the communication stream between peers" + myServer.getPeerId() % 100 + " and "
 					+ getKey().otherPeerId % 100 + " : " + e);
 		}
 
@@ -274,13 +275,13 @@ public class Peer implements Runnable {
 
 	public void reconnect() {
 		if (myKey.address == null || myKey.port <= 0) {
-			System.err.println("can't reconnect because i didn't know the address");
+			Logs.logNet.warning("can't reconnect because i didn't know the address");
 			return;
 		}
 		while (!alive.get() && aliveFail < 10) {
 
 			// try to connect
-			System.err.println("try to reconnect to " + myKey.address);
+			Logs.logNet.warning("try to reconnect to " + myKey.address);
 
 			try (Socket tempSock = new Socket();) {
 				tempSock.connect(new InetSocketAddress(myKey.address, myKey.port), 2000);
@@ -298,23 +299,23 @@ public class Peer implements Runnable {
 	}
 
 	public boolean connect(Socket sock) throws InterruptedException, IOException {
-		System.out.println(
+		Logs.logNet.info(
 				myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " going to connect with " + sock.getPort());
-		// System.out.println(this +" "+ alive.get()+" SETTO true "+myServer.getId()%100+ " for " + sock.getPort());
+		// Logs.logNet.info(this +" "+ alive.get()+" SETTO true "+myServer.getId()%100+ " for " + sock.getPort());
 		boolean alreadyAlive = alive.getAndSet(true);
 		if (alreadyAlive) {
 			// two connections established, keep the one with the higher number
 
 			// wait field sets
 			while (!aliveAndSet) {
-				// System.out.println(this +" "+ alive.get()+" SETTO "+myServer.getId()%100+ " alive but not set yet for " + sock.getPort());
+				// Logs.logNet.info(this +" "+ alive.get()+" SETTO "+myServer.getId()%100+ " alive but not set yet for " + sock.getPort());
 				Thread.sleep(100);
 			}
 
 			boolean iWin = false;
 			// now compare the numbers
 			if (myServer.getPeerId() == myKey.otherPeerId) {
-				System.out.println(myServer.getPeerId() % 100 + " i have the same id as " + myKey.otherPeerId % 100);
+				Logs.logNet.info(myServer.getPeerId() % 100 + " i have the same id as " + myKey.otherPeerId % 100);
 				// me and the other server must recreate a hash id.
 				// compare ips to choose
 				int winner = sock.getLocalAddress().getHostAddress().compareTo(sock.getInetAddress().getHostAddress());
@@ -336,16 +337,16 @@ public class Peer implements Runnable {
 			if (iWin) {
 				// i can kill this new one.
 				sock.close();
-				System.out.println(myServer.getPeerId() % 100 + " now close the socket to " + myKey.otherPeerId % 100);
+				Logs.logNet.info(myServer.getPeerId() % 100 + " now close the socket to " + myKey.otherPeerId % 100);
 			} else {
 				// I'm not the one to kill one connection. I have to wait the close event from the other computer.
 				sockWaitToDelete = sock;
 			}
 
-			System.out.println(myServer.getPeerId() % 100 + "fail to connect (already connected) to " + sock.getPort());
+			Logs.logNet.info(myServer.getPeerId() % 100 + "fail to connect (already connected) to " + sock.getPort());
 			return false;
 		} else {
-			System.out.println(myServer.getPeerId() % 100 + " win to connect with " + sock.getPort());
+			Logs.logNet.info(myServer.getPeerId() % 100 + " win to connect with " + sock.getPort());
 			// connect
 			this.sock = sock;
 			this.streamIn = new BufferedInputStream(sock.getInputStream());
@@ -363,20 +364,20 @@ public class Peer implements Runnable {
 			streamOut.flush();
 
 			// while (myKey.otherServerId == 0) {
-			System.out.println(
+			Logs.logNet.info(
 					myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " want to read " + getIn().available());
 			readMessage();
-			System.out.println(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " read id "
+			Logs.logNet.info(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " read id "
 					+ getKey().getPeerId());
 			// }
 			// while (myKey.port == 0) {
 			readMessage();
-			System.out.println(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " read port " + getKey().port);
+			Logs.logNet.info(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " read port " + getKey().port);
 			// }
 
 			aliveAndSet = true;
 
-			System.out.println(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " succeed to connect to "
+			Logs.logNet.info(myServer.getPeerId() % 100 + " " + myServer.getListenPort() + " succeed to connect to "
 					+ sock.getPort());
 			return true;
 		}
@@ -385,7 +386,7 @@ public class Peer implements Runnable {
 	public void startListen() {
 
 		if (myCurrentThread != null) {
-			System.err.println(myServer.getPeerId() % 100 + " error, a listening thread is already started for addr "
+			Logs.logNet.warning(myServer.getPeerId() % 100 + " error, a listening thread is already started for addr "
 					+ myKey.address + "...");
 		} else {
 			myCurrentThread = new Thread(this);
@@ -397,7 +398,7 @@ public class Peer implements Runnable {
 
 	public synchronized void writeMessage(byte messageId, ByteBuff message) {
 		if(message==null){
-			System.err.println("Warn : emit null message, id :"+messageId);
+			Logs.logNet.warning("Warn : emit null message, id :"+messageId);
 		}
 		try {
 			
@@ -410,7 +411,7 @@ public class Peer implements Runnable {
 						encodedMsg = encoder.doFinal(message.array(), message.position(), message.limit());
 					}
 				}else{
-					System.err.println("Erro, ttry to send a "+messageId+" message when we don't have a aes key!");
+					Logs.logNet.warning("Erro, ttry to send a "+messageId+" message when we don't have a aes key!");
 					return;
 				}
 			}else{
@@ -426,7 +427,7 @@ public class Peer implements Runnable {
 			out.write(5);
 			out.write(messageId);
 			out.write(messageId);
-			// System.out.println("WRITE 5 5 "+myId.id);
+			// Logs.logNet.info("WRITE 5 5 "+myId.id);
 			ByteBuff buffInt = new ByteBuff();
 			if (encodedMsg != null) {
 				buffInt.putInt(encodedMsg.length)
@@ -443,9 +444,9 @@ public class Peer implements Runnable {
 			}
 			out.flush();
 			if(encodedMsg != null && message.position() != 0){
-				System.err.println("Warn, you want to send a buffer which is not rewinded : " + message.position());
+				Logs.logNet.warning("Warn, you want to send a buffer which is not rewinded : " + message.position());
 			}
-			System.out.println("WRITE MESSAGE : "+messageId+" : "+(message==null?"null":(message.limit() - message.position())));
+			Logs.logNet.info("WRITE MESSAGE : "+messageId+" : "+(message==null?"null":(message.limit() - message.position())));
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
@@ -467,9 +468,9 @@ public class Peer implements Runnable {
 					nb5++;
 				}else{
 					nb5 = 0;
-					System.err.println("stream error: receive "+newByte+" instead of 5  ,peerid=" +getKey().getPeerId()%100);
+					Logs.logNet.warning("stream error: receive "+newByte+" instead of 5  ,peerid=" +getKey().getPeerId()%100);
 				}
-//				System.out.println(myServer.getId() % 100 + " read second 5 :" + newByte);
+//				Logs.logNet.info(myServer.getId() % 100 + " read second 5 :" + newByte);
 				if (newByte == -1)
 					throw new IOException("End of stream");
 			} while (nb5 < 4);
@@ -478,14 +479,14 @@ public class Peer implements Runnable {
 			newByte = streamIn.read();
 			int sameByte = streamIn.read();
 			if(sameByte != newByte){
-				System.err.println("Stream error: not same byte for message id : "+newByte+" != "+sameByte);
+				Logs.logNet.warning("Stream error: not same byte for message id : "+newByte+" != "+sameByte);
 				return;
 			}
-			System.out.println(myServer.getPeerId() % 100 + " read message id :" + newByte);
+			Logs.logNet.info(myServer.getPeerId() % 100 + " read message id :" + newByte);
 			if (newByte == -1)
 				throw new IOException("End of stream");
 			if(newByte<0 || newByte >50){
-				System.err.println("error, receive byte: "+newByte);
+				Logs.logNet.warning("error, receive byte: "+newByte);
 				return;
 			}
 			// read message
@@ -495,14 +496,14 @@ public class Peer implements Runnable {
 				int nbBytes = buffIn.getInt();
 				int nbBytes2 = buffIn.getInt();
 				if(nbBytes<0){
-					System.err.println("Stream error: stream want me to read a negative number of bytes");
+					Logs.logNet.warning("Stream error: stream want me to read a negative number of bytes");
 					return;
 				}
 				if(nbBytes!=nbBytes2){
-					System.err.println("Stream error: not same number of bytes to read : "+nbBytes+" != "+nbBytes2);
+					Logs.logNet.warning("Stream error: not same number of bytes to read : "+nbBytes+" != "+nbBytes2);
 					return;
 				}
-				System.out.println("Read "+nbBytes+" from the stream");
+				Logs.logNet.info("Read "+nbBytes+" from the stream");
 				buffIn.limit(nbBytes).rewind();
 				if(nbBytes>0) {
 					int pos = 0;
@@ -522,7 +523,7 @@ public class Peer implements Runnable {
 							buffIn.reset().put(decodedMsg).rewind();
 						}
 					}else{
-						System.err.println("Error, try to receive a "+newByte+" message when we don't have a aes key!");
+						Logs.logNet.warning("Error, try to receive a "+newByte+" message when we don't have a aes key!");
 						return;
 					}
 				}//else : nothing to do, it's not encoded
@@ -543,7 +544,7 @@ public class Peer implements Runnable {
 //						changeState(PeerConnectionState.HAS_ID, true);
 					}else if(clusterId >0 && myServer.getServerIdDb().getClusterId() != clusterId){
 						//error, not my cluster!
-						System.err.println("Error, trying to connect with "+getPeerId()%100+" but his cluster is "+clusterId+" and mine is "
+						Logs.logNet.warning("Error, trying to connect with "+getPeerId()%100+" but his cluster is "+clusterId+" and mine is "
 						+myServer.getServerIdDb().getClusterId()+" => closing connection");
 						this.close();
 					}
@@ -567,9 +568,9 @@ public class Peer implements Runnable {
 
 			// if (MessageId.use[newByte] != null) {
 			// MessageId.use[newByte].read(this);
-			// System.out.println(myServer.getId()%100+" read done for :"+newByte);
+			// Logs.logNet.info(myServer.getId()%100+" read done for :"+newByte);
 			// }else{
-			// System.err.println("Error, message id "+newByte+" has no listener");
+			// Logs.logNet.warning("Error, message id "+newByte+" has no listener");
 			// }
 
 		} catch (IOException e) {
@@ -647,8 +648,8 @@ public class Peer implements Runnable {
 	}
 
 	public void close() {
-		System.out.println("Closing "+getKey().getPeerId()%100);
-		System.out.println(Thread.getAllStackTraces().get(Thread.currentThread()));
+		Logs.logNet.info("Closing "+getKey().getPeerId()%100);
+		Logs.logNet.info(Thread.getAllStackTraces().get(Thread.currentThread()).toString());
 		alive.set(false);
 		changeState(PeerConnectionState.DEAD, false);
 		try {

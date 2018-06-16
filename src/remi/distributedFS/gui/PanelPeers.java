@@ -95,7 +95,7 @@ public class PanelPeers extends GridPane implements Runnable {
 			}
 			List<String> lstStr = new ArrayList<>();
 			
-//			System.out.println("update peers list");
+//			Logs.logGui.info("update peers list");
 			// update data
 			// ListModel<Peer> model = listPeers.setCellRenderer();
 			// remove the ones that are not available
@@ -110,7 +110,7 @@ public class PanelPeers extends GridPane implements Runnable {
 				pos = addItem(strB, ""+p.getState(), pos, 15+6+10+20+30);
 				pos = addItem(strB, ""+p.isAlive(), pos, 15+6+10+20+30+10);
 				lstStr.add(strB.toString());
-//				System.out.println(strB);
+//				Logs.logGui.info(strB);
 			}
 			lstStr.sort((s1,s2)->s1.compareTo(s2));
 

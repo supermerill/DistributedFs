@@ -18,6 +18,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.impl.PhysicalServerDummy;
 
 /**
@@ -69,7 +70,6 @@ public class PanelConnectToCluster extends InstallPanel {
 		btNext.setTooltip(new Tooltip("Ask peer paremeters"));
 		btNext.setOnAction((ActionEvent)->{
 			//check data TODO
-			System.out.println(txtClusterId.getText().length());
 			if(txtClusterId.getText().length()<6 || txtClusterId.getText().length()>32) {
 				Alert alert = new Alert(Alert.AlertType.WARNING);alert.setTitle("Error");alert.setHeaderText("Error:");
 				alert.setContentText("you must have a cluster name with at least 6 characaters and maximum 32");
@@ -98,7 +98,6 @@ public class PanelConnectToCluster extends InstallPanel {
 		btTestConnection.setTooltip(new Tooltip("Try to see if this peer is joinable."));
 		btTestConnection.setOnAction((ActionEvent)->{
 			//TODO: check values
-			System.out.println(txtClusterId.getText().length());
 			if(txtClusterId.getText().length()<6 || txtClusterId.getText().length()>32) {
 				Alert alert = new Alert(Alert.AlertType.WARNING);alert.setTitle("Error");alert.setHeaderText("Error:");
 				alert.setContentText("you must have a cluster name with at least 6 characaters and maximum 32");

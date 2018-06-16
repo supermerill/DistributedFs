@@ -31,6 +31,7 @@ import remi.distributedFS.db.UnreachableChunkException;
 import remi.distributedFS.db.impl.FsDirectoryFromFile;
 import remi.distributedFS.db.impl.WrongSectorTypeException;
 import remi.distributedFS.fs.FileSystemManager;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.util.ByteBuff;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
@@ -71,18 +72,18 @@ public class JnrfuseImpl extends FuseStubFS {
 		            default:
 		                path = drivepath;//"/tmp/mntm_"+driveletter;
 		        }
-		        System.out.println("prepare to mount into "+path);
+		        Logs.logOs.info("prepare to mount into "+path);
 			    try {
 			    	mount(Paths.get(path), false, false);
 			    }catch(Exception e1){
 			    	e1.printStackTrace();
-			    	System.out.println(e1.getLocalizedMessage());
+			    	Logs.logOs.info(e1.getLocalizedMessage());
 			    	throw new RuntimeException(e1);
 			    }
-		        System.out.println("mounted "+path);
+		        Logs.logOs.info("mounted "+path);
 		    }catch(Throwable e2){
 		    	e2.printStackTrace();
-		    	System.out.println(e2.getLocalizedMessage());
+		    	Logs.logOs.info(e2.getLocalizedMessage());
 		    } finally {
 //		    	umount();
 		    }
@@ -121,7 +122,7 @@ public class JnrfuseImpl extends FuseStubFS {
 		PUGA puga = new PUGA(obj.getPUGA());
 		puga.computerRead = true;
 		puga.computerWrite = true;
-//		System.out.println("PUGA="+puga);
+//		Logs.logOs.info("PUGA="+puga);
     	long mode = 0;
     	if(puga.userRead) mode |= FileStat.S_IRUSR;
     	if(puga.userRead && puga.canExec) mode |= FileStat.S_IXUSR;
@@ -140,11 +141,11 @@ public class JnrfuseImpl extends FuseStubFS {
     public int getattr(String path, FileStat stat) {
     	try{
         	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-//        	System.out.println(">>>>NC getattr for (path) : "+path);
-//        	System.out.println(/*">>>>NC */"get attr for (path) : "+path);
+        	Logs.logOs.fine("getattr for (path) : "+path);
+//        	Logs.logOs.info(/*"*/"get attr for (path) : "+path);
     	FsObject obj = getPathObj(manager.getRoot(), path);
     	if(obj ==null){
-    		System.err.println(">> getattr : warn: can't find "+path);
+    		Logs.logOs.warning("getattr : warn: can't find "+path);
     		return -ErrorCodes.ENOENT();
     	}
     	long mode = PUGAToMode(obj);
@@ -159,12 +160,12 @@ public class JnrfuseImpl extends FuseStubFS {
     	if(obj.asFile() != null){
         	stat.st_size.set(Long.valueOf(((FsFile)obj).getSize()));
     	}
-//		System.out.println(">> getattr : mode "+mode+" == "+modeToPUGAObj(mode)+", uid : "+stat.st_uid);
-//    	System.out.println(" bad file perm = "+stat.st_mode.intValue());
+//		Logs.logOs.info(">> getattr : mode "+mode+" == "+modeToPUGAObj(mode)+", uid : "+stat.st_uid);
+//    	Logs.logOs.info(" bad file perm = "+stat.st_mode.intValue());
 //    	mode = 0777;
 //    	if(obj instanceof FsDirectory) mode |= FileStat.S_IFDIR;
 //        stat.st_mode.set(mode);
-//    	System.out.println(" good file perm for "+path+" = "+stat.st_mode.intValue());
+//    	Logs.logOs.info(" good file perm for "+path+" = "+stat.st_mode.intValue());
     	}catch(Exception e){
     		e.printStackTrace();
     		return -ErrorCodes.ENOENT();
@@ -176,7 +177,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int readlink(String path, Pointer buf, @size_t long size) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC readlink for (path) : "+path);
+    	Logs.logOs.info("readlink for (path) : "+path);
         return 0;
     }
 
@@ -184,14 +185,14 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int mknod(String path, @mode_t long mode, @dev_t long rdev) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC mknod for (path) : "+path);
+    	Logs.logOs.info("mknod for (path) : "+path);
         return create(path, mode, null);
     }
 
     @Override
     public int create(String path, @mode_t long mode, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC create for (path) : "+path);
+    	Logs.logOs.info("create for (path) : "+path);
 
     	try{
         	FsDirectory dir = getPathParentDir(manager.getRoot(), path);
@@ -211,14 +212,14 @@ public class JnrfuseImpl extends FuseStubFS {
 			List<FsChunk> lst = new ArrayList<>(fic.getChunks());
 			lst.add(newChunk);
 			fic.setChunks(lst);
-        	System.out.println(">> set userid to "+getContext().uid.get());
+        	Logs.logOs.fine(">> set userid to "+getContext().uid.get());
         	fic.setUserId(getContext().uid.get());
-        	System.out.println(">> set groupid to "+getContext().gid.get());
+        	Logs.logOs.fine(">> set groupid to "+getContext().gid.get());
         	fic.setGroupId(getContext().gid.get());
 
 			// modification(s) ? -> set timestamp!
 	    	dir.setModifyDate(System.currentTimeMillis());
-			System.out.println(">> new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
+			Logs.logOs.info(">> new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
 			dir.setModifyUID(manager.getUserId());
 			
 			// set id
@@ -245,7 +246,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int mkdir(String path, @mode_t long mode) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC mkdir for (path) : "+path);
+    	Logs.logOs.info("mkdir for (path) : "+path);
     	try{
     		FsDirectory dir = getPathParentDir(manager.getRoot(), path);
 	    	if(dir==null){
@@ -266,7 +267,7 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	
 			// modification(s) ? -> set timestamp!
 	    	dir.setModifyDate(System.currentTimeMillis());
-			System.out.println("new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
+			Logs.logOs.info("new modifydate for folder '"+dir.getPath()+"' : "+dir.getModifyDate());
 			dir.setModifyUID(manager.getUserId());
 	    	
 			// set id
@@ -287,7 +288,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int unlink(String path) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC unlink for (path) : "+path);
+    	Logs.logOs.info("unlink for (path) : "+path);
     	try{
 	    	FsFile obj = getPathFile(manager.getRoot(), path);
 	    	FsDirectory oldDir = getPathParentDir(manager.getRoot(), path);
@@ -326,7 +327,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int rmdir(String path) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC rmdir for (path) : "+path);
+    	Logs.logOs.info("rmdir for (path) : "+path);
     	try{
     		FsDirectory obj = getPathDir(manager.getRoot(), path);//getPathParentDir(manager.getRoot(), path);
 	    	if(obj==null){
@@ -376,41 +377,41 @@ public class JnrfuseImpl extends FuseStubFS {
     public int rename(String oldpath, String newpath) {
     	if(oldpath.indexOf(0)>0) oldpath = oldpath.substring(0,oldpath.indexOf(0));
     	if(newpath.indexOf(0)>0) newpath = newpath.substring(0,newpath.indexOf(0));
-    	System.out.println(">>>>NC rename for (path) : "+oldpath+" => "+newpath);
+    	Logs.logOs.info("rename for (path) : "+oldpath+" => "+newpath);
 		try{
 	    	FsObject obj = getPathObj(manager.getRoot(), oldpath);
 	    	FsDirectory oldDir = getPathParentDir(manager.getRoot(), oldpath);
 	    	FsDirectory newDir = getPathParentDir(manager.getRoot(), newpath);
 	    	String newName = getPathObjectName(manager.getRoot(), newpath);
 	    	if(obj==null || oldDir==null || newDir==null || newName==null || newName.isEmpty()){
-	        	System.out.println("rename : path problem : "+obj+", "+oldDir+", "+newDir);
+	        	Logs.logOs.warning("rename : path problem : "+obj+", "+oldDir+", "+newDir);
 	    		return -ErrorCodes.ENOENT();
 	    	}
 //	    	String name = getPathObjectName(newDir, newpath);
 	    	String name = newpath.substring(newpath.lastIndexOf("/")+1);
     		//check it doesn't exist
-			System.out.println("check it doesn't exist : "+name);
+			Logs.logOs.fine("check it doesn't exist : "+name);
 	    	if(getObj(newDir, name) != null){
 	    		return -ErrorCodes.EEXIST();
 	    	}
-        	System.out.println("rename : path : "+obj.getPath()+", "+oldDir.getPath()+", "+newDir.getPath());
-        	System.out.println("rename : obj : "+obj+", "+oldDir+", "+newDir);
+        	Logs.logOs.fine("rename : path : "+obj.getPath()+", "+oldDir.getPath()+", "+newDir.getPath());
+        	Logs.logOs.info("rename : obj : "+obj+", "+oldDir+", "+newDir);
 //	    	if(obj instanceof FsDirectory){
 //	        	//remove
 //		    	Iterator<FsDirectory> it = oldDir.getDirs().iterator();
 //		    	while(it.hasNext()){
 //		    		if(it.next() == obj){
-//		    	    	System.out.println("rename :removedir");
+//		    	    	Logs.logOs.info("rename :removedir");
 //		    			it.remove();
 //		    			break;
 //		    		}
 //		    	}
-//	        	System.out.println("rename : test old location : "+getPathObj(manager.getRoot(), oldpath));
+//	        	Logs.logOs.info("rename : test old location : "+getPathObj(manager.getRoot(), oldpath));
 //		    	//add
-//    	    	System.out.println("rename : adddir");
+//    	    	Logs.logOs.info("rename : adddir");
 //		    	newDir.getDirs().add((FsDirectory) obj);
 //		    	obj.setName(newName);
-//	        	System.out.println("rename : test new location : "+getPathObj(manager.getRoot(), newpath));
+//	        	Logs.logOs.info("rename : test new location : "+getPathObj(manager.getRoot(), newpath));
 //
 //	    	}else{
 //	        	//remove
@@ -434,7 +435,7 @@ public class JnrfuseImpl extends FuseStubFS {
 
         	obj.setName(newName);
         	if(oldDir != newDir){
-        		System.out.println("FS : move "+obj.getPath()+" from "+oldDir.getPath()+" to "+newDir.getPath());
+        		Logs.logOs.info("FS : move "+obj.getPath()+" from "+oldDir.getPath()+" to "+newDir.getPath());
 	        	if(obj instanceof FsFile){
 	    	    	oldDir.moveFile((FsFile)obj, newDir);
 	        	}else if(obj instanceof FsDirectory){
@@ -463,7 +464,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int chmod(String path, @mode_t long mode) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC chmod for (path) : "+path);
+    	Logs.logOs.info("chmod for (path) : "+path);
     	try{
     		FsDirectory obj = getPathDir(manager.getRoot(), path);
 	    	if(obj==null ){
@@ -487,7 +488,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int chown(String path, @uid_t long uid, @gid_t long gid) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC chown for (path) : "+path);
+    	Logs.logOs.info("chown for (path) : "+path);
     	FsObject obj = getPathObj(manager.getRoot(), path);
     	if(obj==null){
             return -ErrorCodes.ENOENT();
@@ -505,7 +506,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int truncate(String path, @off_t long size) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC truncate for (path) : "+path+", for new size : "+size);
+    	Logs.logOs.info("truncate for (path) : "+path+", for new size : "+size);
     	FsFile fic = getPathFile(manager.getRoot(), path);
     	if(fic==null){
             return -ErrorCodes.ENOENT();
@@ -533,21 +534,21 @@ public class JnrfuseImpl extends FuseStubFS {
     public int open(String path, FuseFileInfo fi) {
     	try{
 	    	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-	    	System.out.println(">>>>NC Open for (path) : "+path+" with flags: "+fi.flags.get());
+	    	Logs.logOs.info("Open for (path) : "+path+" with flags: "+fi.flags.get());
 	        if (getPathFile(manager.getRoot(), path) == null) {
-	        	System.err.println("can't open this file");
+	        	Logs.logOs.warning("can't open this file");
 	            return -ErrorCodes.ENOENT();
 	        }
 	        Object padseek = fi.nonseekable;
 	        jnr.ffi.Pointer point;
 	        fi.fh.struct();
-	//    	System.out.println("open : ok, no problem");
-	//    	System.out.println("nonseekable:"+fi.nonseekable);
-	//    	System.out.println("direct_io:"+fi.direct_io);
-	//    	System.out.println("padding:"+fi.padding);
-	//    	System.out.println("keep_cache:"+fi.keep_cache);
-	//    	System.out.println("lock_owner:"+fi.lock_owner);
-	//    	System.out.println("flock_release:"+fi.flock_release);
+	//    	Logs.logOs.info("open : ok, no problem");
+	//    	Logs.logOs.info("nonseekable:"+fi.nonseekable);
+	//    	Logs.logOs.info("direct_io:"+fi.direct_io);
+	//    	Logs.logOs.info("padding:"+fi.padding);
+	//    	Logs.logOs.info("keep_cache:"+fi.keep_cache);
+	//    	Logs.logOs.info("lock_owner:"+fi.lock_owner);
+	//    	Logs.logOs.info("flock_release:"+fi.flock_release);
     	}catch(Exception e){
     		e.printStackTrace();
     	}
@@ -557,21 +558,21 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int read(String path, Pointer buf, @size_t long size, @off_t long offset, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC Read for (path) : "+path+", for off/size "+offset+" / "+size);
+    	Logs.logOs.info("Read for (path) : "+path+", for off/size "+offset+" / "+size);
     	FsFile fic = getPathFile(manager.getRoot(), path);
     	if(fic==null){
-    		System.err.println("can't read: no file");
+    		Logs.logOs.warning("can't read: no file");
             return -ErrorCodes.ENOENT();
     	}
     	if(size > Integer.MAX_VALUE){
-    		System.err.println("can't read: size >2gio");
+    		Logs.logOs.warning("can't read: size >2gio");
             return -ErrorCodes.EMSGSIZE();
     	}
     	int readsize = (int) size;
     	if(readsize+offset>fic.getSize()){
 //            return -ErrorCodes.ENODATA();
     		readsize = (int) (fic.getSize() - offset);
-        	System.out.println("read : reduce size read to'"+readsize+"' ("+fic.getSize()+" - "+offset+")");
+        	Logs.logOs.info("read : reduce size read to'"+readsize+"' ("+fic.getSize()+" - "+offset+")");
     		if(readsize<0)  return -ErrorCodes.ENODATA();
     	}
     	try{
@@ -582,8 +583,8 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	FsFile.read(fic, buff, offset);
 	
 	    	buf.put(0, buff.array(), 0, readsize);
-//	    	System.out.println("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
-//	    	System.out.println("read : size = "+ buff.array().length);
+//	    	Logs.logOs.info("read : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
+//	    	Logs.logOs.info("read : size = "+ buff.array().length);
 	    	return readsize;
     	}catch(TimeoutException e){
     		return -ErrorCodes.ETIME();
@@ -598,7 +599,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int write(String path, Pointer buf, @size_t long size, @off_t long offset, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC Write for (path) : "+path+", for off/size "+offset+" / "+size);
+    	Logs.logOs.info("Write for (path) : "+path+", for off/size "+offset+" / "+size);
     	FsFile fic = getPathFile(manager.getRoot(), path);
     	if(fic==null){
             return -ErrorCodes.ENOENT();
@@ -613,13 +614,13 @@ public class JnrfuseImpl extends FuseStubFS {
 	    	
 	    	FsFile.write(fic, buff, offset);
 	
-//	    	System.out.println("write : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
+//	    	Logs.logOs.info("write : '"+ Charset.forName("UTF-8").decode(ByteBuffer.wrap(buff.array()))+"'");
 
 	    	// save/propagate
 	    	fic.flush();
         	manager.propagateChange(fic);
         	
-        	System.out.println("write "+writesize+" bytes / "+size);
+        	Logs.logOs.info("write "+writesize+" bytes / "+size);
 	    	return writesize;
     	}catch(TimeoutException e){
     		return -ErrorCodes.ETIME();
@@ -635,19 +636,19 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     public int statfs(String path, Statvfs stbuf) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC statfs for (path) : "+path);
+    	Logs.logOs.info("statfs for (path) : "+path);
         if (Platform.getNativePlatform().getOS() == jnr.ffi.Platform.OS.WINDOWS) {
             // statfs needs to be implemented on Windows in order to allow for copying
             // data from other devices because winfsp calculates the volume size based
             // on the statvfs call.
             // see https://github.com/billziss-gh/winfsp/blob/14e6b402fe3360fdebcc78868de8df27622b565f/src/dll/fuse/fuse_intf.c#L654
             if ("/".equals(path)) {
-            	System.out.println(">>>>NC statfs OK");
+            	Logs.logOs.info("statfs OK");
                 stbuf.f_blocks.set(1024 * 1024); // total data blocks in file system
                 stbuf.f_frsize.set(1024);        // fs block size
                 stbuf.f_bfree.set(1024 * 1024);  // free blocks in fs
             }else{
-            	System.err.println(">>>>NC statfs KO");
+            	Logs.logOs.warning("statfs KO");
             }
         }
         return super.statfs(path, stbuf);
@@ -657,80 +658,80 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int flush(String path, FuseFileInfo fi) {
-    	System.out.println(">>>>NC flush '"+path+"'");
+    	Logs.logOs.info("flush '"+path+"'");
         return 0;
     }
 
     @Override
     @NotImplemented
     public int release(String path, FuseFileInfo fi) {
-    	System.out.println(">>>>NC release '"+path+"'");
+    	Logs.logOs.info("release '"+path+"'");
         return 0;
     }
 
     @Override
     @NotImplemented
     public int fsync(String path, int isdatasync, FuseFileInfo fi) {
-    	System.out.println(">>>>NC fsync "+path);
+    	Logs.logOs.info("fsync "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int setxattr(String path, String name, Pointer value, @size_t long size, int flags) {
-    	System.out.println(">>>>NC setxattr "+path);
+    	Logs.logOs.info("setxattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int getxattr(String path, String name, Pointer value, @size_t long size) {
-    	System.out.println(">>>>NC getxattr "+path);
+    	Logs.logOs.info("getxattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int listxattr(String path, Pointer list, @size_t long size) {
-    	System.out.println(">>>>NC listxattr "+path);
+    	Logs.logOs.info("listxattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int removexattr(String path, String name) {
-    	System.out.println(">>>>NC removexattr "+path);
+    	Logs.logOs.info("removexattr "+path);
         return 0;
     }
 
     @Override
     @NotImplemented
     public int opendir(String path, FuseFileInfo fi) {
-    	System.out.println(">>>>NC opendir "+path);
+    	Logs.logOs.info("opendir "+path);
         return 0;
     }
 
     @Override
     public int readdir(String path, Pointer buf, FuseFillDir filter, @off_t long offset, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println(">>>>NC readdir for (path) : "+path);
+    	Logs.logOs.info("readdir for (path) : "+path);
     	FsDirectory dir = getPathDir(manager.getRoot(), path);
     	if(dir == null && path.equals("/")){
     		dir = manager.getRoot();
     	}
     	if(dir==null){
-    		System.err.println("Error, can't read not-existant dir "+path);
+    		Logs.logOs.warning("Error, can't read not-existant dir "+path);
     		return -ErrorCodes.ENOENT();
     	}
     	try{
 	    	filter.apply(buf, ".",  null, 0);
 	    	filter.apply(buf, "..",  null, 0);
 	    	for(FsDirectory childDir : dir.getDirs()){
-	        	System.out.println(dir.getName()+" have a dir "+childDir.getName());
+	        	Logs.logOs.info(dir.getName()+" have a dir "+childDir.getName());
 	        	filter.apply(buf, childDir.getName(), null, 0);
 	    	}
 	    	for(FsFile childFile : dir.getFiles()){
-	        	System.out.println(dir.getName()+" have a file "+childFile.getName());
+	        	Logs.logOs.info(dir.getName()+" have a file "+childFile.getName());
 	        	filter.apply(buf, childFile.getName(), null, 0);
 	    	}
     	}catch(WrongSectorTypeException e)
@@ -767,7 +768,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int access(String path, int mask) {
-    	System.out.println(">>>>NC access "+path);
+    	Logs.logOs.info("access "+path);
         return 0;
     }
 
@@ -786,7 +787,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int lock(String path, FuseFileInfo fi, int cmd, Flock flock) {
-    	System.out.println(">>>>NC lock "+path);
+    	Logs.logOs.info("lock "+path);
 //        return -ErrorCodes.ENOSYS();
     	return 0;
     }
@@ -820,7 +821,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int write_buf(String path, FuseBufvec buf, @off_t long off, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println("write_buf "+path);
+    	Logs.logOs.info("write_buf "+path);
     	// TODO.
         // Some problem in implementation, but it not enabling by default
         int res;
@@ -862,7 +863,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @NotImplemented
     public int read_buf(String path, Pointer bufp, @size_t long size, @off_t long off, FuseFileInfo fi) {
     	if(path.indexOf(0)>0) path = path.substring(0,path.indexOf(0));
-    	System.out.println("read_buf "+path);
+    	Logs.logOs.info("read_buf "+path);
         // should be implemented or null
         long vecmem = MemoryIO.getInstance().allocateMemory(Struct.size(new FuseBufvec(Runtime.getSystemRuntime())), false);
         if (vecmem == 0) {
@@ -888,7 +889,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int flock(String path, FuseFileInfo fi, int op) {
-    	System.out.println("flock "+path);
+    	Logs.logOs.info("flock "+path);
 //        return -ErrorCodes.ENOSYS();
     	return 0;
     }
@@ -896,7 +897,7 @@ public class JnrfuseImpl extends FuseStubFS {
     @Override
     @NotImplemented
     public int fallocate(String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {
-    	System.out.println("fallocate "+path);
+    	Logs.logOs.info("fallocate "+path);
 //        return -ErrorCodes.ENOSYS();
     	return 0;
     }

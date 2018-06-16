@@ -22,6 +22,7 @@ import remi.distributedFS.db.StorageManager;
 import remi.distributedFS.db.impl.FsFileFromFile;
 import remi.distributedFS.fs.FileSystemManager;
 import remi.distributedFS.fs.StandardManager;
+import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.ClusterManager;
 
 public class MainWindow extends Application {
@@ -73,6 +74,7 @@ public class MainWindow extends Application {
 	}
 	
 	protected void initProcesses() {
+		
 
 		//get config
 		File mainDir = new File(".");
@@ -84,30 +86,30 @@ public class MainWindow extends Application {
 		//current net instance repo
 
 		//TODO: read config file
-			System.out.println("====================start client ====================");
+			Logs.logGui.info("====================start client ====================");
 
 			String drivePath = paramsMana.get("DriveLetter");
 			int port = paramsMana.getInt("ListenPort");
 				StandardManager manager = new StandardManager();
-				System.out.println("INIT BD & NET");
+				Logs.logGui.info("INIT BD & NET");
 				manager.initBdNet(mainDir.getAbsolutePath(), port);
-				System.out.println("CONNECT");
+				Logs.logGui.info("CONNECT");
 				int nbConnection = manager.getNet().connect();
 				
 				boolean iAmTheMaster =false;
 				if(nbConnection < 2) {
 					//wait to be sure you are really connected
-					System.out.println("WAIT CONNECTION");
+					Logs.logGui.info("WAIT CONNECTION");
 					try {
 						do{
-							Thread.sleep(3000);
+							Thread.sleep(10000);
 						}while(manager.getNet().isConnecting());
 						//TODO: loop while connection has not failed.
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
 					nbConnection = manager.getNet().getNbPeers();
-					System.out.println("nb connected peers = "+nbConnection);
+					Logs.logGui.info("nb connected peers = "+nbConnection);
 					boolean waitAbit = true;
 					do{
 						Alert alert = new Alert(AlertType.CONFIRMATION);
@@ -128,7 +130,7 @@ public class MainWindow extends Application {
 					}while(nbConnection == 0 && waitAbit);
 					
 					if(nbConnection == 0) {
-						System.out.println("can't connect, create my new server ? " + !paramsNet.getBoolOrDef("FirstConnection", false));
+						Logs.logGui.info("can't connect, create my new server ? " + !paramsNet.getBoolOrDef("FirstConnection", false));
 						//start a new net cluster
 						//TODO: if "connect to existing cluter" is checked, please do not create a new cluster without user permission
 						if(paramsNet.getBoolOrDef("FirstConnection", false)) {
@@ -162,7 +164,7 @@ public class MainWindow extends Application {
 						}
 					}
 				}else{
-					System.out.println("MANY connection");
+					Logs.logGui.info("MANY connection");
 					//update later
 					nbConnection = manager.getNet().getNbPeers();
 				}
@@ -179,10 +181,10 @@ public class MainWindow extends Application {
 					}
 				}
 				
-				System.out.println("INIT OS");
+				Logs.logGui.info("INIT OS");
 				manager.initOs("./data"+drivePath, drivePath);
 
-				System.out.println("READY!");
+				Logs.logGui.info("READY!");
 				
 				this.manager = manager;
 				this.peers.startListen(manager);

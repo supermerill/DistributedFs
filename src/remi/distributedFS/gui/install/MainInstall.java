@@ -11,6 +11,7 @@ import javafx.application.Application;
 import javafx.scene.control.Tooltip;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import remi.distributedFS.log.Logs;
 
 
 public class MainInstall extends Application {
@@ -53,14 +54,14 @@ public class MainInstall extends Application {
 	
 	
 	public void goToPanel(InstallPanel nextPanel) {
-		System.out.println("next panel : "+currentPanel);
+		Logs.logGui.info("next panel : "+currentPanel);
 		if(currentPanel != null) {
-//			System.out.println("destroy "+currentPanel);
+//			Logs.logGui.info("destroy "+currentPanel);
 			currentPanel.destroy();
 //			this.remove(currentPanel);
 		}
 //		currentPanel = nextPanel;
-//		System.out.println("add nextPanel "+nextPanel);
+//		Logs.logGui.info("add nextPanel "+nextPanel);
 //		currentPanel.init(this);
 //		this.add(currentPanel, BorderLayout.CENTER);
 //		currentPanel.construct();
@@ -81,14 +82,14 @@ public class MainInstall extends Application {
 
 	public void finish() {
 		if(currentPanel != null) {
-			System.out.println("destroy "+currentPanel);
+			Logs.logGui.info("destroy "+currentPanel);
 			currentPanel.destroy();
 		}
 		
 		File mainDir = new File(savedData.get("InstallPath").toString());//+"/Data"+savedData.get("DrivePath").toString());
 		mainDir.mkdirs();
-		System.out.println(savedData.get("InstallPath"));
-		System.out.println(savedData);
+		Logs.logGui.info(savedData.get("InstallPath").toString());
+		Logs.logGui.info(savedData.toString());
 		
 		// create parameter files
 		
@@ -146,7 +147,7 @@ public class MainInstall extends Application {
 		
 		// launch first instance
 		
-		System.out.println("end it!");
+		Logs.logGui.info("end it!");
 		myFrame.close();
 	}
 
