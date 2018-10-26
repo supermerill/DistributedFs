@@ -53,6 +53,7 @@ public class PanelConnectToCluster extends InstallPanel {
 
 	Button btTestConnection = new Button();
 	Button btNext = new Button();
+	Button btPrevious = new Button();
 	
 	public PanelConnectToCluster() {
 		super(new GridPane());
@@ -93,6 +94,11 @@ public class PanelConnectToCluster extends InstallPanel {
 				//TODO
 			}
 			manager.goToPanel(new PanelParameterPeer());
+		});
+		btPrevious.setText("Previous");
+		btPrevious.setTooltip(new Tooltip("Return to choices"));
+		btPrevious.setOnAction((ActionEvent)->{
+			manager.goToPanel(new PanelChoiceNewConnect());
 		});
 		btTestConnection.setText("Test cluster connection");
 		btTestConnection.setTooltip(new Tooltip("Try to see if this peer is joinable."));
@@ -187,18 +193,36 @@ public class PanelConnectToCluster extends InstallPanel {
 			panelPubPrivKey.add(txtPubKey, 1, 1, 3, 1);
 		}
 		grid.add(panelPubPrivKey, 0, 4, 4, 1);
-		
+
+		grid.add(btPrevious, 0, 5, 1, 1);
 		grid.add(btNext, 4, 5, 1, 1);
 	}
 	
 	@Override
 	public void construct() {
-		// TODO Auto-generated method stub
-
+		if(manager.savedData.containsKey("ClusterIpPort")) {
+			txtClusterIpPort.setText(manager.savedData.get("ClusterIpPort").toString());
+			txtClusterId.setText(manager.savedData.get("ClusterId").toString());
+			txtClusterPwd.setText(manager.savedData.get("ClusterPwd").toString());
+			if(manager.savedData.containsKey("CreateNewKey")) {
+				if((Boolean)(manager.savedData.get("CreateNewKey"))){
+					chkNewOld.setSelected(false);
+				}else {
+					chkNewOld.setSelected(true);
+				}
+			}
+			if(manager.savedData.containsKey("PrivKey")) {
+				txtPrivKey.setText(manager.savedData.get("PrivKey").toString());
+			}
+			if(manager.savedData.containsKey("PubKey")) {
+				txtPubKey.setText(manager.savedData.get("PubKey").toString());
+			}
+		}
 	}
 
 	@Override
 	public void destroy() {
+		manager.savedData.put("ClusterChoice", "connect");
 		manager.savedData.put("ClusterIpPort", txtClusterIpPort.getText());
 		manager.savedData.put("ClusterId", txtClusterId.getText());
 		manager.savedData.put("ClusterPwd", txtClusterPwd.getText());

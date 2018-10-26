@@ -79,6 +79,7 @@ public class PanelParameterPeer extends InstallPanel {
 	CheckBox chkGrab = new CheckBox();
 
 	Button btNext = new Button();
+	Button btPrevious = new Button();
 
 	public PanelParameterPeer() {
 		super(new GridPane());
@@ -104,6 +105,8 @@ public class PanelParameterPeer extends InstallPanel {
 		chkGrab.setTooltip(new Tooltip("Grab every data from other peers when they add or modify something."));
 		btNext.setText("Finish");
 		btNext.setTooltip(new Tooltip("Create your instance and connect it."));
+		btPrevious.setText("Previous");
+		btPrevious.setTooltip(new Tooltip("Return to the previous panel"));
 		String localPath = new File(".").getAbsolutePath();
 //		txtInstallPath.setText(localPath.substring(0, localPath.length()-1)+"myNewDrive");
 //		txtInstallPath.setMultiSelectionEnabled(false);
@@ -152,6 +155,13 @@ public class PanelParameterPeer extends InstallPanel {
 				return;
 			}
 			manager.finish();
+		});
+		btPrevious.setOnAction((ActionEvent) -> {
+			if(manager.savedData.get("ClusterChoice").equals("create")) {
+				manager.goToPanel(new PanelCreateNewCluster());
+			}else {
+				manager.goToPanel(new PanelConnectToCluster());
+			}
 		});
 
 		btInstallPath.setOnAction(ActionEvent -> {
@@ -275,6 +285,7 @@ public class PanelParameterPeer extends InstallPanel {
 		y++;
 		grid.add(panelCleaner, 0, y, 3, 1);
 		y++;
+		grid.add(btPrevious, 0, y, 1, 1);
 		grid.add(btNext, 3, y, 1, 1);
 		
 
@@ -286,7 +297,17 @@ public class PanelParameterPeer extends InstallPanel {
 
 	@Override
 	public void construct() {
-
+		if(manager.savedData.containsKey("InstallPath")) txtInstallPath.setText(manager.savedData.get("InstallPath").toString());
+		if(manager.savedData.containsKey("DrivePath")) txtDrivePath.setText(manager.savedData.get("DrivePath").toString());
+		if(manager.savedData.containsKey("ListenPort")) txtListenPort.setText(manager.savedData.get("ListenPort").toString());
+		if(manager.savedData.containsKey("Cleaner")) cmbCleaner.setValue(manager.savedData.get("Cleaner").toString());
+		if(manager.savedData.containsKey("SizeIdeal")) txtSizeIdeal.setText(manager.savedData.get("SizeIdeal").toString());
+		if(manager.savedData.containsKey("SizeMax")) txtSizeMax.setText(manager.savedData.get("SizeMax").toString());
+		if(manager.savedData.containsKey("NoDelete")) chkCanDelFic.setSelected((Boolean)manager.savedData.get("NoDelete"));
+		if(manager.savedData.containsKey("TimeDelFic")) txtTimeDelFic.setText(manager.savedData.get("TimeDelFic").toString());
+		if(manager.savedData.containsKey("TimeDelFS")) txtTimeDelFS.setText(manager.savedData.get("TimeDelFS").toString());
+		if(manager.savedData.containsKey("PlainFileOnly")) chkStoreOnlyPlainFiles.setSelected((Boolean)manager.savedData.get("PlainFileOnly"));
+		if(manager.savedData.containsKey("AlgoPropagate")) chkGrab.setSelected(manager.savedData.get("AlgoPropagate").equals("Grab"));
 	}
 
 	@Override

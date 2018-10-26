@@ -29,6 +29,7 @@ public class PanelCreateNewCluster extends InstallPanel {
 	TextField txtClusterId = new TextField();
 	TextField txtClusterPwd = new TextField();
 	
+	Button btPrevious = new Button();
 	Button btNext = new Button();
 	
 	public PanelCreateNewCluster() {
@@ -58,6 +59,11 @@ public class PanelCreateNewCluster extends InstallPanel {
 			}
 			manager.goToPanel(new PanelParameterPeer());
 		});
+		btPrevious.setText("Previous");
+		btPrevious.setTooltip(new Tooltip("Return to choices"));
+		btPrevious.setOnAction((ActionEvent)->{
+			manager.goToPanel(new PanelChoiceNewConnect());
+		});
 
 		grid.setHgap(10);
 	    grid.setVgap(10);
@@ -78,15 +84,21 @@ public class PanelCreateNewCluster extends InstallPanel {
 		grid.add(lblClusterPwd, 0, 1, 1, 1);
 		grid.add(txtClusterPwd, 1, 1, 1, 1);
 
+		grid.add(btPrevious, 0, 2, 1, 1);
 		grid.add(btNext, 2, 2, 1, 1);
 	}
 	
 	@Override
 	public void construct() {
+		if(manager.savedData.containsKey("ClusterId")) {
+			txtClusterId.setText(manager.savedData.get("ClusterId").toString());
+			txtClusterPwd.setText(manager.savedData.get("ClusterPwd").toString());
+		}
 	}
 
 	@Override
 	public void destroy() {
+		manager.savedData.put("ClusterChoice", "create");
 		manager.savedData.put("CreateNewKey", true);
 		manager.savedData.put("CreateEmptyDrive", true);
 		manager.savedData.put("ClusterId", txtClusterId.getText());

@@ -21,6 +21,7 @@ public abstract class InstallPanel extends Scene {
 
 	public void init(MainInstall mainInstall) {
 		this.manager = mainInstall;
+		construct();
 	}
 	
 	public abstract void construct();

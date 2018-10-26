@@ -119,7 +119,7 @@ public class MainInstall extends Application {
 		paramsNet.setLong("ClusterId", Math.abs(savedData.get("ClusterId").hashCode()));
 		paramsNet.setString("ClusterPassphrase", savedData.get("ClusterPwd").toString());
 		
-		if(savedData.containsKey("ClusterIpPort")) {
+		if(savedData.containsKey("ClusterIpPort") && savedData.containsKey("ClusterChoice") && savedData.get("ClusterChoice").equals("connect")) {
 			paramsNet.setString("PeerIp", savedData.get("ClusterIpPort").toString().split(":")[0]);
 			paramsNet.setLong("PeerPort", Long.parseLong(savedData.get("ClusterIpPort").toString().split(":")[1]));
 			paramsNet.setBool("FirstConnection", true);
