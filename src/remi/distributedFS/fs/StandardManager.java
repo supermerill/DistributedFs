@@ -13,6 +13,7 @@ import remi.distributedFS.db.impl.FsTableLocal.FsTableLocalFactory;
 import remi.distributedFS.db.impl.ObjectFactory;
 import remi.distributedFS.db.impl.readable.FsChunkOneFile;
 import remi.distributedFS.fs.messages.ExchangeChunk;
+import remi.distributedFS.fs.messages.FlowAndPing;
 import remi.distributedFS.fs.messages.PropagateChange;
 import remi.distributedFS.fs.messages.PropagateChangeAndGrabData;
 import remi.distributedFS.log.Logs;
@@ -33,6 +34,7 @@ public class StandardManager implements FileSystemManager {
 
 	protected PropagateChange algoPropagate;
 	protected ExchangeChunk chunkRequester = new ExchangeChunk(this);
+	protected FlowAndPing flowManager = new FlowAndPing(this);
 	
 	protected String driveletter;
 	protected String rootFolder = ".";
@@ -113,6 +115,8 @@ public class StandardManager implements FileSystemManager {
 				net.init(port);
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
+				flowManager.register(this.net);
+				flowManager.startAutoRefresh();
 			}
 			
 

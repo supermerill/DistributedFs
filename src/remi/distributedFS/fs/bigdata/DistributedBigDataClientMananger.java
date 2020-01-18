@@ -45,6 +45,7 @@ public class DistributedBigDataClientMananger extends StandardManager {
 				net.init(port);
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
+				flowManager.register(this.net);
 				bigdataExchange.register(this.net); // <======= a change is here
 				net.connect();
 			}

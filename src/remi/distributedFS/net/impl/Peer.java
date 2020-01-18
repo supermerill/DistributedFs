@@ -396,6 +396,51 @@ public class Peer implements Runnable {
 	
 
 
+	public synchronized void writeMessagePriorityClear(byte messageId, ByteBuff message) {
+		if(message==null){
+			Logs.logNet.warning("Warn : emit null message, id :"+messageId);
+		}
+		try {
+			
+			byte[] encodedMsg = message.toArray();
+			
+			OutputStream out = this.getOut();
+			out.write(5);
+			out.write(5);
+			out.write(5);
+			out.write(5);
+			out.write(AbstractMessageManager.PRIORITY_CLEAR);
+			out.write(AbstractMessageManager.PRIORITY_CLEAR);
+			// Logs.logNet.info("WRITE 5 5 "+myId.id);
+			ByteBuff buffInt = new ByteBuff();
+			if (encodedMsg != null) {
+				buffInt.putInt(encodedMsg.length+1)
+						.putInt(encodedMsg.length+1)
+						.flip();
+			} else {
+				buffInt.putInt(1)
+						.putInt(1)
+						.flip();
+			}
+			out.write(messageId);
+			out.write(buffInt.array(), 0, 8);
+			if (encodedMsg != null) {
+				out.write(encodedMsg,  0, encodedMsg.length);
+			}
+			out.flush();
+			if(encodedMsg != null && message.position() != 0){
+				Logs.logNet.warning("Warn, you want to send a buffer which is not rewinded : " + message.position());
+			}
+			Logs.logNet.info("WRITE PRIORITY MESSAGE : "+messageId+" : "+(message==null?"null":(message.limit() - message.position())));
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
+
+	//TODO: allow to segment the message if it's big and shaping is activated.
+	// it's to not overload the network.
+	// we can use the Flowmanager to know the speed of the link. We shouldn't go higher than a parameter (like 0.3) * maxspeed
 	public synchronized void writeMessage(byte messageId, ByteBuff message) {
 		if(message==null){
 			Logs.logNet.warning("Warn : emit null message, id :"+messageId);
@@ -556,6 +601,9 @@ public class Peer implements Runnable {
 				if (newByte == AbstractMessageManager.SEND_LISTEN_PORT) {
 					// special case, give the peer object directly.
 					setPort(buffIn.getInt());
+				}
+				if(newByte == AbstractMessageManager.PRIORITY_CLEAR) {
+					newByte = buffIn.get();
 				}
 				
 				// standard case, give the peer id. Our physical server should be able to retrieve us.

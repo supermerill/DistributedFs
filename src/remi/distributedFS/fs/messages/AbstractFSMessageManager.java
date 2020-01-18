@@ -35,6 +35,8 @@ public abstract class AbstractFSMessageManager extends AbstractMessageManager {
 		public static final byte  SEND_OBJECT = (byte) 27;
 		public static final byte  GET_HOST_PROPERTIES = (byte) 28;
 		public static final byte  SEND_HOST_PROPERTIES = (byte) 29;
+		public static final byte  GET_MAX_FLOW = (byte) 30;
+		public static final byte  SEND_MAX_FLOW = (byte) 31;
 		
 	
 }

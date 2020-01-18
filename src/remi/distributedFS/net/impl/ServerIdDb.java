@@ -749,13 +749,15 @@ public class ServerIdDb {
 				Cipher cipherPri = Cipher.getInstance("RSA");
 				cipherPri.init(Cipher.ENCRYPT_MODE, privateKey);
 				ByteBuff buffEncodedPriv = blockCipher(secretKey.getEncoded(), Cipher.ENCRYPT_MODE, cipherPri);
-				Logs.logNet.info(serv.getPeerId()%100+" (sendAesKey) key : "+Arrays.toString(secretKey.getEncoded()));
+				Logs.logNet.info(serv.getPeerId()%100+" (sendAesKey) secret key : "+Arrays.toString(secretKey.getEncoded()));
 				Logs.logNet.info(serv.getPeerId()%100+" (sendAesKey) EncryptKey : "+Arrays.toString(buffEncodedPriv.array()));
 				
 				//encode again with their public key
 				//encode msg with private key
 				Cipher cipherPub = Cipher.getInstance("RSA");
+				Logs.logNet.info(serv.getPeerId()%100+" (sendAesKey) public key : "+id2PublicKey.get(peer.getComputerId()));
 				cipherPub.init(Cipher.ENCRYPT_MODE, id2PublicKey.get(peer.getComputerId()));
+				Logs.logNet.info(serv.getPeerId()%100+" (sendAesKey) buffEncodedPriv : "+Arrays.toString(buffEncodedPriv.toArray()));
 				ByteBuff buffEncodedPrivPub = blockCipher(buffEncodedPriv.toArray(), Cipher.ENCRYPT_MODE, cipherPub);
 				buffMsg.putInt(buffEncodedPrivPub.limit()).put(buffEncodedPrivPub);
 				Logs.logNet.info(serv.getPeerId()%100+" (sendAesKey) EncryptKey2 : "+Arrays.toString(buffEncodedPrivPub.array()));
@@ -764,6 +766,7 @@ public class ServerIdDb {
 				serv.writeMessage(peer, AbstractMessageManager.SEND_SERVER_AES_KEY, buffMsg.flip());
 
 			} catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException | NoSuchAlgorithmException | NoSuchPaddingException e1) {
+				Logs.logNet.severe(serv.getPeerId()%100+" (sendAesKey) error : "+e1.toString());
 				throw new RuntimeException(e1);
 			}
 			

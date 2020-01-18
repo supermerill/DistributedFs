@@ -5,9 +5,12 @@ import static remi.distributedFS.datastruct.FsDirectory.FsDirectoryMethods.getPa
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 import it.unimi.dsi.fastutil.shorts.ShortList;
 import remi.distributedFS.datastruct.FsChunk;
@@ -23,8 +26,8 @@ import remi.distributedFS.util.ByteBuff;
 /**
  * Gere les echanges de chunks dans le réseau.
  * 
- * TODO: utiliser des stats réseau pour demander des morceuaux de chunks de façon répartie sur els hosts qui répondent "oui je l'ai".
- * plutot que demander à tous de tout passer d'un coup.
+ * TODO: utiliser des stats réseau pour demander des morceaux de chunks de façon répartie sur les hosts qui répondent "oui je l'ai".
+ * plutot que demander à tous de tout passer d'un coup. (utiliser FlowAndPing, ie FLowManager, to choose the distribution of requests).
  * 
  * @author Admin
  *
@@ -57,9 +60,9 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 	List<Semaphore> waiters = new java.util.concurrent.CopyOnWriteArrayList<>();
 	
 	List<Request> requests = new ArrayList<>();
-	
 
 	private StandardManager manager;
+
 
 	public ExchangeChunk(StandardManager standardManager) {
 		this.manager = standardManager;
@@ -309,10 +312,10 @@ public class ExchangeChunk extends AbstractFSMessageManager {
 			waiters.remove(mySema);
 		}
 	}
-
+	
 	public void register(ClusterManager net) {
 		net.registerListener(GET_FILE_CHUNK, this);
-		net.registerListener(SEND_FILE_CHUNK, this);
+		net.registerListener(SEND_FILE_CHUNK, this);;
 	}
 
 }

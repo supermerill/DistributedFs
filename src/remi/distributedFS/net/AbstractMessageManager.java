@@ -65,11 +65,16 @@ public abstract class AbstractMessageManager {
 		 * emit our AES (encrypted with our private & his public key)
 		 */
 		public static final byte  SEND_SERVER_AES_KEY = (byte) 12;
+		
+		/**
+		 * For priority unencrypted message
+		 */
+		public static final byte  PRIORITY_CLEAR = (byte) 13;
 
 		/**
 		 * Used to see if the message is aes-encoded
 		 */
-		public static final byte  LAST_UNENCODED_MESSAGE = (byte) 13;
+		public static final byte  LAST_UNENCODED_MESSAGE = (byte) 14;
 
 	
 	public abstract void receiveMessage(long senderId, byte messageId, ByteBuff message);

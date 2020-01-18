@@ -59,10 +59,11 @@ public class PhysicalServer implements ClusterManager {
 	protected long myPeerId;
 
 	protected ServerConnectionState myInformalState = ServerConnectionState.JUST_BORN;
-	enum ServerConnectionState{
+	public enum ServerConnectionState{
 		JUST_BORN,
 		CONNECTING,
 		CONNECTED,
+		DISCONNECTED,
 		
 		SOLO,
 		HAS_FRIENDS;
@@ -846,6 +847,7 @@ public class PhysicalServer implements ClusterManager {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+			this.myInformalState = ServerConnectionState.DISCONNECTED;
 		}
 	}
 
