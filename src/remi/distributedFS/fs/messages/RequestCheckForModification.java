@@ -10,6 +10,7 @@ import remi.distributedFS.fs.StandardManager;
 import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.net.impl.Peer;
+import remi.distributedFS.net.impl.Peer.PeerConnectionState;
 import remi.distributedFS.net.impl.PhysicalServer;
 import remi.distributedFS.util.ByteBuff;
 
@@ -223,11 +224,13 @@ public class RequestCheckForModification extends AbstractFSMessageManager{
 	public void refreshAll() {
 		PhysicalServer net = (PhysicalServer) manager.getNet();
 		for(Peer p : net.getPeers()) {
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
+			if(p.hasState(PeerConnectionState.CONNECTED_W_AES) && p.isAlive()) {
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+				}
+				emitGetHash(manager.getRoot(), p.getPeerId());
 			}
-			emitGetHash(manager.getRoot(), p.getPeerId());
 		}
 	}
 
