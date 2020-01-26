@@ -30,7 +30,7 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		files = new ArrayList<FsFileFromFile>();
 //		delete = new HashMap<>(0);
 		deleteObjs = new ArrayList<>();
-	}
+	}	
 	
 	//only for the root
 	FsDirectoryFromFile(FsTableLocal fsTableLocal, int sectorPos) {
@@ -49,7 +49,6 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 		// modification(s) ? -> set timestamp!
     	this.setModifyDate(System.currentTimeMillis());
 		Logs.logDb.info("new modifydate for folder '"+this.getPath()+"' : "+this.getModifyDate());
-		this.setModifyUID(master.getUserId());
 	}
 	
 //	FsDirectoryFromFile(FsTableLocal master, ByteBuffer buffer, long mysector, FsDirectory parent){
@@ -354,15 +353,16 @@ public class FsDirectoryFromFile extends FsObjectImplFromFile  implements FsDire
 
 	@Override
 	public void moveFile(FsFile obj, FsDirectory newDir) {
+		long modifyDate = System.currentTimeMillis();
 		files.remove(obj);
-		obj.setModifyDate(System.currentTimeMillis()); 
+		obj.setModifyDate(modifyDate); 
 		obj.setModifyUID(master.getUserId());
 		obj.setParent(newDir);
 		obj.setParentId(newDir.getId());
 		setModifyDate();
 		setModifyUID(master.getUserId());
 		newDir.getFiles().add(obj);
-		newDir.setModifyDate(System.currentTimeMillis()); 
+		newDir.setModifyDate(modifyDate); 
 		newDir.setModifyUID(master.getUserId());
 		((FsObjectImplFromFile)obj).setDirty(true);
 		setDirty(true);

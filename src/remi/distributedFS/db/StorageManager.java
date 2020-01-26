@@ -32,5 +32,4 @@ public interface StorageManager {
 
 	void cleanUnusedSectors(boolean hard);
 
-
 }

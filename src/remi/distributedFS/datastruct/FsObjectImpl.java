@@ -27,12 +27,14 @@ public abstract class FsObjectImpl implements FsObject {
 		return deleteDate;
 	}
 	public void setDeleteDate(long deleteDate) {
+		setDirty(this.deleteDate != deleteDate);
 		this.deleteDate = deleteDate;
 	}
 	public short getPUGA() {
 		return PUGA;
 	}
 	public void setPUGA(short pugaData) {
+		setDirty(PUGA != pugaData);
 		PUGA = pugaData;
 	}
 	public long getModifyDate() {
@@ -64,6 +66,7 @@ public abstract class FsObjectImpl implements FsObject {
 		return parent;
 	}
 	public void setParent(FsDirectory newDir) {
+		setDirty(parent != newDir);
 		parent = newDir;
 		if(newDir==null)parentId = -1;
 		else parentId = newDir.getId();
@@ -88,34 +91,43 @@ public abstract class FsObjectImpl implements FsObject {
 		return creatorUserId;
 	}
 	public void setCreatorUID(long creatorUserId) {
+		setDirty(this.creatorUserId != creatorUserId);
 		this.creatorUserId = creatorUserId;
 	}
 	public void setModifyUID(long modifyUserId) {
+		setDirty(this.modifyUserId != modifyUserId);
 		this.modifyUserId = modifyUserId;
 	}
 	public void setDeleteUID(long deleteUserId) {
+		setDirty(this.deleteUserId != deleteUserId);
 		this.deleteUserId = deleteUserId;
 	}
 	public long getComputerId() {
 		return computerId;
 	}
 	public void setComputerId(long computerId) {
+		setDirty(this.computerId != computerId);
 		this.computerId = computerId;
 	}
 	public void setUserId(long uid) {
 		setCreatorUID(uid);
 	}
 	public void setParentId(long parentId) {
+		setDirty(this.parentId != parentId);
 		this.parentId = parentId;
 	}
 	public void setCreationDate(long creationDate) {
+		setDirty(this.creationDate != creationDate);
 		this.creationDate = creationDate;
 	}
 	public void setModifyDate(long modifyDate) {
+		setDirty(this.modifyDate != modifyDate);
 		this.modifyDate = modifyDate;
+		if(parent != this && parent != null) parent.setModifyDate(modifyDate);
 	}
 	public void setGroupId(long groupId) {
 		this.groupId = groupId;
+		setDirty(true);
 	}
 	public boolean isDirty() {
 		return dirty.get();
@@ -137,4 +149,5 @@ public abstract class FsObjectImpl implements FsObject {
 	public FsFile asFile() {
 		return this instanceof FsFile ? (FsFile) this : null;
 	}
+	
 }

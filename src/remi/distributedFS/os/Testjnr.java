@@ -420,7 +420,7 @@ public class Testjnr {
 			}
 
 			@Override
-			public void requestDirUpdate() {
+			public void requestDirUpdate(String path) {
 				// TODO Auto-generated method stub
 				
 			}

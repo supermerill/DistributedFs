@@ -52,11 +52,15 @@ public interface FsObject extends FsId {
 	 */
 	public void delete(); 
 	
+	/**
+	 * Called when somthing is changed inside this object.
+	 */
 	public void changes();
 	
 	/**
 	 * Notify that modifications on this object are finished and now should be saved / transmitted.
 	 */
 	public void flush();
+	
 	
 }

@@ -43,7 +43,6 @@ public class FsObjectDummy extends FsObjectImpl {
 	@Override
 	public void changes() {
 		// TODO Auto-generated method stub
-		
 	}
 
 	@Override

@@ -454,7 +454,8 @@ public abstract class FsObjectImplFromFile extends FsObjectImpl {
 	}
 	public void setModifyDate(long modifyDate) {
 		checkLoaded();
-		this.modifyDate = modifyDate;
+		this.setModifyUID(master.getUserId());
+		super.setModifyDate(modifyDate);
 	}
 	public void setGroupId(long groupId) {
 		checkLoaded();

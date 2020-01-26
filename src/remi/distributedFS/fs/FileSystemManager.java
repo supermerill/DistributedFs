@@ -23,7 +23,7 @@ public interface FileSystemManager {
 	public long getUserId();
 	public long getGroupId();
 	
-	public void requestDirUpdate();
+	public void requestDirUpdate(String path);
 	public FsChunk requestChunk(FsFileFromFile file, FsChunk chunk, ShortList serverIdPresent);
 	
 	

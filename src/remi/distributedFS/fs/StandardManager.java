@@ -16,6 +16,7 @@ import remi.distributedFS.fs.messages.ExchangeChunk;
 import remi.distributedFS.fs.messages.FlowAndPing;
 import remi.distributedFS.fs.messages.PropagateChange;
 import remi.distributedFS.fs.messages.PropagateChangeAndGrabData;
+import remi.distributedFS.fs.messages.RequestCheckForModification;
 import remi.distributedFS.log.Logs;
 import remi.distributedFS.net.ClusterManager;
 import remi.distributedFS.net.impl.PhysicalServer;
@@ -35,6 +36,7 @@ public class StandardManager implements FileSystemManager {
 	protected PropagateChange algoPropagate;
 	protected ExchangeChunk chunkRequester = new ExchangeChunk(this);
 	protected FlowAndPing flowManager = new FlowAndPing(this);
+	protected RequestCheckForModification updateManager = new RequestCheckForModification(this);
 	
 	protected String driveletter;
 	protected String rootFolder = ".";
@@ -115,8 +117,10 @@ public class StandardManager implements FileSystemManager {
 				net.init(port);
 				algoPropagate.register(this.net);
 				chunkRequester.register(this.net);
-				flowManager.register(this.net);
-				flowManager.startAutoRefresh();
+//				flowManager.register(this.net);
+//				flowManager.startAutoRefresh();__________и-__________________ииии_________
+				updateManager.register(net);
+				updateManager.startRefreshThread(1000);
 			}
 			
 
@@ -217,8 +221,8 @@ public class StandardManager implements FileSystemManager {
 	}
 
 	@Override
-	public void requestDirUpdate() {
-		algoPropagate.requestDirPath("/",-1);
+	public void requestDirUpdate(String path) {
+		algoPropagate.requestDirPath(path,-1);
 	}
 
 	@Override

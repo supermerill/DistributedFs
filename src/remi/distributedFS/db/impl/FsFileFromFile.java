@@ -24,7 +24,6 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 		chunks = new ArrayList<>();
 		allChunks = new ArrayList<>();
 	}
-	
 
 	public void load(ByteBuffer buffer){
 		//check if it's a file
@@ -275,5 +274,5 @@ public class FsFileFromFile extends FsObjectImplFromFile implements FsFile {
 	public FsFile asFile() {
 		return this;
 	}
-
+	
 }

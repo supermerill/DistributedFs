@@ -395,7 +395,8 @@ public class Peer implements Runnable {
 	}
 	
 
-
+	//BUGGY!!!! used by ping.
+	//TODO: write a branch to allow the read() to read that.
 	public synchronized void writeMessagePriorityClear(byte messageId, ByteBuff message) {
 		if(message==null){
 			Logs.logNet.warning("Warn : emit null message, id :"+messageId);

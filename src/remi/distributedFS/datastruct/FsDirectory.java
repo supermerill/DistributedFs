@@ -8,6 +8,12 @@ import remi.distributedFS.db.impl.WrongSectorTypeException;
 import remi.distributedFS.log.Logs;
 
 public interface FsDirectory extends FsObject {
+	
+	/**
+	 * The modifydate is modified if any file of directory inside this directory is created, modified or deleted.
+	 * That means that when a file is modified, the modifydate of the directory also is.
+	 */
+	public long getModifyDate() ;
 
 //	List<FsObject> dirsAndFiles = new ArrayList<>();
 //	List<FsDirectory> dirs = new ArrayList<>();

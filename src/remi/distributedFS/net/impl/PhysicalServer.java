@@ -69,7 +69,7 @@ public class PhysicalServer implements ClusterManager {
 		HAS_FRIENDS;
 	}
 	
-	// should be inetAddress ut it's implier with this to test in 1 pc.
+	// should be inetAddress but it's simplier with this to test in 1 pc.
 	// private Map<PeerKey ,Peer> peers = new HashMap<>();
 	// private Semaphore peersSemaphore = new Semaphore(1);
 	protected PeerList peers = new PeerList(); // don't access this outside of semaphore. Use getters instead.
@@ -205,7 +205,7 @@ public class PhysicalServer implements ClusterManager {
 		// toutes les heures
 		if (lastDirUpdate + 1000 * 60 * 60 < System.currentTimeMillis()) {
 			Logs.logNet.info(getPeerId() % 100 + " REQUEST DIR UPDATE");
-			myFs.requestDirUpdate();
+			myFs.requestDirUpdate("/");
 			lastDirUpdate = System.currentTimeMillis();
 		}
 
@@ -536,6 +536,9 @@ public class PhysicalServer implements ClusterManager {
 		try {
 			out.write(5);
 			out.write(5);
+			out.write(5);
+			out.write(5);
+			out.write(messageId);
 			out.write(messageId);
 		} catch (IOException e) {
 			e.printStackTrace();

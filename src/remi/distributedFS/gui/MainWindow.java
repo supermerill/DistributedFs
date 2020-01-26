@@ -171,7 +171,7 @@ public class MainWindow extends Application {
 
 				//ask the whole fstab
 				if(!iAmTheMaster){
-					manager.requestDirUpdate();
+					manager.requestDirUpdate("/");
 					//wait to receive the root
 //					manager.getDb().getRoot().
 					try {
@@ -189,6 +189,8 @@ public class MainWindow extends Application {
 				this.manager = manager;
 				this.peers.startListen(manager);
 				this.req.init(manager);
+				
+				this.myFrame.setTitle(myFrame.getTitle() + " ("+manager.getDrivePath()+")");
 
 	}
 

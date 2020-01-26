@@ -181,6 +181,7 @@ public class PanelRequest extends GridPane{
 			}
 			listDirsString.setAll(lstDirStr);
 			listFilesString.setAll(lstFileStr);
+			refreshDir(mainDir.getPath().isEmpty()? "/" : mainDir.getPath());
 		}
 	}
 	

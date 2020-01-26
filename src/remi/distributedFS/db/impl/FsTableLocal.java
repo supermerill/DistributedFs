@@ -246,6 +246,7 @@ public class FsTableLocal implements StorageManager{
 			buffer.rewind();
 			
 			if(fsFile.size()<FS_SECTOR_SIZE){
+				long modDate = System.currentTimeMillis();
 				//create!
 				FsDirectoryFromFile obj = new FsDirectoryFromFile(this, 0);
 				obj.loaded = true;
@@ -253,8 +254,8 @@ public class FsTableLocal implements StorageManager{
 				obj.setPUGA((short)0x1FF);
 				obj.setParent(obj);
 				obj.setParentId(obj.getId());
-				obj.setCreationDate(System.currentTimeMillis());
-				obj.setModifyDate(System.currentTimeMillis());
+				obj.setCreationDate(modDate);
+				obj.setModifyDate(modDate);
 				obj.setDeleteDate(0);
 				obj.setComputerId(getComputerId());
 				obj.setUserId(getUserId());

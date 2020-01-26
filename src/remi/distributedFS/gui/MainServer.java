@@ -127,7 +127,7 @@ public class MainServer {
 
 				//ask the whole fstab
 				if(!iAmTheMaster){
-					manager.requestDirUpdate();
+					manager.requestDirUpdate("/");
 					//wait to receive the root
 //					manager.getDb().getRoot().
 					try {

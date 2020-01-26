@@ -549,5 +549,6 @@ public class FsChunkFromFile extends FsObjectImplFromFile implements FsChunk {
 	public long getLastAccessDate() {
 		return lastaccess;
 	}
+	
 
 }
